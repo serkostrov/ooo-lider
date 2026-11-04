@@ -1,0 +1,325 @@
+import { useState, type ReactNode } from "react";
+import { Link } from "@tanstack/react-router";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { FileText } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { formatDate, showError } from "@/lib/format";
+import { addDays } from "@/lib/dates";
+import { formatSize, listTemplateFiles, openTemplateFile, type TemplateFile } from "@/lib/files";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Field } from "@/components/directories/common";
+import { toIntOrNull } from "@/components/directories/stages/data";
+import { useActiveProfiles } from "@/components/objects/data";
+import { StatusBadge, useObjectStages, type ObjectStage } from "../data";
+
+const NONE = "__none";
+
+function Section({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section className="rounded-xl border border-border bg-card p-4 sm:p-5">
+      <h3 className="mb-5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">{title}</h3>
+      {children}
+    </section>
+  );
+}
+
+export function StageMainTab({ stage, onSaved }: { stage: ObjectStage; onSaved: () => void }) {
+  const { data: profiles = [] } = useActiveProfiles();
+  const [v, setV] = useState({
+    executor_id: stage.executor_id ?? "",
+    coexecutor_id: stage.coexecutor_id ?? "",
+    confirmer_id: stage.confirmer_id ?? "",
+    start_date: stage.start_date ?? "",
+    due_date: stage.due_date ?? "",
+    doc_sent_at: stage.doc_sent_at ?? "",
+    response_days: stage.response_days?.toString() ?? "",
+    response_received_at: stage.response_received_at ?? "",
+    remind_days: stage.remind_days?.toString() ?? "",
+    note: stage.note ?? "",
+  });
+  const set = (k: keyof typeof v, val: string) => setV((x) => ({ ...x, [k]: val }));
+
+  const respDays = toIntOrNull(v.response_days);
+  const responseDue = v.doc_sent_at && typeof respDays === "number" ? addDays(v.doc_sent_at, respDays) : "";
+
+  const showDoc =
+    !!stage.outgoing_doc ||
+    !!stage.expected_doc ||
+    !!v.doc_sent_at ||
+    !!v.response_days ||
+    !!v.response_received_at ||
+    !!stage.template_id;
+
+  const save = useMutation({
+    mutationFn: async () => {
+      const rd = toIntOrNull(v.response_days);
+      const rm = toIntOrNull(v.remind_days);
+      if (rd === "bad" || rm === "bad") throw new Error("Дни — целое число от 0 или пусто");
+      if (v.start_date && v.due_date && v.due_date < v.start_date) throw new Error("Срок окончания раньше даты начала");
+      const d = (x: string) => x || null;
+      const { error } = await supabase
+        .from("object_stages")
+        .update({
+          executor_id: d(v.executor_id),
+          coexecutor_id: d(v.coexecutor_id),
+          confirmer_id: d(v.confirmer_id),
+          start_date: d(v.start_date),
+          due_date: d(v.due_date),
+          doc_sent_at: d(v.doc_sent_at),
+          response_days: rd,
+          response_received_at: d(v.response_received_at),
+          remind_days: rm,
+          note: v.note.trim() || null,
+        })
+        .eq("id", stage.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Сохранено");
+      onSaved();
+    },
+    onError: showError,
+  });
+
+  const person = (k: "executor_id" | "coexecutor_id" | "confirmer_id", placeholder: string) => (
+    <Select value={v[k] || NONE} onValueChange={(x) => set(k, x === NONE ? "" : x)}>
+      <SelectTrigger className="h-9 w-full text-sm">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value={NONE} className="text-sm">
+          {placeholder}
+        </SelectItem>
+        {profiles.map((p) => (
+          <SelectItem key={p.id} value={p.id} className="text-sm">
+            {p.full_name}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+  const date = (k: keyof typeof v) => (
+    <Input type="date" value={v[k]} onChange={(e) => set(k, e.target.value)} className="h-9 w-full text-sm" />
+  );
+
+  return (
+    <div className="w-full space-y-4">
+      {stage.description && <p className="whitespace-pre-line text-sm text-muted-foreground">{stage.description}</p>}
+      {stage.return_reason && stage.status_code !== "closed" && (
+        <div className="rounded-xl border border-warning/40 bg-warning-soft px-4 py-3 text-sm">
+          <span className="font-semibold text-warning">Возвращён на доработку:</span> {stage.return_reason}
+        </div>
+      )}
+
+      <Section title="Кто">
+        <div className="grid w-full gap-4 sm:grid-cols-3">
+          <Field label="Исполнитель">{person("executor_id", "не назначен")}</Field>
+          <Field label="Соисполнитель">{person("coexecutor_id", "Нет")}</Field>
+          <div className="min-w-0 space-y-3">
+            <Field label="Адресат">{person("confirmer_id", "По роли")}</Field>
+            {stage.confirmer_role_name && (
+              <p className="text-xs text-muted-foreground">По регламенту: {stage.confirmer_role_name}</p>
+            )}
+          </div>
+        </div>
+      </Section>
+
+      <Section title="Когда">
+        <div className="grid w-full gap-4 sm:grid-cols-3">
+          <Field label="Дата начала">{date("start_date")}</Field>
+          <Field label="Срок окончания">{date("due_date")}</Field>
+          <Field label="Напомнить за, дней">
+            <Input
+              value={v.remind_days}
+              onChange={(e) => set("remind_days", e.target.value)}
+              inputMode="numeric"
+              className="h-9 w-full text-sm"
+            />
+          </Field>
+        </div>
+      </Section>
+
+      {showDoc && (
+        <Section title="Документ">
+          <div className="space-y-4">
+            {(stage.outgoing_doc || stage.expected_doc) && (
+              <p className="text-sm text-foreground">
+                {stage.outgoing_doc ? (
+                  <>
+                    От нас: <span className="font-medium">«{stage.outgoing_doc}»</span>
+                  </>
+                ) : (
+                  <span className="text-muted-foreground">От нас не задан</span>
+                )}
+                <span className="mx-2 text-muted-foreground">→</span>
+                {stage.expected_doc ? (
+                  <>
+                    ждём <span className="font-medium">«{stage.expected_doc}»</span>
+                  </>
+                ) : (
+                  <span className="text-muted-foreground">ожидание не задано</span>
+                )}
+              </p>
+            )}
+            <TemplateSamples templateId={stage.template_id} />
+            <div className="grid w-full gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <Field label="Отправлен">{date("doc_sent_at")}</Field>
+              <Field label="Дней на ответ">
+                <Input
+                  value={v.response_days}
+                  onChange={(e) => set("response_days", e.target.value)}
+                  inputMode="numeric"
+                  className="h-9 w-full text-sm"
+                />
+              </Field>
+              <Field label="Ждём до">
+                <div className="flex h-9 w-full items-center rounded-xl border border-border bg-muted/40 px-3 text-sm tabular-nums text-muted-foreground">
+                  {formatDate(responseDue) || "—"}
+                </div>
+              </Field>
+              <Field label="Получен">{date("response_received_at")}</Field>
+            </div>
+          </div>
+        </Section>
+      )}
+
+      <Section title="Примечание">
+        <Textarea
+          value={v.note}
+          onChange={(e) => set("note", e.target.value)}
+          rows={3}
+          placeholder="Что мешает, когда обещали"
+          className="w-full text-sm"
+        />
+      </Section>
+
+      <div className="pt-1">
+        <Button onClick={() => save.mutate()} disabled={save.isPending} className="h-9 w-full text-sm">
+          {save.isPending ? "Сохранение…" : "Сохранить"}
+        </Button>
+      </div>
+
+      <div className="space-y-4 pt-2">
+        <Predecessors stage={stage} />
+        <LinkedRequests stage={stage} />
+      </div>
+    </div>
+  );
+}
+
+function Predecessors({ stage }: { stage: ObjectStage }) {
+  const { data: all = [] } = useObjectStages(stage.object_id);
+  const { data: ids = [] } = useQuery({
+    queryKey: ["stage-predecessors", stage.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("object_stage_predecessors")
+        .select("predecessor_id")
+        .eq("stage_id", stage.id);
+      if (error) throw error;
+      return (data ?? []).map((r) => r.predecessor_id as string);
+    },
+  });
+  const preds = all.filter((s) => ids.includes(s.id));
+  if (preds.length === 0) return null;
+  return (
+    <Section title="Предшествующие этапы">
+      <ul className="-mx-1 divide-y divide-border">
+        {preds.map((p) => (
+          <li key={p.id}>
+            <Link
+              to="/objects/$id/stages/$stageId"
+              params={{ id: stage.object_id, stageId: p.id }}
+              className="flex items-center gap-3 px-1 py-2.5 text-sm transition-colors hover:text-primary"
+            >
+              <span className="w-8 shrink-0 tabular-nums text-muted-foreground">{p.number}</span>
+              <span className="min-w-0 flex-1 truncate">{p.name}</span>
+              <StatusBadge name={p.status_name} color={p.status_color} />
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </Section>
+  );
+}
+
+function LinkedRequests({ stage }: { stage: ObjectStage }) {
+  const { data = [] } = useQuery({
+    queryKey: ["stage-requests", stage.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("v_requests")
+        .select("id, number, type_name, call_date, status")
+        .eq("stage_id", stage.id)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+  if (data.length === 0) return null;
+  return (
+    <Section title="Связанные заявки">
+      <ul className="-mx-1 divide-y divide-border">
+        {data.map((r) => (
+          <li key={r.id}>
+            <Link
+              to="/requests/$requestId"
+              params={{ requestId: r.id! }}
+              search={{ from: "object" }}
+              className="flex flex-wrap items-center gap-x-3 gap-y-1 px-1 py-2.5 text-sm transition-colors hover:text-primary"
+            >
+              <span className="font-medium tabular-nums">№{r.number}</span>
+              <span className="min-w-0 flex-1 truncate">{r.type_name}</span>
+              <span className="text-muted-foreground">вызов на {formatDate(r.call_date)}</span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </Section>
+  );
+}
+
+/** Образцы «От нас» / «Ждём» из справочника этапов (правка 2.3). Нет файлов — блока нет. */
+function TemplateSamples({ templateId }: { templateId: string | null }) {
+  const { data: files = [] } = useQuery({
+    queryKey: ["template-files", templateId ?? "none"],
+    enabled: !!templateId,
+    queryFn: () => listTemplateFiles(templateId!),
+  });
+  if (files.length === 0) return null;
+  const group = (kind: TemplateFile["kind"], label: string) => {
+    const list = files.filter((f) => f.kind === kind);
+    if (list.length === 0) return null;
+    return (
+      <div className="min-w-0 flex-1">
+        <div className="mb-3 text-sm font-medium leading-5 text-muted-foreground">{label}</div>
+        <ul className="space-y-1">
+          {list.map((f) => (
+            <li key={f.id} className="flex items-center gap-2 text-sm">
+              <FileText className="size-3.5 shrink-0 text-muted-foreground" />
+              <button
+                type="button"
+                onClick={() => openTemplateFile(f.storage_path).catch(showError)}
+                className="min-w-0 truncate text-left text-primary hover:underline"
+                title={f.file_name}
+              >
+                {f.file_name}
+              </button>
+              <span className="shrink-0 text-xs text-muted-foreground">{formatSize(f.size_bytes)}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    );
+  };
+  return (
+    <div className="flex flex-wrap gap-x-8 gap-y-2">
+      {group("outgoing", "Образцы «От нас»")}
+      {group("expected", "Образцы «Ждём»")}
+    </div>
+  );
+}
