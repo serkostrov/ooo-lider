@@ -11,7 +11,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Field } from "@/components/directories/common";
-import { RequestStatusBadge, overdueDays, type RequestRow } from "../data";
+import { RequestStatusBadge, overdueDays, stageCallLabel, useRequests, type RequestRow } from "../data";
+import { useObjectStages } from "@/components/stages/data";
 
 /** Шапка карточки заявки: кто/что слева, срок вызова справа. */
 export function RequestHeader({
@@ -21,12 +22,20 @@ export function RequestHeader({
   r: RequestRow;
   onChanged: () => void;
 }) {
+  const { data: objectRequests = [] } = useRequests(r.object_id);
+  const { data: stages = [] } = useObjectStages(r.object_id);
+  const stageNumberById = Object.fromEntries(stages.map((s) => [s.id, s.number]));
+  const stageNo = stageCallLabel(r, objectRequests, stageNumberById);
+
   return (
     <header className="flex flex-col gap-3 lg:flex-row lg:items-stretch lg:justify-between lg:gap-6">
       <div className="flex min-w-0 flex-1 flex-col justify-center gap-1.5">
         <div className="flex flex-wrap items-center gap-2.5">
           <h1 className="text-xl font-semibold leading-snug tracking-tight">
-            <span className="font-medium text-muted-foreground">№{r.number}</span> {r.type_name}
+            <span className="font-medium text-muted-foreground" title={stageNo ? `Сквозной №${r.number}` : undefined}>
+              №{stageNo ?? r.number}
+            </span>{" "}
+            {r.type_name}
           </h1>
           {r.is_new ? (
             <span className="rounded-md bg-danger px-2 py-0.5 text-xs font-semibold text-danger-foreground">

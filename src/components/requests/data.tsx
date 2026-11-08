@@ -102,6 +102,26 @@ export function sortRequests(rows: RequestRow[]) {
   );
 }
 
+/**
+ * Номер вызова в рамках этапа: «15.2» (этап 15, второй вызов —
+ * технадзор, ГИП, геотрест и т. д.). Без этапа — null.
+ */
+export function stageCallLabel(
+  request: RequestRow,
+  allOnObject: RequestRow[],
+  stageNumberById: Record<string, number>,
+): string | null {
+  if (!request.stage_id) return null;
+  const stageNo = stageNumberById[request.stage_id];
+  if (stageNo == null) return null;
+  const peers = allOnObject
+    .filter((r) => r.stage_id === request.stage_id)
+    .sort((a, b) => a.number - b.number || a.created_at.localeCompare(b.created_at));
+  const idx = peers.findIndex((r) => r.id === request.id);
+  if (idx < 0) return null;
+  return `${stageNo}.${idx + 1}`;
+}
+
 export function useRequests(objectId?: string) {
   return useQuery({
     queryKey: [...requestsKey, objectId ?? "all"],

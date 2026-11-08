@@ -1,19 +1,21 @@
 import { useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Pencil, Plus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useProfile } from "@/lib/profile";
-import { showError } from "@/lib/format";
 import { useSortedRows, useTableSort } from "@/lib/table-sort";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
 import { SortableTh } from "@/components/SortableTh";
 import { fieldLabelClass, fieldStackClass } from "@/lib/ui";
-import { DeleteButton, EditSheet, EmptyRow, Field, FormActions, Toolbar, emptyToNull, matches } from "./common";
+import { DeleteButton, EditSheet, EmptyRow, Toolbar, matches } from "./common";
 import { CustomerForm, CUSTOMERS_KEY, type Customer } from "./CustomerForm";
+import {
+  CustomerContactForm,
+  customerContactsKey,
+  objectContactsKey,
+  type CustomerContact,
+} from "./CustomerContactForm";
 
 type CustSort = "name" | "inn" | "address" | "comment";
 const CUST_GETTERS: Record<CustSort, (c: Customer) => unknown> = {
@@ -144,12 +146,11 @@ function CustomerCard({ customer, onClose }: { customer: Customer; onClose: () =
   );
 }
 
-type Contact = { id: string; full_name: string; position: string | null; phone: string | null; email: string | null; comment: string | null };
-
 function Contacts({ customerId }: { customerId: string }) {
   const { is_admin } = useProfile();
-  const key = ["dir-customer-contacts", customerId];
-  const [editing, setEditing] = useState<Contact | "new" | null>(null);
+  const qc = useQueryClient();
+  const key = customerContactsKey(customerId);
+  const [editing, setEditing] = useState<CustomerContact | "new" | null>(null);
   const { data = [] } = useQuery({
     queryKey: key,
     queryFn: async () => {
@@ -160,30 +161,51 @@ function Contacts({ customerId }: { customerId: string }) {
         .is("deleted_at", null)
         .order("sort");
       if (error) throw error;
-      return data as Contact[];
+      return data as CustomerContact[];
     },
   });
   return (
     <div className="space-y-3 border-t pt-5">
-      <div className="flex items-center justify-between gap-3">
-        <h3 className="text-base font-semibold">Контактные лица</h3>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="text-base font-semibold">Специалисты заказчика</h3>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Технадзор, куратор, ГИП и другие. На объекте выбираются из этого списка.
+          </p>
+        </div>
         {is_admin && editing === null && (
-          <Button onClick={() => setEditing("new")} size="icon" className="size-8" title="Добавить" aria-label="Добавить">
+          <Button
+            type="button"
+            onClick={() => setEditing("new")}
+            size="icon"
+            className="size-8 shrink-0"
+            title="Добавить"
+            aria-label="Добавить"
+          >
             <Plus className="size-4" />
           </Button>
         )}
       </div>
-      {editing === "new" && <ContactForm customerId={customerId} contact={null} invalidate={key} onClose={() => setEditing(null)} />}
-      {data.length === 0 && editing !== "new" && <p className="text-sm text-muted-foreground">Контактов нет</p>}
+      {editing === "new" && (
+        <div className="rounded-xl border border-border bg-muted/40 p-4">
+          <CustomerContactForm customerId={customerId} contact={null} onClose={() => setEditing(null)} />
+        </div>
+      )}
+      {data.length === 0 && editing !== "new" && (
+        <p className="text-sm text-muted-foreground">Пока никого нет — добавьте технадзора или другого специалиста</p>
+      )}
       {data.length > 0 && (
         <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border">
-          {data.map((c) =>
+          {data.map((c, i) =>
             editing !== null && editing !== "new" && editing.id === c.id ? (
               <li key={c.id} className="bg-muted/40 p-4">
-                <ContactForm customerId={customerId} contact={c} invalidate={key} onClose={() => setEditing(null)} />
+                <CustomerContactForm customerId={customerId} contact={c} onClose={() => setEditing(null)} />
               </li>
             ) : (
               <li key={c.id} className="flex items-start gap-3 px-4 py-2.5 text-sm">
+                <span className="w-6 shrink-0 pt-0.5 text-xs font-medium tabular-nums text-muted-foreground">
+                  {i + 1}.
+                </span>
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
                     <span className="font-medium">{c.full_name}</span>
@@ -200,6 +222,7 @@ function Contacts({ customerId }: { customerId: string }) {
                 {is_admin && (
                   <div className="flex shrink-0 items-center gap-1.5">
                     <Button
+                      type="button"
                       variant="outline"
                       size="icon"
                       className="size-8"
@@ -209,7 +232,13 @@ function Contacts({ customerId }: { customerId: string }) {
                     >
                       <Pencil className="size-3.5" />
                     </Button>
-                    <DeleteButton table="customer_contacts" id={c.id} name={c.full_name} invalidate={key} />
+                    <DeleteButton
+                      table="customer_contacts"
+                      id={c.id}
+                      name={c.full_name}
+                      invalidate={[...key]}
+                      onDone={() => qc.invalidateQueries({ queryKey: objectContactsKey(customerId) })}
+                    />
                   </div>
                 )}
               </li>
@@ -218,82 +247,5 @@ function Contacts({ customerId }: { customerId: string }) {
         </ul>
       )}
     </div>
-  );
-}
-
-function ContactForm({
-  customerId,
-  contact,
-  invalidate,
-  onClose,
-}: {
-  customerId: string;
-  contact: Contact | null;
-  invalidate: string[];
-  onClose: () => void;
-}) {
-  const qc = useQueryClient();
-  const [v, setV] = useState({
-    full_name: contact?.full_name ?? "",
-    position: contact?.position ?? "",
-    phone: contact?.phone ?? "",
-    email: contact?.email ?? "",
-    comment: contact?.comment ?? "",
-  });
-  const set = (k: keyof typeof v) => (e: { target: { value: string } }) => setV((s) => ({ ...s, [k]: e.target.value }));
-  const m = useMutation({
-    mutationFn: async () => {
-      const payload = {
-        full_name: v.full_name.trim(),
-        position: emptyToNull(v.position),
-        phone: emptyToNull(v.phone),
-        email: emptyToNull(v.email),
-        comment: emptyToNull(v.comment),
-      };
-      const { error } = contact
-        ? await supabase.from("customer_contacts").update(payload).eq("id", contact.id)
-        : await supabase.from("customer_contacts").insert({ ...payload, customer_id: customerId });
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      toast.success("Сохранено");
-      qc.invalidateQueries({ queryKey: invalidate });
-      onClose();
-    },
-    onError: showError,
-  });
-  const cls = "h-9 text-sm";
-  return (
-    <form
-      className="space-y-4 rounded-xl border border-border bg-muted/40 p-4"
-      onSubmit={(e) => {
-        e.preventDefault();
-        if (!v.full_name.trim()) { toast.error("Заполните ФИО"); return; }
-        m.mutate();
-      }}
-    >
-      <Field label="ФИО" required><Input value={v.full_name} onChange={set("full_name")} className={cls} /></Field>
-      <Field label="Должность"><Input value={v.position} onChange={set("position")} className={cls} /></Field>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Телефон"><Input value={v.phone} onChange={set("phone")} className={cls} /></Field>
-        <Field label="Email"><Input type="email" value={v.email} onChange={set("email")} className={cls} /></Field>
-      </div>
-      <Field label="Комментарий"><Textarea value={v.comment} onChange={set("comment")} className="text-sm" /></Field>
-      <FormActions
-        pending={m.isPending}
-        onCancel={onClose}
-        danger={
-          contact ? (
-            <DeleteButton
-              table="customer_contacts"
-              id={contact.id}
-              name={contact.full_name}
-              invalidate={invalidate}
-              onDone={onClose}
-            />
-          ) : undefined
-        }
-      />
-    </form>
   );
 }

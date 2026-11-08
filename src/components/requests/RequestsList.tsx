@@ -13,6 +13,7 @@ import { Toolbar } from "@/components/directories/common";
 import { SortableTh } from "@/components/SortableTh";
 import { useRequestTypes } from "@/components/directories/request-types/data";
 import { useObjects } from "@/components/objects/data";
+import { useObjectStages } from "@/components/stages/data";
 import { NewRequestDialog } from "./NewRequestDialog";
 import {
   useRequestStatuses,
@@ -20,6 +21,7 @@ import {
   formatValue,
   overdueDays,
   sortRequests,
+  stageCallLabel,
   statusInfo,
   useFieldValues,
   useRequests,
@@ -76,8 +78,18 @@ export function RequestsList({
   const { data: types = [] } = useRequestTypes();
   const statuses = useRequestStatuses();
   const { data: objects = [] } = useObjects();
+  const { data: stages = [] } = useObjectStages(objectId ?? "");
   const ids = rows.map((r) => r.id);
   const { data: values = [] } = useFieldValues(ids, objectId ?? "all");
+
+  const stageNumberById = useMemo(() => {
+    const m: Record<string, number> = {};
+    for (const s of stages) m[s.id] = s.number;
+    return m;
+  }, [stages]);
+
+  const callLabel = (r: RequestRow) =>
+    objectId ? stageCallLabel(r, rows, stageNumberById) : null;
 
   const [search, setSearch] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
@@ -122,8 +134,10 @@ export function RequestsList({
       }
       if (f.onlyOverdue && !r.is_overdue) return false;
       if (q) {
+        const stageLabel = objectId ? stageCallLabel(r, rows, stageNumberById) : null;
         const hay = [
           String(r.number),
+          stageLabel,
           r.type_name,
           r.object_name,
           r.representative_name,
@@ -137,7 +151,7 @@ export function RequestsList({
       }
       return true;
     });
-  }, [rows, f, effectiveType, search, valuesByRequest]);
+  }, [rows, f, effectiveType, search, valuesByRequest, objectId, stageNumberById]);
 
   const { sort, toggle } = useTableSort<ReqSort>();
   const getters = useMemo(
@@ -164,7 +178,11 @@ export function RequestsList({
   const showObject = !objectId;
 
   const columns: Column<RequestRow>[] = [
-    { header: "№", value: (r) => r.number, width: 7 },
+    {
+      header: "№",
+      value: (r) => callLabel(r) ?? r.number,
+      width: 7,
+    },
     { header: "Дата формирования", value: (r) => formatDate(r.created_at), width: 12 },
     { header: "Дата вызова", value: (r) => formatDate(r.call_date), width: 12 },
     { header: "Вид", value: (r) => r.type_name, width: 18 },
@@ -337,7 +355,12 @@ export function RequestsList({
                   >
                     <td className="max-w-[7rem] px-5 py-2.5 align-middle">
                       <div className="flex min-w-0 items-center gap-2">
-                        <span className="shrink-0 font-semibold tabular-nums">{r.number}</span>
+                        <span
+                          className="shrink-0 font-semibold tabular-nums"
+                          title={callLabel(r) ? `Сквозной №${r.number}` : undefined}
+                        >
+                          {callLabel(r) ?? r.number}
+                        </span>
                         {r.is_new && (
                           <span className="shrink-0 rounded bg-danger px-1.5 py-0.5 text-[11px] font-semibold leading-none text-danger-foreground">
                             Новая

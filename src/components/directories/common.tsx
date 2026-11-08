@@ -162,8 +162,16 @@ export function DeleteButton({
   const [open, setOpen] = useState(false);
   const m = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from(table).update({ deleted_at: new Date().toISOString() }).eq("id", id);
+      // select нужен: без него PostgREST при RLS/miss возвращает «успех» с 0 строк
+      const { data, error } = await supabase
+        .from(table)
+        .update({ deleted_at: new Date().toISOString() })
+        .eq("id", id)
+        .is("deleted_at", null)
+        .select("id")
+        .maybeSingle();
       if (error) throw error;
+      if (!data) throw new Error("Не удалось удалить запись");
     },
     onSuccess: () => {
       toast.success("Удалено");
@@ -176,9 +184,14 @@ export function DeleteButton({
   return (
     <>
       <Button
+        type="button"
         variant="outline"
         size="icon"
-        onClick={() => setOpen(true)}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setOpen(true);
+        }}
         className="text-destructive"
         title="Удалить"
         aria-label="Удалить"

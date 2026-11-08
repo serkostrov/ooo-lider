@@ -99,12 +99,14 @@ export function EmployeesDirectory() {
 }
 
 function EmpForm({ emp, roles, onClose }: { emp: Emp | null; roles: { code: string; name: string }[]; onClose: () => void }) {
+  const { id: myId } = useProfile();
   const qc = useQueryClient();
   const [name, setName] = useState(emp?.full_name ?? "");
   const [role, setRole] = useState(emp?.role_code ?? "");
   const [phone, setPhone] = useState(emp?.phone ?? "");
   const [email, setEmail] = useState(emp?.email ?? "");
   const [active, setActive] = useState(emp?.is_active ?? true);
+  const isSelf = emp?.id === myId;
   const m = useMutation({
     mutationFn: async () => {
       const payload = { full_name: name.trim(), role_code: role, phone: emptyToNull(phone), email: emptyToNull(email), is_active: active };
@@ -148,11 +150,12 @@ function EmpForm({ emp, roles, onClose }: { emp: Emp | null; roles: { code: stri
         pending={m.isPending}
         onCancel={onClose}
         danger={
-          emp ? (
+          emp && !isSelf ? (
             <DeleteButton table="profiles" id={emp.id} name={emp.full_name} invalidate={KEY} onDone={onClose} />
           ) : undefined
         }
       />
+      {isSelf && <p className="text-xs text-muted-foreground">Свой профиль удалить нельзя</p>}
     </form>
   );
 }
