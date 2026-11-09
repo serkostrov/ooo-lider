@@ -461,12 +461,39 @@ create trigger requests_guard before update on public.requests
 -- 9. RPC: объекты и этапы
 -- ---------------------------------------------------------------------
 -- Копирует шаблоны в этапы объекта (условия, сценарий, связи)
+-- Нумерация этапов на объекте: 1…n по порядку (не номера из справочника).
+create or replace function public.renumber_object_stages(p_object_id uuid)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  -- Два прохода: сначала отрицательные, чтобы не пересечься с текущими номерами.
+  with ordered as (
+    select id, row_number() over (order by sort, number, created_at) as rn
+    from public.object_stages
+    where object_id = p_object_id and deleted_at is null
+  )
+  update public.object_stages s
+  set number = -o.rn, sort = -o.rn
+  from ordered o
+  where s.id = o.id;
+
+  update public.object_stages
+  set number = -number, sort = -sort
+  where object_id = p_object_id and deleted_at is null and number < 0;
+end $$;
+
+revoke all on function public.renumber_object_stages(uuid) from public, anon, authenticated;
+
 create or replace function public.add_object_stages(p_object_id uuid, p_template_ids uuid[])
 returns int language plpgsql security definer set search_path = public as $$
 declare
-  t record; v_stage uuid; v_count int := 0; v_first int;
+  t record; v_stage uuid; v_count int := 0; v_first int; v_next int;
 begin
   if not public.is_admin() then raise exception 'Нет прав'; end if;
+
+  select coalesce(max(number), 0) into v_next
+  from public.object_stages
+  where object_id = p_object_id and deleted_at is null;
+
   for t in select * from public.stage_templates
            where id = any(p_template_ids) and deleted_at is null
              and not exists (select 1 from public.object_stages s
@@ -474,12 +501,13 @@ begin
                                and s.deleted_at is null)
            order by sort, number
   loop
+    v_next := v_next + 1;
     insert into public.object_stages(object_id, template_id, number, name, work_type_id, description,
       duration_days, confirmer_role, outgoing_doc, expected_doc, response_days, remind_days,
       is_critical, sort)
-    values (p_object_id, t.id, t.number, t.name, t.work_type_id, t.description, t.duration_days,
+    values (p_object_id, t.id, v_next, t.name, t.work_type_id, t.description, t.duration_days,
       t.confirmer_role, t.outgoing_doc, t.expected_doc, t.response_days, t.remind_days,
-      t.is_critical, t.sort)
+      t.is_critical, v_next)
     returning id into v_stage;
 
     insert into public.object_stage_conditions(stage_id, title, kind, is_required, to_id_folder, document_id, sort)
@@ -511,6 +539,9 @@ begin
   join public.object_stages sp on sp.template_id = tp.predecessor_id and sp.object_id = s.object_id
   where s.object_id = p_object_id and s.deleted_at is null and sp.deleted_at is null
   on conflict do nothing;
+
+  -- На объекте всегда сплошные 1…n (номера справочника не переносятся)
+  perform public.renumber_object_stages(p_object_id);
 
   if v_count > 0 then
     perform public.log_history(p_object_id, 'object', p_object_id, 'stages_added',
@@ -3045,3 +3076,23 @@ update public.request_statuses
 set action_label = 'Отправить'
 where code = 'sent';
 
+
+
+-- =============================================================================
+-- 20251109000000_object_stage_numbers.sql
+-- =============================================================================
+
+-- Нумерация этапов индивидуальна для каждого объекта: 1…n по порядку.
+-- (Функции renumber_object_stages / add_object_stages уже определены выше в этом файле.)
+
+revoke all on function public.renumber_object_stages(uuid) from public, anon, authenticated;
+
+do $$
+declare oid uuid;
+begin
+  for oid in
+    select distinct object_id from public.object_stages where deleted_at is null
+  loop
+    perform public.renumber_object_stages(oid);
+  end loop;
+end $$;

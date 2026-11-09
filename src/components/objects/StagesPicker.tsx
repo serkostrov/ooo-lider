@@ -42,6 +42,9 @@ export function StagesPicker({
 
   return (
     <div className="w-full space-y-4">
+      <p className="text-xs text-muted-foreground">
+        Номера слева — из справочника. На объекте выбранные этапы получат свою нумерацию 1, 2, 3… по порядку.
+      </p>
       <div className="sticky top-0 z-10 flex flex-wrap items-center gap-3 bg-background/95 py-2 backdrop-blur-sm">
         <span className="flex-1 text-sm font-semibold">
           Выбрано этапов: {selected.length} из {templates.length}
