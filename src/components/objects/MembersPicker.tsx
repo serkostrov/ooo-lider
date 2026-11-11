@@ -63,7 +63,7 @@ function RoleSelect({
   const chips = showAll ? picked : picked.slice(0, CHIPS_LIMIT);
 
   return (
-    <div className="rounded-xl border border-border bg-card p-4 shadow-sm shadow-black/10">
+    <div className="rounded-md border border-border bg-card p-4">
       <div className="mb-3 flex items-baseline gap-2">
         <span className="text-sm font-semibold">{title}</span>
         {people.length > 0 && (
@@ -88,7 +88,7 @@ function RoleSelect({
               <button
                 type="button"
                 disabled={disabled}
-                className="flex h-9 w-full items-center gap-2 rounded-xl border border-border bg-card px-3 text-left text-sm transition-colors hover:bg-muted/40 disabled:opacity-60"
+                className="flex h-9 w-full items-center gap-2 rounded-md border border-border bg-card px-3 text-left text-sm transition-colors hover:bg-muted/40 disabled:opacity-60"
               >
                 <span className={`min-w-0 flex-1 truncate ${picked.length ? "" : "text-muted-foreground"}`}>
                   {picked.length === 0

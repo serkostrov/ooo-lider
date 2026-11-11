@@ -5,7 +5,7 @@ const FALLBACK = "oklch(0.62 0.02 250)";
 
 /**
  * Статус-бейдж: цвет из справочника.
- * Насыщенная заливка и крупный текст — читается на тёмной таблице.
+ * Насыщенная заливка — читается на тёмной таблице.
  */
 export function ToneBadge({
   color,
@@ -21,14 +21,14 @@ export function ToneBadge({
 }) {
   const c = color || FALLBACK;
   const style: CSSProperties = {
-    backgroundColor: `color-mix(in oklab, ${c} 28%, var(--card))`,
-    color: `color-mix(in oklab, ${c} 78%, white)`,
-    boxShadow: `inset 0 0 0 1.5px color-mix(in oklab, ${c} 55%, transparent)`,
+    backgroundColor: `color-mix(in oklab, ${c} 32%, var(--card))`,
+    color: `color-mix(in oklab, ${c} 82%, white)`,
+    boxShadow: `inset 0 0 0 1px color-mix(in oklab, ${c} 50%, transparent)`,
   };
   return (
     <span
       className={cn(
-        "inline-flex h-7 max-w-full items-center gap-1.5 rounded-xl px-2.5 text-xs font-semibold leading-none tracking-tight",
+        "inline-flex h-6 max-w-full items-center gap-1.5 rounded px-2 text-xs font-semibold leading-none tracking-tight",
         className,
       )}
       style={style}
@@ -37,7 +37,7 @@ export function ToneBadge({
       <span
         aria-hidden
         className="size-1.5 shrink-0 rounded-full"
-        style={{ backgroundColor: c, boxShadow: `0 0 0 2px color-mix(in oklab, ${c} 35%, transparent)` }}
+        style={{ backgroundColor: c }}
       />
       <span className={cn("min-w-0", truncate ? "truncate" : "whitespace-nowrap")}>{children}</span>
     </span>

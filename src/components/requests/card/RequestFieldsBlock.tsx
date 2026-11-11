@@ -4,13 +4,15 @@ import { Field } from "@/components/directories/common";
 import type { RequestField } from "@/components/directories/request-types/data";
 import { fieldLabelClass, fieldStackClass, panelClass } from "@/lib/ui";
 import { cn } from "@/lib/utils";
-import { FieldInput, isEmptyValue } from "../FieldInput";
+import { FieldInput, isEmptyValue, isValidEmail, looksLikeEmailField } from "../FieldInput";
 import { formatValue, type FieldValue } from "../data";
 
 export type RequestFieldsHandle = {
   dirty: () => boolean;
   save: () => Promise<boolean>;
   reset: () => void;
+  hasField: (fieldId: string) => boolean;
+  getValue: (fieldId: string) => unknown;
 };
 
 function valuesMap(values: FieldValue[]) {
@@ -24,7 +26,7 @@ function colSpan(t: string) {
 
 /**
  * Поля заявки одной группы (прораб или офис-менеджер).
- * До status=done — сразу редактируемые; сохранение через ref (общий sticky-бар страницы).
+ * readOnly задаёт страница по статусу; сохранение через ref (общий sticky-бар).
  */
 export const RequestFieldsBlock = forwardRef<
   RequestFieldsHandle,
@@ -37,9 +39,11 @@ export const RequestFieldsBlock = forwardRef<
     orphanValues: FieldValue[];
     readOnly: boolean;
     onDirtyChange?: (dirty: boolean) => void;
+    /** Любое изменение черновика — чтобы страница пересчитала обязательные поля. */
+    onDraftChange?: () => void;
   }
 >(function RequestFieldsBlock(
-  { title, hint, requestId, fields, values, orphanValues, readOnly, onDirtyChange },
+  { title, hint, requestId, fields, values, orphanValues, readOnly, onDirtyChange, onDraftChange },
   ref,
 ) {
   const editable = fields.filter((f) => f.field_type !== "file");
@@ -73,10 +77,21 @@ export const RequestFieldsBlock = forwardRef<
   useImperativeHandle(ref, () => ({
     dirty: isDirty,
     reset: () => setDraft({ ...initialRef.current }),
+    hasField: (fieldId) => editable.some((f) => f.id === fieldId),
+    getValue: (fieldId) => draftRef.current[fieldId],
     save: async () => {
       if (readOnly || !isDirty()) return true;
       const cur = draftRef.current;
       const base = initialRef.current;
+      for (const f of editable) {
+        if (!looksLikeEmailField(f)) continue;
+        const raw = cur[f.id];
+        if (isEmptyValue(raw)) continue;
+        if (typeof raw !== "string" || !isValidEmail(raw)) {
+          const label = values.find((v) => v.field_id === f.id)?.label ?? f.label;
+          throw new Error(`Некорректный email в поле «${label}»`);
+        }
+      }
       const p_values = editable
         .filter((f) => JSON.stringify(cur[f.id] ?? null) !== JSON.stringify(base[f.id] ?? null))
         .map((f) => ({ field_id: f.id, value: cur[f.id] ?? null }));
@@ -86,6 +101,10 @@ export const RequestFieldsBlock = forwardRef<
         p_values: p_values as never,
       });
       if (error) throw error;
+      // Сразу считаем сохранённым, не ждём refetch — иначе «Отправить» видит старый dirty/пусто.
+      initialRef.current = { ...cur };
+      setDraft({ ...cur });
+      onDirtyChange?.(false);
       return true;
     },
   }));
@@ -109,7 +128,12 @@ export const RequestFieldsBlock = forwardRef<
                 <FieldInput
                   field={f}
                   value={draft[f.id]}
-                  onChange={(v) => setDraft((x) => ({ ...x, [f.id]: v }))}
+                  onChange={(v) => {
+                    const next = { ...draftRef.current, [f.id]: v };
+                    draftRef.current = next;
+                    setDraft(next);
+                    onDraftChange?.();
+                  }}
                 />
               </Field>
             </div>

@@ -90,10 +90,10 @@ export const Route = createFileRoute("/_authenticated/directories")({
   component: DirectoriesPage,
   head: () => ({
     meta: [
-      { title: "Настройки — Лидер" },
-      { name: "description", content: "Настройки и справочники в системе «Лидер»" },
-      { property: "og:title", content: "Настройки — Лидер" },
-      { property: "og:description", content: "Настройки и справочники в системе «Лидер»" },
+      { title: "Справочники — Лидер" },
+      { name: "description", content: "Справочники в системе «Лидер»" },
+      { property: "og:title", content: "Справочники — Лидер" },
+      { property: "og:description", content: "Справочники в системе «Лидер»" },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
@@ -109,19 +109,19 @@ function DirectoriesPage() {
   if (!is_admin) {
     return (
       <div>
-        <PageHeader title="Настройки" />
+        <PageHeader title="Справочники" />
         <p className="py-10 text-base text-muted-foreground">
-          Настройки доступны администратору и руководителю
+          Справочники доступны администратору и руководителю
         </p>
       </div>
     );
   }
 
   return (
-    <div>
+    <div className="flex h-full min-h-0 flex-col overflow-hidden">
       {/* Мобильный заголовок */}
-      <div className="mb-4 lg:hidden">
-        <PageHeader title="Настройки" />
+      <div className="mb-3 shrink-0 lg:hidden">
+        <PageHeader title="Справочники" className="mb-3" />
         <Select value={tab} onValueChange={(v) => goTab(v as TabValue)}>
           <SelectTrigger className="h-9 w-full text-sm">
             <SelectValue />
@@ -141,11 +141,11 @@ function DirectoriesPage() {
         </Select>
       </div>
 
-      <div className="flex flex-col gap-6 lg:flex-row lg:gap-10">
-        <aside className="hidden w-52 shrink-0 lg:block">
-          <nav className="sticky top-6">
+      <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-hidden lg:flex-row lg:gap-10">
+        <aside className="hidden w-52 shrink-0 overflow-y-auto lg:block">
+          <nav>
             <h1 className="mb-5 flex h-9 items-center px-2.5 text-xl font-semibold tracking-tight text-foreground">
-              Настройки
+              Справочники
             </h1>
             <div className="space-y-5">
               {SECTIONS.map((s) => (
@@ -162,7 +162,7 @@ function DirectoriesPage() {
                             type="button"
                             onClick={() => goTab(t.v)}
                             className={cn(
-                              "w-full rounded-xl px-2.5 py-1.5 text-left text-sm transition-colors",
+                              "w-full rounded-md px-2.5 py-1.5 text-left text-sm transition-colors",
                               active
                                 ? "bg-accent font-medium text-foreground"
                                 : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
@@ -180,13 +180,15 @@ function DirectoriesPage() {
           </nav>
         </aside>
 
-        <div className="min-w-0 flex-1">
+        <div className="min-h-0 min-w-0 flex-1 overflow-auto">
           {tab !== "work-types" &&
             tab !== "object-types" &&
             tab !== "request-types" &&
             tab !== "statuses" &&
             tab !== "request-statuses" && (
-              <h2 className="mb-4 flex h-9 items-center text-xl font-semibold tracking-tight">{tabLabel(tab)}</h2>
+              <h2 className="mb-4 flex h-9 items-center text-xl font-semibold tracking-tight">
+                {tabLabel(tab)}
+              </h2>
             )}
           {tab === "stages" && <StagesDirectory />}
           {tab === "work-types" && <WorkTypesDirectory />}

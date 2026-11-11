@@ -264,7 +264,7 @@ function StForm({
       <Field label="Цвет">
         <ColorField value={color} onChange={setColor} />
       </Field>
-      <label className="flex items-start gap-3 rounded-xl border border-border/70 bg-background/40 px-4 py-3 text-sm">
+      <label className="flex items-start gap-3 rounded-md border border-border/70 bg-background/40 px-4 py-3 text-sm">
         <Switch checked={closed} onCheckedChange={setClosed} className="mt-0.5" />
         <span>
           <span className="font-medium">Закрывающий статус</span>

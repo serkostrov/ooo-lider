@@ -35,6 +35,7 @@ function actionsFor(status: string): Action[] {
   return [];
 }
 
+/** Компактная карточка справа: статус + действия. */
 export function StageStatusBar({
   stage,
   conditions,
@@ -50,6 +51,13 @@ export function StageStatusBar({
 
   const setStatus = useMutation({
     mutationFn: async ({ to, comment }: { to: string; comment?: string }) => {
+      if (to === "in_work" && stage.status_code === "not_started" && !stage.executor_id) {
+        const { error: assignErr } = await supabase
+          .from("object_stages")
+          .update({ executor_id: me.id })
+          .eq("id", stage.id);
+        if (assignErr) throw assignErr;
+      }
       const args: { p_stage_id: string; p_status: string; p_comment?: string } = {
         p_stage_id: stage.id,
         p_status: to,
@@ -81,16 +89,12 @@ export function StageStatusBar({
       </Bar>
     );
   }
+
   if (stage.status_code === "closed") {
     return (
       <Bar>
-        <div className="flex items-center justify-between gap-2">
-          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Ход этапа</span>
-          <StatusBadge name={stage.status_name} color={stage.status_color} />
-        </div>
-        <p className="text-sm text-success">
-          Закрыт {stage.closed_at ? formatDateTime(stage.closed_at) : ""}
-        </p>
+        <Head status={<StatusBadge name={stage.status_name} color={stage.status_color} />} />
+        <p className="text-sm text-success">Закрыт {stage.closed_at ? formatDateTime(stage.closed_at) : ""}</p>
       </Bar>
     );
   }
@@ -106,67 +110,62 @@ export function StageStatusBar({
   const pending = setStatus.isPending;
 
   return (
-    <Bar>
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Ход этапа</span>
-        <StatusBadge name={stage.status_name} color={stage.status_color} />
-      </div>
+    <>
+      <Bar>
+        <Head status={<StatusBadge name={stage.status_name} color={stage.status_color} />} />
 
-      <div className="flex flex-col gap-1.5">
-        {secondary.length > 0 && (
-          <Select
-            key={stage.status_code}
-            onValueChange={(to) => setStatus.mutate({ to })}
-            disabled={pending}
-          >
-            <SelectTrigger className="h-8 text-xs text-muted-foreground">
-              <SelectValue placeholder="Промежуточный статус" />
-            </SelectTrigger>
-            <SelectContent>
-              {secondary.map((a) => (
-                <SelectItem key={a.to} value={a.to} className="text-sm">
-                  {a.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
+        <div className="flex flex-col gap-1.5">
+          {secondary.length > 0 && (
+            <Select key={stage.status_code} onValueChange={(to) => setStatus.mutate({ to })} disabled={pending}>
+              <SelectTrigger className="h-8 text-xs text-muted-foreground">
+                <SelectValue placeholder="Промежуточный статус" />
+              </SelectTrigger>
+              <SelectContent>
+                {secondary.map((a) => (
+                  <SelectItem key={a.to} value={a.to} className="text-sm">
+                    {a.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
 
-        {primary.map((a) => {
-          const blocked = a.to === "on_review" && missing.length > 0;
-          return (
-            <Button
-              key={a.to}
-              disabled={blocked || pending}
-              title={blocked ? missingText : undefined}
-              onClick={() => setStatus.mutate({ to: a.to })}
-              className="h-9 w-full text-sm"
-            >
-              {a.label}
-            </Button>
-          );
-        })}
+          {primary.map((a) => {
+            const blocked = a.to === "on_review" && missing.length > 0;
+            return (
+              <Button
+                key={a.to}
+                disabled={blocked || pending}
+                title={blocked ? missingText : undefined}
+                onClick={() => setStatus.mutate({ to: a.to })}
+                className="h-9 w-full text-sm"
+              >
+                {a.label}
+              </Button>
+            );
+          })}
 
-        {stage.status_code === "on_review" && (
-          <>
-            <Button
-              disabled={!canClose || pending}
-              title={canClose ? undefined : "Закрыть этап может только адресат или руководитель"}
-              onClick={() => setStatus.mutate({ to: "closed" })}
-              className="h-9 w-full bg-success text-sm text-success-foreground hover:bg-success/90"
-            >
-              Принять и закрыть
-            </Button>
-            <Button
-              variant="ghost"
-              onClick={() => setReturning(true)}
-              className="h-8 w-full text-xs text-warning hover:text-warning"
-            >
-              Вернуть на доработку
-            </Button>
-          </>
-        )}
-      </div>
+          {stage.status_code === "on_review" && (
+            <>
+              <Button
+                disabled={!canClose || pending}
+                title={canClose ? undefined : "Закрыть этап может только адресат или администратор"}
+                onClick={() => setStatus.mutate({ to: "closed" })}
+                className="h-9 w-full bg-success text-sm text-success-foreground hover:bg-success/90"
+              >
+                Принять и закрыть
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={() => setReturning(true)}
+                className="h-8 w-full text-xs text-warning hover:text-warning"
+              >
+                Вернуть на доработку
+              </Button>
+            </>
+          )}
+        </div>
+      </Bar>
 
       <Dialog open={returning} onOpenChange={setReturning}>
         <DialogContent>
@@ -208,7 +207,16 @@ export function StageStatusBar({
           </form>
         </DialogContent>
       </Dialog>
-    </Bar>
+    </>
+  );
+}
+
+function Head({ status }: { status: ReactNode }) {
+  return (
+    <div className="flex items-center justify-between gap-2">
+      <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Ход этапа</span>
+      {status}
+    </div>
   );
 }
 

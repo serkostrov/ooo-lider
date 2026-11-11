@@ -16,7 +16,7 @@ import { fieldLabelClass, fieldStackClass } from "@/lib/ui";
 import { useRequestFields, useRequestTypes } from "@/components/directories/request-types/data";
 import { useObjects } from "@/components/objects/data";
 import { useObjectStages } from "@/components/stages/data";
-import { FieldInput, isEmptyValue } from "@/components/requests/FieldInput";
+import { FieldInput, isEmptyValue, isValidEmail, looksLikeEmailField } from "@/components/requests/FieldInput";
 import { useRefreshRequests, useRepresentatives } from "@/components/requests/data";
 
 const NONE = "__none";
@@ -110,6 +110,13 @@ function NewRequestForm({
       if (missing.length) throw new Error(`Заполните: ${missing.map((f) => f.label).join(", ")}`);
       const requiredFile = fields.find((f) => f.is_required && f.field_type === "file");
       if (requiredFile && files.length === 0) throw new Error(`Прикрепите: ${requiredFile.label}`);
+      for (const f of fields) {
+        if (!looksLikeEmailField(f) || isEmptyValue(values[f.id])) continue;
+        const raw = values[f.id];
+        if (typeof raw !== "string" || !isValidEmail(raw)) {
+          throw new Error(`Некорректный email в поле «${f.label}»`);
+        }
+      }
 
       const p_values = fields
         .filter((f) => f.field_type !== "file" && !isEmptyValue(values[f.id]))
@@ -232,7 +239,7 @@ function NewRequestForm({
       )}
 
       {isTechnadzorType && (
-        <div className="rounded-xl border border-border bg-muted/40 px-4 py-3.5 text-sm">
+        <div className="rounded-md border border-border bg-muted/40 px-4 py-3.5 text-sm">
           <div className={fieldStackClass}>
             <div className={fieldLabelClass}>Технадзор объекта</div>
             <div className="font-medium">
@@ -277,7 +284,7 @@ function NewRequestForm({
             {files.map((file, i) => (
               <div
                 key={`${file.name}-${i}`}
-                className="flex items-center gap-3 rounded-xl border border-border bg-card px-3 py-2 text-sm"
+                className="flex items-center gap-3 rounded-md border border-border bg-card px-3 py-2 text-sm"
               >
                 <Paperclip className="size-3.5 shrink-0" />
                 <span className="flex-1 truncate">{file.name}</span>

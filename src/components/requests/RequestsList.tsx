@@ -1,14 +1,18 @@
 import { useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate } from "@tanstack/react-router";
-import { FileSpreadsheet, Plus, Printer } from "lucide-react";
+import { FileSpreadsheet, ListFilter, Plus, Printer, X } from "lucide-react";
 import { formatDate } from "@/lib/format";
 import { mskToday } from "@/lib/dates";
 import { exportXlsx, printTable, type Column } from "@/lib/export";
 import { sortRows, useTableSort } from "@/lib/table-sort";
+import { fieldLabelClass, fieldStackClass } from "@/lib/ui";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Toolbar } from "@/components/directories/common";
 import { SortableTh } from "@/components/SortableTh";
 import { useRequestTypes } from "@/components/directories/request-types/data";
@@ -66,12 +70,26 @@ export function RequestsList({
   objectId,
   typeId,
   onTypeChange,
+  createOpen: createOpenProp,
+  onCreateOpenChange,
+  hideCreateButton = false,
+  fillHeight = false,
+  chromeHost,
 }: {
   /** Если задан — список одного объекта (колонка и фильтр «Объект» скрыты). */
   objectId?: string;
   /** Контролируемый фильтр вида (URL на странице объекта). */
   typeId?: string | undefined;
   onTypeChange?: (typeId: string | undefined) => void;
+  /** Управление диалогом создания снаружи (кнопка в шапке страницы). */
+  createOpen?: boolean;
+  onCreateOpenChange?: (open: boolean) => void;
+  /** Скрыть «Создать заявку» в тулбаре (если кнопка уже в шапке). */
+  hideCreateButton?: boolean;
+  /** Занять высоту родителя: тулбар сверху, таблица скроллится. */
+  fillHeight?: boolean;
+  /** Если задан — поиск/фильтры/Excel рендерятся сюда (строка с табами на карточке объекта). */
+  chromeHost?: HTMLElement | null;
 }) {
   const navigate = useNavigate();
   const { data: rows = [], isLoading } = useRequests(objectId);
@@ -92,8 +110,11 @@ export function RequestsList({
     objectId ? stageCallLabel(r, rows, stageNumberById) : null;
 
   const [search, setSearch] = useState("");
-  const [createOpen, setCreateOpen] = useState(false);
-  const [f, setF] = useState<Filters>({
+  const [createOpenLocal, setCreateOpenLocal] = useState(false);
+  const createControlled = onCreateOpenChange != null;
+  const createOpen = createControlled ? (createOpenProp ?? false) : createOpenLocal;
+  const setCreateOpen = createControlled ? onCreateOpenChange! : setCreateOpenLocal;
+  const defaults: Filters = {
     object: ALL,
     type: ALL,
     status: ALL,
@@ -102,7 +123,8 @@ export function RequestsList({
     onlyOpen: true,
     onlyOverdue: false,
     archive: false,
-  });
+  };
+  const [f, setF] = useState<Filters>(defaults);
   const set = <K extends keyof Filters>(k: K, v: Filters[K]) => setF((x) => ({ ...x, [k]: v }));
   /** Вид зафиксирован снаружи без колбэка (напр. роль снабжения). */
   const typeLocked = !!typeId && !onTypeChange;
@@ -111,6 +133,27 @@ export function RequestsList({
   const setType = (v: string) => {
     if (onTypeChange) onTypeChange(v === ALL ? undefined : v);
     else set("type", v);
+  };
+
+  const showObject = !objectId;
+  const activeFilterCount = useMemo(() => {
+    let n = 0;
+    if (showObject && f.object !== ALL) n++;
+    if (!typeLocked && typeSelect !== ALL) n++;
+    if (f.status !== ALL) n++;
+    if (f.from) n++;
+    if (f.to) n++;
+    if (f.archive) n++;
+    else {
+      if (!f.onlyOpen) n++;
+      if (f.onlyOverdue) n++;
+    }
+    return n;
+  }, [showObject, typeLocked, typeSelect, f]);
+
+  const resetFilters = () => {
+    setF(defaults);
+    if (onTypeChange) onTypeChange(undefined);
   };
 
   const valuesByRequest = useMemo(() => {
@@ -175,8 +218,6 @@ export function RequestsList({
     return sortRows(visible, sort, getters);
   }, [visible, sort, getters]);
 
-  const showObject = !objectId;
-
   const columns: Column<RequestRow>[] = [
     {
       header: "№",
@@ -195,118 +236,219 @@ export function RequestsList({
     { header: "Офис-менеджер", value: (r) => r.office_name, width: 20 },
   ];
 
+  const chrome = (
+    <Toolbar
+      search={search}
+      onSearch={setSearch}
+      className={cn(
+        "mb-0 min-w-0",
+        // flex-1 только в строке с табами объекта; на /requests иначе тулбар раздувается и таблица уезжает вниз
+        chromeHost ? "w-full flex-1" : "shrink-0",
+      )}
+    >
+      <div className="inline-flex h-9 shrink-0 items-stretch overflow-hidden rounded-md border border-border">
+        <Popover>
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              className="inline-flex items-center gap-1.5 px-3 text-sm transition-colors hover:bg-accent hover:text-accent-foreground"
+            >
+              <ListFilter className="size-4" />
+              Фильтры
+              {activeFilterCount > 0 ? (
+                <span className="inline-flex h-5 min-w-5 items-center justify-center rounded bg-primary px-1 text-[11px] font-semibold tabular-nums text-primary-foreground">
+                  {activeFilterCount}
+                </span>
+              ) : null}
+            </button>
+          </PopoverTrigger>
+          <PopoverContent align="end" className="w-[min(100vw-2rem,22rem)] p-0">
+            <div className="space-y-3 p-4">
+              {showObject && (
+                <div className={fieldStackClass}>
+                  <span className={fieldLabelClass}>Объект</span>
+                  <Select value={f.object} onValueChange={(v) => set("object", v)}>
+                    <SelectTrigger className="h-9 w-full text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={ALL} className="text-sm">
+                        Все объекты
+                      </SelectItem>
+                      {objects.map((o) => (
+                        <SelectItem key={o.id} value={o.id} className="text-sm">
+                          {o.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              {!typeLocked && (
+                <div className={fieldStackClass}>
+                  <span className={fieldLabelClass}>Вид</span>
+                  <Select value={typeSelect} onValueChange={setType}>
+                    <SelectTrigger className="h-9 w-full text-sm">
+                      <SelectValue placeholder="Все виды" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={ALL} className="text-sm">
+                        Все виды
+                      </SelectItem>
+                      {types
+                        .filter((t) => t.is_active || t.id === typeSelect)
+                        .map((t) => (
+                          <SelectItem key={t.id} value={t.id} className="text-sm">
+                            {t.name}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              <div className={fieldStackClass}>
+                <span className={fieldLabelClass}>Статус</span>
+                <Select value={f.status} onValueChange={(v) => set("status", v)}>
+                  <SelectTrigger className="h-9 w-full text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={ALL} className="text-sm">
+                      Все статусы
+                    </SelectItem>
+                    {statuses.map((s) => (
+                      <SelectItem key={s.v} value={s.v} className="text-sm">
+                        {s.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className={fieldStackClass}>
+                <span className={fieldLabelClass}>Период</span>
+                <div className="grid grid-cols-2 gap-2">
+                  <Input
+                    type="date"
+                    value={f.from}
+                    onChange={(e) => set("from", e.target.value)}
+                    className="h-9 text-sm"
+                    aria-label="Дата с"
+                  />
+                  <Input
+                    type="date"
+                    value={f.to}
+                    onChange={(e) => set("to", e.target.value)}
+                    className="h-9 text-sm"
+                    aria-label="Дата по"
+                  />
+                </div>
+              </div>
+              <label className="flex items-center justify-between gap-3 text-sm">
+                <span>Архив</span>
+                <Switch
+                  checked={f.archive}
+                  onCheckedChange={(v) =>
+                    setF((x) => ({
+                      ...x,
+                      archive: v,
+                      onlyOpen: v ? false : x.onlyOpen,
+                      onlyOverdue: v ? false : x.onlyOverdue,
+                    }))
+                  }
+                />
+              </label>
+              {!f.archive && (
+                <>
+                  <label className="flex items-center justify-between gap-3 text-sm">
+                    <span>Незакрытые</span>
+                    <Switch checked={f.onlyOpen} onCheckedChange={(v) => set("onlyOpen", v)} />
+                  </label>
+                  <label className="flex items-center justify-between gap-3 text-sm">
+                    <span>Просроченные</span>
+                    <Switch checked={f.onlyOverdue} onCheckedChange={(v) => set("onlyOverdue", v)} />
+                  </label>
+                </>
+              )}
+            </div>
+            {activeFilterCount > 0 && (
+              <div className="border-t border-border p-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-9 w-full text-sm"
+                  onClick={resetFilters}
+                >
+                  Сбросить фильтры
+                </Button>
+              </div>
+            )}
+          </PopoverContent>
+        </Popover>
+        {activeFilterCount > 0 && (
+          <button
+            type="button"
+            className="inline-flex items-center border-l border-border px-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            onClick={resetFilters}
+            title="Сбросить фильтры"
+            aria-label="Сбросить фильтры"
+          >
+            <X className="size-3.5" />
+          </button>
+        )}
+      </div>
+      <Button
+        variant="outline"
+        className="h-9 shrink-0 gap-1.5 px-3 text-sm"
+        disabled={sorted.length === 0}
+        onClick={() => exportXlsx(`Заявки — ${formatDate(mskToday())}`, "Заявки", columns, sorted)}
+      >
+        <FileSpreadsheet className="size-4" />
+        Excel
+      </Button>
+      <Button
+        variant="outline"
+        className="h-9 shrink-0 gap-1.5 px-3 text-sm"
+        disabled={sorted.length === 0}
+        onClick={() =>
+          printTable(
+            "Заявки",
+            `Сформировано ${formatDate(mskToday())}. Заявок в списке: ${sorted.length}`,
+            columns,
+            sorted,
+          )
+        }
+      >
+        <Printer className="size-4" />
+        Печать
+      </Button>
+      {!hideCreateButton && (
+        <Button onClick={() => setCreateOpen(true)} className="h-9 shrink-0 gap-2 px-3 text-sm">
+          <Plus className="size-4" />
+          Создать заявку
+        </Button>
+      )}
+    </Toolbar>
+  );
+
   return (
-    <div>
+    <div className={cn(fillHeight && "flex h-full min-h-0 flex-col gap-3")}>
       <NewRequestDialog
         open={createOpen}
         onOpenChange={setCreateOpen}
         objectId={objectId}
         typeId={effectiveType}
       />
-      <Toolbar search={search} onSearch={setSearch}>
-        <Button
-          onClick={() => setCreateOpen(true)}
-          size="icon"
-          title="Новая заявка"
-          aria-label="Новая заявка"
-        >
-          <Plus className="size-4" />
-        </Button>
-      </Toolbar>
+      {chromeHost ? createPortal(chrome, chromeHost) : chrome}
 
-      <div className="mb-4 flex flex-nowrap items-center gap-2 overflow-x-auto whitespace-nowrap">
-        {showObject && (
-          <Select value={f.object} onValueChange={(v) => set("object", v)}>
-            <SelectTrigger className="h-9 w-44 shrink-0 text-sm"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value={ALL} className="text-sm">Все объекты</SelectItem>
-              {objects.map((o) => (
-                <SelectItem key={o.id} value={o.id} className="text-sm">{o.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+      {/* Один overflow: иначе sticky thead не работает во вложенном overflow-x-auto */}
+      <div
+        className={cn(
+          "overflow-auto rounded-md border border-border bg-card",
+          fillHeight && "min-h-0 flex-1",
         )}
-        {!typeLocked && (
-          <Select value={typeSelect} onValueChange={setType}>
-            <SelectTrigger className="h-9 w-36 shrink-0 text-sm">
-              <SelectValue placeholder="Все виды" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={ALL} className="text-sm">Все виды</SelectItem>
-              {types.filter((t) => t.is_active || t.id === typeSelect).map((t) => (
-                <SelectItem key={t.id} value={t.id} className="text-sm">{t.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
-        <Select value={f.status} onValueChange={(v) => set("status", v)}>
-          <SelectTrigger className="h-9 w-36 shrink-0 text-sm"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value={ALL} className="text-sm">Все статусы</SelectItem>
-            {statuses.map((s) => (
-              <SelectItem key={s.v} value={s.v} className="text-sm">{s.label}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <label className="flex shrink-0 items-center gap-1.5 text-sm">
-          с
-          <Input type="date" value={f.from} onChange={(e) => set("from", e.target.value)} className="h-9 w-[9.5rem] text-sm" />
-          по
-          <Input type="date" value={f.to} onChange={(e) => set("to", e.target.value)} className="h-9 w-[9.5rem] text-sm" />
-        </label>
-        <label className="flex shrink-0 items-center gap-1.5 text-sm">
-          <Switch
-            checked={f.archive}
-            onCheckedChange={(v) =>
-              setF((x) => ({ ...x, archive: v, onlyOpen: v ? false : x.onlyOpen, onlyOverdue: v ? false : x.onlyOverdue }))
-            }
-          />
-          Архив
-        </label>
-        {!f.archive && (
-          <>
-            <label className="flex shrink-0 items-center gap-1.5 text-sm">
-              <Switch checked={f.onlyOpen} onCheckedChange={(v) => set("onlyOpen", v)} /> Незакрытые
-            </label>
-            <label className="flex shrink-0 items-center gap-1.5 text-sm">
-              <Switch checked={f.onlyOverdue} onCheckedChange={(v) => set("onlyOverdue", v)} /> Просроченные
-            </label>
-          </>
-        )}
-        <div className="ml-auto flex shrink-0 gap-2">
-          <Button
-            variant="outline"
-            size="icon"
-            disabled={sorted.length === 0}
-            title="Выгрузить в Excel"
-            aria-label="Выгрузить в Excel"
-            onClick={() => exportXlsx(`Заявки — ${formatDate(mskToday())}`, "Заявки", columns, sorted)}
-          >
-            <FileSpreadsheet className="size-4" />
-          </Button>
-          <Button
-            variant="outline"
-            size="icon"
-            disabled={sorted.length === 0}
-            title="Печать"
-            aria-label="Печать"
-            onClick={() =>
-              printTable(
-                "Заявки",
-                `Сформировано ${formatDate(mskToday())}. Заявок в списке: ${sorted.length}`,
-                columns,
-                sorted,
-              )
-            }
-          >
-            <Printer className="size-4" />
-          </Button>
-        </div>
-      </div>
-
-      <div className="overflow-x-auto rounded-xl border border-border bg-card">
+      >
         <table className="w-full min-w-[1000px] text-sm">
-          <thead>
+          <thead className="sticky top-0 z-10 border-b border-border bg-card shadow-[0_1px_0_0_var(--border)]">
             <tr>
               <SortableTh column="number" sort={sort} onToggle={toggle} className="w-28">№</SortableTh>
               <SortableTh column="created" sort={sort} onToggle={toggle}>Сформирована</SortableTh>
@@ -324,8 +466,29 @@ export function RequestsList({
           <tbody>
             {isLoading ? null : sorted.length === 0 ? (
               <tr>
-                <td colSpan={9} className="py-10 text-center text-sm text-muted-foreground">
-                  {rows.length === 0 ? "Заявок пока нет" : "Ничего не найдено"}
+                <td colSpan={showObject ? 9 : 8} className="px-5 py-12 text-center">
+                  <div className="mx-auto flex max-w-sm flex-col items-center gap-3">
+                    <p className="text-sm text-muted-foreground">
+                      {rows.length === 0
+                        ? "Заявок пока нет"
+                        : activeFilterCount > 0 || search.trim()
+                          ? "По выбранным фильтрам ничего не найдено"
+                          : "Ничего не найдено"}
+                    </p>
+                    {(activeFilterCount > 0 || search.trim()) && rows.length > 0 && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="h-9 px-4 text-sm"
+                        onClick={() => {
+                          resetFilters();
+                          setSearch("");
+                        }}
+                      >
+                        Сбросить фильтры
+                      </Button>
+                    )}
+                  </div>
                 </td>
               </tr>
             ) : (

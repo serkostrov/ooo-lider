@@ -26,23 +26,21 @@ export function StagesExport({ objectName, stages }: { objectName: string; stage
     <>
       <Button
         variant="outline"
-        size="icon"
+        className="h-9 gap-1.5 px-3 text-sm"
         disabled={stages.length === 0}
-        title="Выгрузить в Excel"
-        aria-label="Выгрузить в Excel"
         onClick={() => exportXlsx(`Этапы — ${objectName} — ${today}`, "Этапы", COLUMNS, stages)}
       >
         <FileSpreadsheet className="size-4" />
+        Excel
       </Button>
       <Button
         variant="outline"
-        size="icon"
+        className="h-9 gap-1.5 px-3 text-sm"
         disabled={stages.length === 0}
-        title="Печать"
-        aria-label="Печать"
         onClick={() => printTable(`Этапы — ${objectName}`, `Сформировано ${today}. Этапов в списке: ${stages.length}`, COLUMNS, stages)}
       >
         <Printer className="size-4" />
+        Печать
       </Button>
     </>
   );

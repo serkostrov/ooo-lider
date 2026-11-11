@@ -96,7 +96,7 @@ export function DocumentsDirectory() {
           </SelectContent>
         </Select>
       </Toolbar>
-      <div className="overflow-hidden rounded-xl border border-border bg-card">
+      <div className="overflow-hidden rounded-md border border-border bg-card">
         <Table className="text-sm">
           <TableHeader>
             <TableRow>

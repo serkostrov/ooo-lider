@@ -57,13 +57,14 @@ export function WorkTypesDirectory() {
       <div className="mb-4 flex h-9 items-center justify-between gap-3">
         <h2 className="text-xl font-semibold tracking-tight">Группы</h2>
         {is_admin && (
-          <Button onClick={() => setEditing("new")} size="icon" title="Добавить группу" aria-label="Добавить группу">
+          <Button onClick={() => setEditing("new")} className="h-9 gap-1.5 px-3 text-sm">
             <Plus className="size-4" />
+            Добавить группу
           </Button>
         )}
       </div>
       {types.length === 0 ? (
-        <p className="rounded-xl border border-border bg-card py-8 text-center text-sm text-muted-foreground">
+        <p className="rounded-md border border-border bg-card py-8 text-center text-sm text-muted-foreground">
           Групп пока нет
         </p>
       ) : (
@@ -71,6 +72,7 @@ export function WorkTypesDirectory() {
           items={types}
           disabled={!is_admin}
           onMove={(ids) => reorder.mutate(ids)}
+          {...(is_admin ? { onRowClick: (t: (typeof types)[number]) => setEditing(t) } : {})}
           header={
             <>
               <div className={`${thLabelClass} w-10 shrink-0`}>№</div>
@@ -78,15 +80,10 @@ export function WorkTypesDirectory() {
             </>
           }
           render={(t, index) => (
-            <button
-              type="button"
-              disabled={!is_admin}
-              onClick={() => setEditing(t)}
-              className="flex w-full items-center gap-3 p-0 text-left disabled:cursor-default"
-            >
+            <>
               <span className="w-10 shrink-0 text-xs tabular-nums text-muted-foreground">{index + 1}</span>
               <span className="min-w-0 flex-1 truncate text-sm font-medium">{t.name}</span>
-            </button>
+            </>
           )}
         />
       )}

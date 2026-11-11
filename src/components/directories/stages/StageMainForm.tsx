@@ -21,7 +21,7 @@ const NONE = "__none";
 
 function Section({ title, hint, children }: { title: string; hint?: string; children: ReactNode }) {
   return (
-    <section className="rounded-xl border border-border bg-card/50">
+    <section className="rounded-md border border-border bg-card/50">
       <div className="border-b border-border/80 px-5 py-3.5">
         <h2 className="text-sm font-semibold tracking-tight text-foreground">{title}</h2>
         {hint ? <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">{hint}</p> : null}
@@ -331,7 +331,7 @@ export function StageMainForm({
       </Section>
 
       {!readOnly && (
-        <div className="sticky bottom-0 z-10 -mx-1 flex flex-wrap items-center gap-3 border-t border-border/60 bg-background/95 px-1 py-4 backdrop-blur-sm">
+        <div className="flex flex-wrap items-center gap-3 border-t border-border bg-background py-3">
           <Button type="submit" disabled={m.isPending} className="h-10 px-6 text-sm">
             {m.isPending ? "Сохранение…" : "Сохранить"}
           </Button>

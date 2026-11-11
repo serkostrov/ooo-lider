@@ -10,7 +10,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useProfile } from "@/lib/profile";
 import { useRequestStatuses, type RequestRow } from "../data";
+
+/** Кто по умолчанию жмёт переход на статус (как в сценарии вида). Админ — все. */
+function canAdvanceStatus(roleCode: string, isAdmin: boolean, toStatus: string) {
+  if (isAdmin) return true;
+  if (toStatus === "ready") return roleCode === "foreman" || roleCode === "pto";
+  return roleCode === "office";
+}
 
 function useStatusFlow(r: RequestRow) {
   const statuses = useRequestStatuses();
@@ -47,20 +55,23 @@ export function RequestStatusStepper({
   return (
     <ol
       className={cn(
-        "flex min-w-0 flex-wrap gap-0.5 rounded-xl border border-border bg-muted/40 p-0.5 sm:flex-nowrap",
+        "flex min-w-0 flex-wrap gap-0.5 rounded-md border border-border bg-muted/40 p-0.5 sm:flex-nowrap",
         className,
       )}
     >
       {statuses.map((s, i) => {
         const done = i <= idx;
         const current = i === idx;
+        // Финал «Исполнена» — зелёный, не «сигнальный» жёлтый текущего шага.
+        const finished = current && r.status === "done";
+        const active = current && !finished;
         const meta = whenLines(r, s.v, doneByName);
         return (
           <li key={s.v} className="min-w-0 flex-1">
             <div
               className={cn(
                 "flex h-8 w-full items-center justify-center gap-1 rounded-lg px-1.5 text-[11px] font-medium transition-colors sm:px-2 sm:text-xs",
-                current && "bg-card text-foreground shadow-sm",
+                (active || finished) && "bg-card text-foreground",
                 done && !current && "text-foreground/80",
                 !done && !current && "text-muted-foreground",
               )}
@@ -69,9 +80,9 @@ export function RequestStatusStepper({
               <span
                 className={cn(
                   "inline-flex size-3.5 shrink-0 items-center justify-center rounded-full text-[8px] font-semibold tabular-nums",
-                  current
+                  active
                     ? "bg-signal text-[oklch(0.18_0.02_240)]"
-                    : done
+                    : done || finished
                       ? "bg-success text-success-foreground"
                       : "bg-muted-foreground/20 text-muted-foreground",
                 )}
@@ -92,21 +103,30 @@ export function RequestStatusActions({
   r,
   missingRequired,
   onChanged,
+  beforeChange,
   className,
 }: {
   r: RequestRow;
   missingRequired: string[];
   onChanged: () => void;
+  /** Сохранить черновик полей до смены статуса (иначе «Отправить» теряет несохранённое). */
+  beforeChange?: () => Promise<void>;
   className?: string;
 }) {
+  const me = useProfile();
   const { next, prev } = useStatusFlow(r);
   const [result, setResult] = useState(r.result_text ?? "");
   const [back, setBack] = useState(false);
   const [reason, setReason] = useState("");
-  const blockedReady = next?.v === "ready" && missingRequired.length > 0;
+  // Обязательные поля — до «Готова» и до «Отправлена».
+  const blockedByFields =
+    missingRequired.length > 0 && (next?.v === "ready" || next?.v === "sent");
+  const canNext = !!next && canAdvanceStatus(me.role_code, me.is_admin, next.v);
+  const canBack = !!prev && (me.is_admin || me.role_code === "office" || me.role_code === "foreman" || me.role_code === "pto");
 
   const m = useMutation({
     mutationFn: async ({ to, comment }: { to: string; comment?: string }) => {
+      await beforeChange?.();
       const args: { p_request_id: string; p_status: string; p_comment?: string } = {
         p_request_id: r.id,
         p_status: to,
@@ -136,9 +156,17 @@ export function RequestStatusActions({
     );
   }
 
+  if (!canNext && !canBack) {
+    return (
+      <p className={cn("text-sm text-muted-foreground", className)}>
+        Смену статуса выполняют роли сценария этого вида заявки.
+      </p>
+    );
+  }
+
   return (
     <div className={cn("flex flex-nowrap items-center gap-2", className)}>
-      {prev && (
+      {canBack && prev && (
         <Button
           variant="ghost"
           onClick={() => setBack(true)}
@@ -147,7 +175,7 @@ export function RequestStatusActions({
           <Undo2 className="size-4" /> Назад («{prev.label}»)
         </Button>
       )}
-      {next?.v === "done" && (
+      {canNext && next?.v === "done" && (
         <Input
           value={result}
           onChange={(e) => setResult(e.target.value)}
@@ -155,7 +183,7 @@ export function RequestStatusActions({
           className="h-9 w-52 shrink-0 text-sm sm:w-64"
         />
       )}
-      {next && (
+      {canNext && next && (
         <Button
           onClick={() =>
             m.mutate({
@@ -163,8 +191,8 @@ export function RequestStatusActions({
               ...(next.v === "done" && result.trim() ? { comment: result.trim() } : {}),
             })
           }
-          disabled={m.isPending || blockedReady}
-          title={blockedReady ? `Сначала заполните: ${missingRequired.join(", ")}` : undefined}
+          disabled={m.isPending || blockedByFields}
+          title={blockedByFields ? `Сначала заполните: ${missingRequired.join(", ")}` : undefined}
           className="h-9 shrink-0 px-4 text-sm"
         >
           {next.next}

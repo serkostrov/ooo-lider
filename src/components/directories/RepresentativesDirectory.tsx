@@ -5,7 +5,14 @@ import { supabase } from "@/integrations/supabase/client";
 import { useProfile } from "@/lib/profile";
 import { showError } from "@/lib/format";
 import { useSortedRows, useTableSort } from "@/lib/table-sort";
+import {
+  isOptionalEmail,
+  isOptionalPhone,
+  normalizePhone,
+  VALIDATION_MSG,
+} from "@/lib/validation";
 import { Input } from "@/components/ui/input";
+import { PhoneInput } from "@/components/ui/PhoneInput";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
@@ -45,7 +52,7 @@ export function RepresentativesDirectory() {
   return (
     <div>
       <Toolbar search={search} onSearch={setSearch} onAdd={is_admin ? () => setEditing("new") : undefined} />
-      <div className="overflow-hidden rounded-xl border border-border bg-card">
+      <div className="overflow-hidden rounded-md border border-border bg-card">
         <Table className="text-sm">
           <TableHeader>
             <TableRow>
@@ -91,7 +98,13 @@ function RepForm({ rep, onClose }: { rep: Rep | null; onClose: () => void }) {
   const [active, setActive] = useState(rep?.is_active ?? true);
   const m = useMutation({
     mutationFn: async () => {
-      const payload = { name: name.trim(), phone: emptyToNull(phone), email: emptyToNull(email), comment: emptyToNull(comment), is_active: active };
+      const payload = {
+        name: name.trim(),
+        phone: normalizePhone(phone),
+        email: emptyToNull(email),
+        comment: emptyToNull(comment),
+        is_active: active,
+      };
       const { error } = rep
         ? await supabase.from("representatives").update(payload).eq("id", rep.id)
         : await supabase.from("representatives").insert(payload);
@@ -109,13 +122,30 @@ function RepForm({ rep, onClose }: { rep: Rep | null; onClose: () => void }) {
       className="space-y-5"
       onSubmit={(e) => {
         e.preventDefault();
-        if (!name.trim()) { toast.error("Заполните название"); return; }
+        if (!name.trim()) {
+          toast.error("Заполните название");
+          return;
+        }
+        if (!isOptionalPhone(phone)) {
+          toast.error(VALIDATION_MSG.phone);
+          return;
+        }
+        if (!isOptionalEmail(email)) {
+          toast.error(VALIDATION_MSG.email);
+          return;
+        }
         m.mutate();
       }}
     >
-      <Field label="Название" required><Input value={name} onChange={(e) => setName(e.target.value)} className="h-9 text-sm" /></Field>
-      <Field label="Телефон"><Input value={phone} onChange={(e) => setPhone(e.target.value)} className="h-9 text-sm" /></Field>
-      <Field label="Email"><Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="h-9 text-sm" /></Field>
+      <Field label="Название" required>
+        <Input value={name} onChange={(e) => setName(e.target.value)} className="h-9 text-sm" />
+      </Field>
+      <Field label="Телефон">
+        <PhoneInput value={phone} onChange={setPhone} className="h-9 text-sm" />
+      </Field>
+      <Field label="Email">
+        <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="h-9 text-sm" />
+      </Field>
       <Field label="Комментарий"><Textarea value={comment} onChange={(e) => setComment(e.target.value)} className="text-sm" /></Field>
       <label className="flex items-center gap-3 text-sm"><Switch checked={active} onCheckedChange={setActive} /> Активен</label>
       <FormActions

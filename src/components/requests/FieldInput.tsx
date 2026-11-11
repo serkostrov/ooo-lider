@@ -7,6 +7,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import type { RequestField } from "@/components/directories/request-types/data";
 import { formatPickets, parsePickets, picketLength, type Picket, type PicketRange } from "@/lib/pickets";
 import { cn } from "@/lib/utils";
+import { isValidEmail, looksLikeEmailField, VALIDATION_MSG } from "@/lib/validation";
+
+export { isValidEmail, looksLikeEmailField } from "@/lib/validation";
 
 const EMPTY = "__empty";
 
@@ -97,15 +100,27 @@ export function FieldInput({
           Да
         </label>
       );
-    default:
+    default: {
+      const asEmail = looksLikeEmailField(field);
+      const text =
+        typeof value === "string" ? value : value === null || value === undefined ? "" : String(value);
+      const bad = asEmail && text.trim() !== "" && !isValidEmail(text);
       return (
-        <Input
-          disabled={disabled}
-          value={typeof value === "string" ? value : value === null || value === undefined ? "" : String(value)}
-          onChange={(e) => onChange(e.target.value)}
-          className={controlClass}
-        />
+        <div className="space-y-1.5">
+          <Input
+            type={asEmail ? "email" : "text"}
+            inputMode={asEmail ? "email" : undefined}
+            autoComplete={asEmail ? "email" : undefined}
+            disabled={disabled}
+            value={text}
+            onChange={(e) => onChange(e.target.value)}
+            aria-invalid={bad || undefined}
+            className={cn(controlClass, bad && "border-destructive focus-visible:ring-destructive/40")}
+          />
+          {bad && <p className="text-xs text-destructive">{VALIDATION_MSG.email}</p>}
+        </div>
       );
+    }
   }
 }
 
@@ -180,7 +195,7 @@ function PicketRangeInput({
 
   return (
     <div className="space-y-2">
-      <div className="grid gap-3 rounded-xl border border-border bg-muted/20 p-3 sm:grid-cols-[1fr_auto_1fr_auto] sm:items-stretch sm:gap-3 sm:p-3.5">
+      <div className="grid gap-3 rounded-md border border-border bg-muted/20 p-3 sm:grid-cols-[1fr_auto_1fr_auto] sm:items-stretch sm:gap-3 sm:p-3.5">
         {cell("from", "От")}
         <div className="hidden items-center justify-center sm:flex" aria-hidden>
           <ArrowRight className="size-4 text-muted-foreground/70" />

@@ -98,7 +98,7 @@ export function RequestTypeScenario({ typeId, readOnly }: { typeId: string; read
         Цепочка статусов фиксирована. Здесь задаётся, какая роль переводит заявку на статус и какие поля должны быть заполнены к этому шагу.
       </p>
       {steps.length === 0 && (
-        <p className="rounded-xl border border-border bg-card p-4 text-sm text-muted-foreground">
+        <p className="rounded-md border border-border bg-card p-4 text-sm text-muted-foreground">
           Шагов пока нет — после миграции 13 они появятся автоматически. Можно добавить вручную.
         </p>
       )}
@@ -115,8 +115,15 @@ export function RequestTypeScenario({ typeId, readOnly }: { typeId: string; read
         ))}
       </ol>
       {!readOnly && steps.length < STATUSES.length && (
-        <Button type="button" variant="outline" size="icon" onClick={() => add.mutate()} disabled={add.isPending} title="Добавить шаг" aria-label="Добавить шаг">
+        <Button
+          type="button"
+          variant="outline"
+          className="h-9 gap-1.5 px-3 text-sm"
+          onClick={() => add.mutate()}
+          disabled={add.isPending}
+        >
           <Plus className="size-4" />
+          Добавить шаг
         </Button>
       )}
     </div>
@@ -189,7 +196,7 @@ function StepCard({
   };
 
   return (
-    <li className="rounded-xl border border-border bg-card p-4">
+    <li className="rounded-md border border-border bg-card p-4">
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <span className="text-sm font-semibold">Шаг {step.step_no}</span>
         {!readOnly && (

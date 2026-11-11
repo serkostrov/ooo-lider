@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { ToneBadge } from "@/components/ToneBadge";
+import { PageFrame } from "@/components/PageFrame";
 import { PageHeader } from "@/components/PageHeader";
 import { SortableTh } from "@/components/SortableTh";
 import { formatDay, useOverdueItems, type OverdueItem } from "@/components/overdue/data";
@@ -71,54 +72,58 @@ function OverduePage() {
         });
 
   return (
-    <div>
-      <PageHeader
-        title={
-          <span className="inline-flex items-center gap-3">
-            Просрочено
-            {items.length > 0 && (
-              <span className="rounded-full bg-danger px-2.5 text-sm font-semibold leading-6 text-danger-foreground">
-                {items.length}
+    <PageFrame
+      header={
+        <>
+          <PageHeader
+            title={
+              <span className="inline-flex items-center gap-3">
+                Просрочено
+                {items.length > 0 && (
+                  <span className="rounded-full bg-danger px-2.5 text-sm font-semibold leading-6 text-danger-foreground">
+                    {items.length}
+                  </span>
+                )}
               </span>
-            )}
-          </span>
-        }
-        description="Этапы, у которых прошёл срок, и заявки, не исполненные к дате созвона. Сначала то, что опаздывает дольше всего."
-      />
-
-      <div className="mb-4 flex flex-wrap items-center gap-3">
-        <Tabs value={kind} onValueChange={(v) => setKind(v as Kind)}>
-          <TabsList className={`${tabsListClass} mb-0`}>
-            <TabsTrigger value="all" className={tabTriggerClass}>
-              Всё ({items.length})
-            </TabsTrigger>
-            <TabsTrigger value="stage" className={tabTriggerClass}>
-              Этапы ({stagesCount})
-            </TabsTrigger>
-            <TabsTrigger value="request" className={tabTriggerClass}>
-              Заявки ({requestsCount})
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
-        <Select value={objectId} onValueChange={setObjectId}>
-          <SelectTrigger className="h-9 w-72 max-w-full text-sm">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={ALL} className="text-sm">
-              Все объекты
-            </SelectItem>
-            {objects.map(([id, name]) => (
-              <SelectItem key={id} value={id} className="text-sm">
-                {name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
+            }
+            description="Этапы, у которых прошёл срок, и заявки, не исполненные к дате созвона. Сначала то, что опаздывает дольше всего."
+            className="mb-3"
+          />
+          <div className="flex flex-wrap items-center gap-3">
+            <Tabs value={kind} onValueChange={(v) => setKind(v as Kind)}>
+              <TabsList className={`${tabsListClass} mb-0`}>
+                <TabsTrigger value="all" className={tabTriggerClass}>
+                  Всё ({items.length})
+                </TabsTrigger>
+                <TabsTrigger value="stage" className={tabTriggerClass}>
+                  Этапы ({stagesCount})
+                </TabsTrigger>
+                <TabsTrigger value="request" className={tabTriggerClass}>
+                  Заявки ({requestsCount})
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+            <Select value={objectId} onValueChange={setObjectId}>
+              <SelectTrigger className="h-9 w-72 max-w-full text-sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL} className="text-sm">
+                  Все объекты
+                </SelectItem>
+                {objects.map(([id, name]) => (
+                  <SelectItem key={id} value={id} className="text-sm">
+                    {name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </>
+      }
+    >
       {isLoading ? null : items.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 rounded-xl border border-border bg-card py-12 text-center">
+        <div className="flex h-full flex-col items-center justify-center gap-2 rounded-md border border-border bg-card py-12 text-center">
           <CheckCircle2 className="size-8 text-success" />
           <p className="text-sm font-semibold">Просроченного нет</p>
           <p className="text-sm text-muted-foreground">Все этапы и заявки в срок</p>
@@ -126,14 +131,26 @@ function OverduePage() {
       ) : (
         <div className={tableWrapClass}>
           <table className="w-full min-w-[760px] text-sm">
-            <thead>
+            <thead className="sticky top-0 z-10 bg-card">
               <tr className="text-left">
-                <SortableTh column="what" sort={sort} onToggle={toggle}>Что</SortableTh>
-                <SortableTh column="object" sort={sort} onToggle={toggle}>Объект</SortableTh>
-                <SortableTh column="status" sort={sort} onToggle={toggle}>Статус</SortableTh>
-                <SortableTh column="responsible" sort={sort} onToggle={toggle}>Ответственный</SortableTh>
-                <SortableTh column="due" sort={sort} onToggle={toggle}>Срок</SortableTh>
-                <SortableTh column="days" sort={sort} onToggle={toggle}>Просрочено</SortableTh>
+                <SortableTh column="what" sort={sort} onToggle={toggle}>
+                  Что
+                </SortableTh>
+                <SortableTh column="object" sort={sort} onToggle={toggle}>
+                  Объект
+                </SortableTh>
+                <SortableTh column="status" sort={sort} onToggle={toggle}>
+                  Статус
+                </SortableTh>
+                <SortableTh column="responsible" sort={sort} onToggle={toggle}>
+                  Ответственный
+                </SortableTh>
+                <SortableTh column="due" sort={sort} onToggle={toggle}>
+                  Срок
+                </SortableTh>
+                <SortableTh column="days" sort={sort} onToggle={toggle}>
+                  Просрочено
+                </SortableTh>
                 <th className={thClass} />
               </tr>
             </thead>
@@ -190,6 +207,6 @@ function OverduePage() {
           </table>
         </div>
       )}
-    </div>
+    </PageFrame>
   );
 }

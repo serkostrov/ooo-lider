@@ -69,7 +69,7 @@ function CallDateCard({ r, onChanged }: { r: RequestRow; onChanged: () => void }
   return (
     <div
       className={cn(
-        "flex w-full shrink-0 items-center gap-3 rounded-xl border px-3.5 py-2.5 lg:min-h-full lg:w-auto lg:self-stretch",
+        "flex w-full shrink-0 items-center gap-3 rounded-md border px-3.5 py-2.5 lg:min-h-full lg:w-auto lg:self-stretch",
         overdue ? "border-danger/45 bg-danger-soft" : "border-border bg-card",
       )}
     >

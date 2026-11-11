@@ -1,11 +1,15 @@
 import { useMemo, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { Link } from "@tanstack/react-router";
-import { AlertTriangle, ChevronDown, ChevronRight, Flag } from "lucide-react";
+import { AlertTriangle, ChevronDown, ChevronRight, Flag, ListFilter, X } from "lucide-react";
 import { formatDate } from "@/lib/format";
 import { daysBetween, mskToday } from "@/lib/dates";
 import { sortRows, useTableSort, type SortState } from "@/lib/table-sort";
+import { fieldLabelClass, fieldStackClass } from "@/lib/ui";
+import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useProfile } from "@/lib/profile";
 import { cn } from "@/lib/utils";
 import { SortableTh } from "@/components/SortableTh";
@@ -67,10 +71,13 @@ export function rowTone(s: ObjectStage) {
 export function StagesTable({
   objectId,
   toolbar,
+  chromeHost,
 }: {
   objectId: string;
   /** Дополнительные кнопки панели (Excel, печать) получают видимые строки. */
   toolbar?: (visible: ObjectStage[]) => ReactNode;
+  /** Если задан — фильтры/Excel рендерятся сюда (одна строка с табами), иначе над таблицей. */
+  chromeHost?: HTMLElement | null;
 }) {
   const { role_code, is_admin } = useProfile();
   const showExecutor = is_admin || role_code !== "foreman";
@@ -143,107 +150,195 @@ export function StagesTable({
   const onChanged = () => refresh(objectId);
   const rowProps = { objectId, condByStage, preds, numberById, onChanged };
 
-  return (
-    <div>
-      <div className="mb-4 flex flex-nowrap items-center gap-x-3 gap-y-2 overflow-x-auto">
-        <Select value={f.workType} onValueChange={(v) => set("workType", v)}>
-          <SelectTrigger className="h-9 w-40 shrink-0 text-sm"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value={ALL} className="text-sm">Все группы</SelectItem>
-            {workTypes.map(([id, name]) => (
-              <SelectItem key={id} value={id} className="text-sm">{name}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {showExecutor && (
-          <Select value={f.executor} onValueChange={(v) => set("executor", v)}>
-            <SelectTrigger className="h-9 w-40 shrink-0 text-sm"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value={ALL} className="text-sm">Все исполнители</SelectItem>
-              <SelectItem value={NOBODY} className="text-sm">Не назначен</SelectItem>
-              {executors.map(([id, name]) => (
-                <SelectItem key={id} value={id} className="text-sm">{name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
-        <label className="flex shrink-0 items-center gap-2 whitespace-nowrap text-sm">
-          <Switch checked={f.onlyOverdue} onCheckedChange={(v) => set("onlyOverdue", v)} /> Просроченные
-        </label>
-        <label className="flex shrink-0 items-center gap-2 whitespace-nowrap text-sm">
-          <Switch checked={f.onlyOpen} onCheckedChange={(v) => set("onlyOpen", v)} /> Незакрытые
-        </label>
-        <label className="flex shrink-0 items-center gap-2 whitespace-nowrap text-sm">
-          <Switch checked={f.showExcluded} onCheckedChange={(v) => set("showExcluded", v)} /> Исключённые
-        </label>
-        {toolbar && <div className="ml-auto flex shrink-0 gap-2">{toolbar(visible)}</div>}
-      </div>
+  const activeFilterCount =
+    (f.workType !== ALL ? 1 : 0) +
+    (f.executor !== ALL ? 1 : 0) +
+    (f.onlyOverdue ? 1 : 0) +
+    (f.onlyOpen ? 1 : 0) +
+    (f.showExcluded ? 1 : 0);
 
-      {groups.length === 0 ? (
-        <div className="rounded-xl border border-border bg-card py-10 text-center text-sm text-muted-foreground">
-          {stages.length === 0 ? "На объекте нет этапов" : "Нет этапов по выбранным условиям"}
-        </div>
-      ) : (
-        <div className="max-h-[70vh] overflow-auto">
-          <div className="min-w-[1020px]">
-            {/* Одна общая шапка колонок */}
-            <div className="sticky top-0 z-20 overflow-hidden rounded-xl border border-border bg-muted/30 backdrop-blur-sm">
+  const resetFilters = () =>
+    setF({
+      workType: ALL,
+      executor: ALL,
+      onlyOverdue: false,
+      onlyOpen: false,
+      showExcluded: false,
+    });
+
+  const chrome = (
+    <>
+      <div className="inline-flex h-9 shrink-0 items-stretch overflow-hidden rounded-md border border-border">
+        <Popover>
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              className="inline-flex items-center gap-1.5 px-3 text-sm transition-colors hover:bg-accent hover:text-accent-foreground"
+            >
+              <ListFilter className="size-4" />
+              Фильтры
+              {activeFilterCount > 0 ? (
+                <span className="inline-flex h-5 min-w-5 items-center justify-center rounded bg-primary px-1 text-[11px] font-semibold tabular-nums text-primary-foreground">
+                  {activeFilterCount}
+                </span>
+              ) : null}
+            </button>
+          </PopoverTrigger>
+          <PopoverContent align="end" className="w-[min(100vw-2rem,20rem)] p-0">
+            <div className="space-y-3 p-4">
+              <div className={fieldStackClass}>
+                <span className={fieldLabelClass}>Группа</span>
+                <Select value={f.workType} onValueChange={(v) => set("workType", v)}>
+                  <SelectTrigger className="h-9 w-full text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={ALL} className="text-sm">
+                      Все группы
+                    </SelectItem>
+                    {workTypes.map(([id, name]) => (
+                      <SelectItem key={id} value={id} className="text-sm">
+                        {name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {showExecutor && (
+                <div className={fieldStackClass}>
+                  <span className={fieldLabelClass}>Исполнитель</span>
+                  <Select value={f.executor} onValueChange={(v) => set("executor", v)}>
+                    <SelectTrigger className="h-9 w-full text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={ALL} className="text-sm">
+                        Все исполнители
+                      </SelectItem>
+                      <SelectItem value={NOBODY} className="text-sm">
+                        Не назначен
+                      </SelectItem>
+                      {executors.map(([id, name]) => (
+                        <SelectItem key={id} value={id} className="text-sm">
+                          {name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              <label className="flex items-center justify-between gap-3 text-sm">
+                <span>Просроченные</span>
+                <Switch checked={f.onlyOverdue} onCheckedChange={(v) => set("onlyOverdue", v)} />
+              </label>
+              <label className="flex items-center justify-between gap-3 text-sm">
+                <span>Незакрытые</span>
+                <Switch checked={f.onlyOpen} onCheckedChange={(v) => set("onlyOpen", v)} />
+              </label>
+              <label className="flex items-center justify-between gap-3 text-sm">
+                <span>Исключённые</span>
+                <Switch checked={f.showExcluded} onCheckedChange={(v) => set("showExcluded", v)} />
+              </label>
+            </div>
+            {activeFilterCount > 0 && (
+              <div className="border-t border-border p-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-9 w-full text-sm"
+                  onClick={resetFilters}
+                >
+                  Сбросить фильтры
+                </Button>
+              </div>
+            )}
+          </PopoverContent>
+        </Popover>
+        {activeFilterCount > 0 && (
+          <button
+            type="button"
+            className="inline-flex items-center border-l border-border px-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            onClick={resetFilters}
+            title="Сбросить фильтры"
+            aria-label="Сбросить фильтры"
+          >
+            <X className="size-3.5" />
+          </button>
+        )}
+      </div>
+      {toolbar ? <div className="flex shrink-0 gap-2">{toolbar(visible)}</div> : null}
+    </>
+  );
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col gap-3">
+      {chromeHost
+        ? createPortal(chrome, chromeHost)
+        : (
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
+            {chrome}
+          </div>
+        )}
+
+      <div className="min-h-0 flex-1 overflow-auto">
+        {groups.length === 0 && (f.onlyOpen || closedSorted.length === 0) ? (
+          <div className="rounded-md border border-border bg-card py-10 text-center text-sm text-muted-foreground">
+            {stages.length === 0 ? "На объекте нет этапов" : "Нет этапов по выбранным условиям"}
+          </div>
+        ) : (
+          /* Одна обёртка: sticky-шапка живёт до конца скролла, в т.ч. по «Закрытым» */
+          <div className="min-w-[1180px] space-y-3 pb-1">
+            <div className="sticky top-0 z-20 overflow-hidden rounded-md border border-border bg-muted/30 backdrop-blur-sm">
               <table className="w-full table-fixed text-sm">
                 <StagesColgroup showExecutor={showExecutor} />
                 <StagesHead showExecutor={showExecutor} sort={sort} onToggle={toggle} />
               </table>
             </div>
 
-            <div className="space-y-3 pt-3">
-              {groups.map((g) => (
-                <section
-                  key={g.id}
-                  className="overflow-hidden rounded-xl border border-border"
+            {groups.map((g) => (
+              <section key={g.id} className="overflow-hidden rounded-md border border-border bg-card">
+                <header className="border-b border-border/80 bg-muted/40 px-4 py-2">
+                  <h3 className="truncate text-sm font-semibold tracking-tight text-foreground">
+                    {g.name}
+                  </h3>
+                </header>
+                <table className="w-full table-fixed text-sm">
+                  <StagesColgroup showExecutor={showExecutor} />
+                  <tbody>
+                    {g.rows.map((s) => (
+                      <StageRow key={s.id} s={s} showExecutor={showExecutor} {...rowProps} />
+                    ))}
+                  </tbody>
+                </table>
+              </section>
+            ))}
+
+            {!f.onlyOpen && closedSorted.length > 0 && (
+              <div className="rounded-md border border-border bg-card">
+                <button
+                  type="button"
+                  onClick={() => setClosedOpen((v) => !v)}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-muted-foreground hover:bg-muted/40 hover:text-foreground"
                 >
-                  <header className="border-b border-border/80 bg-muted/40 px-4 py-2.5">
-                    <h3 className="truncate text-sm font-semibold tracking-tight text-foreground">{g.name}</h3>
-                  </header>
-                  <table className="w-full table-fixed text-sm">
+                  {closedOpen ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
+                  Закрытые
+                  <span className="tabular-nums">{closedSorted.length}</span>
+                </button>
+                {closedOpen && (
+                  <table className="w-full table-fixed border-t border-border text-sm">
                     <StagesColgroup showExecutor={showExecutor} />
                     <tbody>
-                      {g.rows.map((s) => (
+                      {closedSorted.map((s) => (
                         <StageRow key={s.id} s={s} showExecutor={showExecutor} {...rowProps} />
                       ))}
                     </tbody>
                   </table>
-                </section>
-              ))}
-            </div>
+                )}
+              </div>
+            )}
           </div>
-        </div>
-      )}
-
-      {!f.onlyOpen && closedSorted.length > 0 && (
-        <div className="mt-4 rounded-xl border border-border bg-card">
-          <button
-            type="button"
-            onClick={() => setClosedOpen((v) => !v)}
-            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-muted-foreground hover:bg-muted/40 hover:text-foreground"
-          >
-            {closedOpen ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
-            Закрытые
-            <span className="tabular-nums">{closedSorted.length}</span>
-          </button>
-          {closedOpen && (
-            <div className="overflow-x-auto border-t">
-              <table className="w-full min-w-[1020px] table-fixed text-sm">
-                <StagesColgroup showExecutor={showExecutor} />
-                <StagesHead showExecutor={showExecutor} sort={sort} onToggle={toggle} />
-                <tbody>
-                  {closedSorted.map((s) => (
-                    <StageRow key={s.id} s={s} showExecutor={showExecutor} {...rowProps} />
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
@@ -253,10 +348,11 @@ function StagesColgroup({ showExecutor }: { showExecutor: boolean }) {
     <colgroup>
       <col className="w-12" />
       <col className="w-[22%]" />
+      {/* Шире — чтобы раскрытый чеклист условий не ломал строки; лишнее — в горизонтальный скролл */}
+      <col className="w-72" />
       <col className="w-28" />
-      <col className="w-32" />
       <col className="w-[11.5rem]" />
-      {showExecutor && <col className="w-56" />}
+      {showExecutor && <col className="w-52" />}
       <col className="w-36" />
     </colgroup>
   );
@@ -318,18 +414,19 @@ function StageRow({
   const docsHint = [s.outgoing_doc && `от нас: ${s.outgoing_doc}`, s.expected_doc && `ждём: ${s.expected_doc}`]
     .filter(Boolean)
     .join(" · ");
-  const td = "h-11 px-5 py-0 align-middle";
+  /** top + py: при раскрытых условиях соседние ячейки не «висят» по центру пустоты */
+  const td = "px-5 py-2.5 align-top";
 
   return (
     <tr className={cn("group border-t border-border/50", rowTone(s))}>
       <td className={td}>
-        <Link {...link} className="inline-flex items-center gap-1 tabular-nums leading-none text-muted-foreground hover:text-primary">
+        <Link {...link} className="inline-flex h-7 items-center gap-1 tabular-nums leading-none text-muted-foreground hover:text-primary">
           {s.number}
           {s.is_critical && <Flag className="size-3 fill-destructive text-destructive" aria-label="Критичный" />}
         </Link>
       </td>
       <td className={td}>
-        <div className="flex min-w-0 items-center gap-2">
+        <div className="flex min-h-7 min-w-0 items-center gap-2">
           <Link {...link} className="min-w-0 flex-1 truncate font-medium hover:underline" title={docsHint || s.name}>
             {s.name}
           </Link>
@@ -350,7 +447,7 @@ function StageRow({
       <td className={td}>
         <span
           className={cn(
-            "tabular-nums",
+            "inline-flex h-7 items-center tabular-nums",
             (s.is_overdue || s.is_no_response) && "font-medium text-danger",
           )}
           title={
@@ -361,24 +458,28 @@ function StageRow({
         </span>
       </td>
       <td className={td}>
-        <StatusBadge name={s.status_name} color={s.status_color} className="max-w-[10.5rem]" />
+        <div className="flex h-7 items-center">
+          <StatusBadge name={s.status_name} color={s.status_color} className="max-w-[10.5rem]" />
+        </div>
       </td>
       {showExecutor && (
         <td className={cn(td, "overflow-hidden pr-6")}>
-          {s.executor_name ? (
-            <span className="block truncate" title={s.executor_name}>
-              {s.executor_name}
-            </span>
-          ) : (
-            <span className={s.is_closed || s.is_excluded ? "text-muted-foreground" : "text-warning"}>
-              не назначен
-            </span>
-          )}
+          <div className="flex h-7 items-center overflow-hidden">
+            {s.executor_name ? (
+              <span className="block truncate" title={s.executor_name}>
+                {s.executor_name}
+              </span>
+            ) : (
+              <span className={s.is_closed || s.is_excluded ? "text-muted-foreground" : "text-warning"}>
+                не назначен
+              </span>
+            )}
+          </div>
         </td>
       )}
       <td className={cn(td, "overflow-hidden pl-1 text-muted-foreground")}>
         <div
-          className="truncate"
+          className="flex h-7 items-center truncate"
           title={s.confirmer_name ?? s.confirmer_role_name ?? undefined}
         >
           {s.confirmer_name ?? s.confirmer_role_name ?? "—"}
@@ -428,11 +529,13 @@ function ConditionsCell({
         </span>
       </button>
       {open && (
-        <ul className="mt-1.5 space-y-1 border-l border-border/70 pl-2">
+        <ul className="mt-2 max-w-none space-y-1.5 border-l border-border/60 pb-1 pl-3 ml-1.5">
           {conds.map((c) => (
-            <li key={c.id} className="flex items-start gap-2 text-xs leading-snug">
-              <ConditionToggle cond={c} size="sm" disabled={!!disabled} onDone={onDone} />
-              <span className={c.is_done ? "text-muted-foreground line-through" : ""}>
+            <li key={c.id} className="flex items-start gap-2.5 whitespace-nowrap text-xs leading-5">
+              <span className="mt-0.5 inline-flex shrink-0">
+                <ConditionToggle cond={c} size="sm" disabled={!!disabled} onDone={onDone} />
+              </span>
+              <span className={c.is_done ? "text-muted-foreground line-through" : "text-foreground/90"}>
                 {c.title}
                 {c.kind === "field" && c.value_text && <span className="no-underline"> — {c.value_text}</span>}
               </span>

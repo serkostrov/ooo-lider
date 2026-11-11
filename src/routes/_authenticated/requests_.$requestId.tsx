@@ -11,7 +11,7 @@ import { useRequestFields } from "@/components/directories/request-types/data";
 import { useActiveProfiles } from "@/components/objects/data";
 import { HistoryFeed } from "@/components/history/HistoryFeed";
 import { FileList, UploadButton } from "@/components/stages/page/FileButtons";
-import { isEmptyValue } from "@/components/requests/FieldInput";
+import { isEmptyValue, isValidEmail, looksLikeEmailField } from "@/components/requests/FieldInput";
 import {
   markRequestSeen,
   useRefreshRequests,
@@ -28,6 +28,7 @@ import { RequestComments, commentsQuery } from "@/components/requests/card/Reque
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { tabsListClass, tabTriggerClass } from "@/lib/ui";
+import { useProfile } from "@/lib/profile";
 
 /** Основная работа + вторичные вкладки. Старые tab=initiator|office|files → work. */
 const TABS = ["work", "comments", "history"] as const;
@@ -54,6 +55,7 @@ function RequestCard() {
   const { requestId } = Route.useParams();
   const { tab = "work", from } = Route.useSearch();
   const navigate = useNavigate({ from: "/requests/$requestId" });
+  const me = useProfile();
   const { data: comments = [] } = useQuery(commentsQuery(requestId));
   const qc = useQueryClient();
   const refreshAll = useRefreshRequests();
@@ -91,28 +93,32 @@ function RequestCard() {
   const officeRef = useRef<RequestFieldsHandle>(null);
   const [dirtyInitiator, setDirtyInitiator] = useState(false);
   const [dirtyOffice, setDirtyOffice] = useState(false);
+  const [draftRev, setDraftRev] = useState(0);
   const [saving, setSaving] = useState(false);
   const dirty = dirtyInitiator || dirtyOffice;
 
   const onDirtyInitiator = useCallback((d: boolean) => setDirtyInitiator(d), []);
   const onDirtyOffice = useCallback((d: boolean) => setDirtyOffice(d), []);
+  const onDraftChange = useCallback(() => setDraftRev((n) => n + 1), []);
 
   const refresh = () => {
     refreshAll(requestId);
     qc.invalidateQueries({ queryKey: ["request", requestId] });
+    qc.invalidateQueries({ queryKey: ["request", requestId, "values"] });
     qc.invalidateQueries({ queryKey: ["request-comments", requestId] });
   };
 
-  const saveAll = async () => {
-    if (!dirty) return;
+  const saveAll = async (opts?: { silent?: boolean }) => {
     setSaving(true);
     try {
       await initiatorRef.current?.save();
       await officeRef.current?.save();
-      toast.success("Сохранено");
-      refresh();
+      if (!opts?.silent) toast.success("Сохранено");
+      await qc.invalidateQueries({ queryKey: ["request", requestId, "values"] });
+      refreshAll(requestId);
     } catch (e) {
       showError(e);
+      throw e;
     } finally {
       setSaving(false);
     }
@@ -154,135 +160,186 @@ function RequestCard() {
 
   const active = fields.filter((f) => f.is_active && f.request_type_id === r.request_type_id);
   const activeIds = new Set(active.map((f) => f.id));
-  const valueOf = (id: string) => values.find((v) => v.field_id === id)?.value;
+  // Черновик из блоков важнее сервера — иначе «Отправить» блокируется, пока не нажмут «Сохранить».
+  void draftRev;
+  const valueOf = (id: string) => {
+    if (initiatorRef.current?.hasField(id)) return initiatorRef.current.getValue(id);
+    if (officeRef.current?.hasField(id)) return officeRef.current.getValue(id);
+    return values.find((v) => v.field_id === id)?.value;
+  };
   const missingRequired = active
     .filter((f) => f.is_required)
-    .filter((f) => (f.field_type === "file" ? files.length === 0 : isEmptyValue(valueOf(f.id))))
+    .filter((f) => {
+      if (f.field_type === "file") return files.length === 0;
+      const raw = valueOf(f.id);
+      if (isEmptyValue(raw)) return true;
+      if (looksLikeEmailField(f) && (typeof raw !== "string" || !isValidEmail(raw))) return true;
+      return false;
+    })
     .map((f) => f.label);
   const orphan = values.filter((v) => !activeIds.has(v.field_id) && v.field_type !== "file");
   const doneByName = r.done_by ? profiles.find((p) => p.id === r.done_by)?.full_name ?? null : null;
-  const readOnly = r.status === "done";
+  // Админ — всё в окне статуса; прораб/ПТО — поля initiator на «Новая»; офис — office до отправки.
+  const isInitiatorRole = me.role_code === "foreman" || me.role_code === "pto";
+  const isOfficeRole = me.role_code === "office";
+  const statusAllowsInitiator = r.status === "new";
+  const statusAllowsOffice = r.status === "new" || r.status === "ready";
+  const canEditInitiator = (me.is_admin || isInitiatorRole) && statusAllowsInitiator;
+  const canEditOffice = (me.is_admin || isOfficeRole) && statusAllowsOffice;
+  const canEditFiles =
+    (me.is_admin && statusAllowsOffice) ||
+    (isInitiatorRole && statusAllowsInitiator) ||
+    (isOfficeRole && statusAllowsOffice);
+  const initiatorReadOnly = !canEditInitiator;
+  const officeReadOnly = !canEditOffice;
+  const filesReadOnly = !canEditFiles;
   const initiatorFields = active.filter((f) => f.filled_by === "initiator");
   const officeFields = active.filter((f) => f.filled_by === "office");
-  const count = (n: number) => (n > 0 ? <span className="ml-1.5 tabular-nums text-muted-foreground">{n}</span> : null);
+  const initiatorHint = !statusAllowsInitiator
+    ? "Зафиксированы после «Готова к отправке»."
+    : !canEditInitiator
+      ? "Заполняет прораб или ПТО."
+      : undefined;
+  const officeHint = !statusAllowsOffice
+    ? "Зафиксированы после отправки заявки."
+    : !canEditOffice
+      ? "Заполняет офис-менеджер перед отправкой."
+      : "Заполняются перед отправкой заявки.";
+  const count = (n: number) =>
+    n > 0 ? (
+      <span
+        aria-hidden
+        className="ml-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary/15 px-1 text-[10px] font-semibold leading-none tabular-nums text-primary"
+      >
+        {n > 99 ? "99+" : n}
+      </span>
+    ) : null;
   const showBar = tab === "work";
 
   return (
-    <div className={`flex w-full flex-col ${showBar ? "pb-24" : "pb-10"}`}>
-      <BackLink objectId={backObjectId} />
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-y-contain pb-6">
+        <BackLink objectId={backObjectId} />
 
-      <div className="mt-4">
-        <RequestHeader r={r} onChanged={refresh} />
-      </div>
-
-      <Tabs
-        value={tab}
-        onValueChange={(v) =>
-          navigate({
-            search: { tab: v as Tab, ...(from === "object" ? { from: "object" as const } : {}) },
-            replace: true,
-          })
-        }
-        className="mt-5"
-      >
-        <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between lg:gap-4">
-          <TabsList
-            className={cn(
-              tabsListClass,
-              "mb-0 grid h-9 w-full grid-cols-3 p-0.5 lg:w-[22rem] lg:shrink-0",
-            )}
-          >
-            <TabsTrigger value="work" className={cn(tabTriggerClass, "justify-center px-2")}>
-              Заполнение
-            </TabsTrigger>
-            <TabsTrigger value="comments" className={cn(tabTriggerClass, "justify-center px-2")}>
-              Переписка{count(comments.length)}
-            </TabsTrigger>
-            <TabsTrigger value="history" className={cn(tabTriggerClass, "justify-center px-2")}>
-              История
-            </TabsTrigger>
-          </TabsList>
-          <RequestStatusStepper
-            r={r}
-            doneByName={doneByName}
-            className="w-full lg:max-w-2xl lg:flex-1"
-          />
+        <div className="mt-4">
+          <RequestHeader r={r} onChanged={refresh} />
         </div>
 
-        <TabsContent value="work" className="mt-5 space-y-8">
-          {initiatorFields.length === 0 && orphan.length === 0 ? (
-            <p className="text-sm text-muted-foreground">У этого вида заявки нет полей прораба</p>
-          ) : (
-            <RequestFieldsBlock
-              ref={initiatorRef}
-              title="Данные прораба"
-              requestId={r.id}
-              fields={initiatorFields}
-              values={values}
-              orphanValues={orphan}
-              readOnly={readOnly}
-              onDirtyChange={onDirtyInitiator}
-            />
-          )}
-
-          {officeFields.length > 0 && (
-            <RequestFieldsBlock
-              ref={officeRef}
-              title="Данные офис-менеджера"
-              hint="Заполняются перед отправкой заявки."
-              requestId={r.id}
-              fields={officeFields}
-              values={values}
-              orphanValues={[]}
-              readOnly={readOnly}
-              onDirtyChange={onDirtyOffice}
-            />
-          )}
-
-          <section className="space-y-3 border-t border-border pt-6">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <h2 className="text-base font-semibold tracking-tight">
-                Файлы
-                {files.length > 0 && (
-                  <span className="ml-1.5 font-normal tabular-nums text-muted-foreground">{files.length}</span>
-                )}
-              </h2>
-              {!readOnly && (
-                <UploadButton
-                  objectId={r.object_id}
-                  entityType="request_field"
-                  entityId={r.id}
-                  kind="photo"
-                  label="Добавить файлы"
-                  onUploaded={() => {
-                    qc.invalidateQueries({ queryKey: filesKey });
-                    qc.invalidateQueries({ queryKey: ["history"] });
-                  }}
-                />
+        <Tabs
+          value={tab}
+          onValueChange={(v) =>
+            navigate({
+              search: { tab: v as Tab, ...(from === "object" ? { from: "object" as const } : {}) },
+              replace: true,
+            })
+          }
+          className="mt-5"
+        >
+          <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between lg:gap-4">
+            <TabsList
+              className={cn(
+                tabsListClass,
+                "mb-0 grid h-9 w-full grid-cols-3 p-0.5 lg:w-[22rem] lg:shrink-0",
               )}
-            </div>
-            {files.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Файлов нет</p>
-            ) : (
-              <FileList files={files} />
-            )}
-          </section>
-        </TabsContent>
+            >
+              <TabsTrigger value="work" className={cn(tabTriggerClass, "justify-center px-2")}>
+                Заполнение
+              </TabsTrigger>
+              <TabsTrigger value="comments" className={cn(tabTriggerClass, "justify-center px-2")}>
+                Переписка{count(comments.length)}
+              </TabsTrigger>
+              <TabsTrigger value="history" className={cn(tabTriggerClass, "justify-center px-2")}>
+                История
+              </TabsTrigger>
+            </TabsList>
+            <RequestStatusStepper
+              r={r}
+              doneByName={doneByName}
+              className="w-full lg:max-w-2xl lg:flex-1"
+            />
+          </div>
 
-        <TabsContent value="comments" className="mt-5">
-          <RequestComments requestId={r.id} />
-        </TabsContent>
-        <TabsContent value="history" className="mt-5">
-          <HistoryFeed filter={{ entityType: "request", entityId: r.id }} />
-        </TabsContent>
-      </Tabs>
+          <TabsContent value="work" className="mt-5 space-y-8">
+            {initiatorFields.length === 0 && orphan.length === 0 ? (
+              <p className="text-sm text-muted-foreground">У этого вида заявки нет полей прораба</p>
+            ) : (
+              <RequestFieldsBlock
+                ref={initiatorRef}
+                title="Данные прораба"
+                {...(initiatorHint ? { hint: initiatorHint } : {})}
+                requestId={r.id}
+                fields={initiatorFields}
+                values={values}
+                orphanValues={orphan}
+                readOnly={initiatorReadOnly}
+                onDirtyChange={onDirtyInitiator}
+                onDraftChange={onDraftChange}
+              />
+            )}
+
+            {officeFields.length > 0 && (
+              <RequestFieldsBlock
+                ref={officeRef}
+                title="Данные офис-менеджера"
+                hint={officeHint}
+                requestId={r.id}
+                fields={officeFields}
+                values={values}
+                orphanValues={[]}
+                readOnly={officeReadOnly}
+                onDirtyChange={onDirtyOffice}
+                onDraftChange={onDraftChange}
+              />
+            )}
+
+            <section className="space-y-3 border-t border-border pt-6">
+              <div className="flex flex-wrap items-center gap-3">
+                <h2 className="text-base font-semibold tracking-tight">
+                  Файлы
+                  {files.length > 0 && (
+                    <span className="ml-1.5 font-normal tabular-nums text-muted-foreground">{files.length}</span>
+                  )}
+                </h2>
+                {!filesReadOnly && (
+                  <UploadButton
+                    objectId={r.object_id}
+                    entityType="request_field"
+                    entityId={r.id}
+                    kind="photo"
+                    label="Добавить файлы"
+                    onUploaded={() => {
+                      qc.invalidateQueries({ queryKey: filesKey });
+                      qc.invalidateQueries({ queryKey: ["history"] });
+                    }}
+                  />
+                )}
+                {files.length === 0 && (
+                  <span className="text-sm text-muted-foreground">Файлов нет</span>
+                )}
+              </div>
+              {files.length > 0 && <FileList files={files} />}
+            </section>
+          </TabsContent>
+
+          <TabsContent value="comments" className="mt-5">
+            <RequestComments requestId={r.id} />
+          </TabsContent>
+          <TabsContent value="history" className="mt-5">
+            <HistoryFeed filter={{ entityType: "request", entityId: r.id }} />
+          </TabsContent>
+        </Tabs>
+      </div>
 
       {showBar && (
-        <div className="sticky bottom-0 z-20 -mx-4 mt-8 border-t border-border bg-background/95 px-4 py-3 backdrop-blur lg:-mx-8 lg:px-8">
-          <div className="flex flex-nowrap items-center gap-2 overflow-x-auto sm:gap-3">
-            {!readOnly && (
+        <div className="shrink-0 border-t border-border bg-background py-3">
+          <div className="flex min-w-0 flex-wrap items-center gap-2 sm:gap-3">
+            {(!initiatorReadOnly || !officeReadOnly) && (
               <>
-                <Button onClick={() => void saveAll()} disabled={!dirty || saving} className="h-9 shrink-0 px-4 text-sm">
+                <Button
+                  onClick={() => void saveAll().catch(() => undefined)}
+                  disabled={!dirty || saving}
+                  className="h-9 shrink-0 px-4 text-sm"
+                >
                   {saving ? "Сохранение…" : "Сохранить"}
                 </Button>
                 {dirty && (
@@ -305,6 +362,7 @@ function RequestCard() {
             <RequestStatusActions
               r={r}
               missingRequired={missingRequired}
+              beforeChange={() => saveAll({ silent: true })}
               onChanged={refresh}
               className="ml-auto shrink-0"
             />

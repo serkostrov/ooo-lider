@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { showError } from "@/lib/format";
+import { isOptionalEmail, VALIDATION_MSG } from "@/lib/validation";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
@@ -29,8 +30,7 @@ export function RequestTypeForm({
   const m = useMutation({
     mutationFn: async () => {
       if (!name.trim()) throw new Error("Укажите название вида заявки");
-      const e = email.trim();
-      if (e && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) throw new Error("Проверьте адрес отправки");
+      if (!isOptionalEmail(email)) throw new Error(VALIDATION_MSG.email);
       const payload = {
         name: name.trim(),
         send_to_email: emptyToNull(email),

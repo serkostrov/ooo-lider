@@ -5,11 +5,11 @@ export type StatusTone = "neutral" | "success" | "warning" | "danger" | "info" |
 
 const tones: Record<StatusTone, string> = {
   neutral: "bg-muted text-muted-foreground ring-border",
-  success: "bg-success-soft text-success ring-success/35",
-  warning: "bg-warning-soft text-warning ring-warning/35",
-  danger: "bg-danger-soft text-danger ring-danger/35",
-  info: "bg-info-soft text-info ring-info/35",
-  signal: "bg-signal/15 text-signal ring-signal/35",
+  success: "bg-success-soft text-success ring-success/40",
+  warning: "bg-warning-soft text-warning ring-warning/40",
+  danger: "bg-danger-soft text-danger ring-danger/40",
+  info: "bg-info-soft text-info ring-info/40",
+  signal: "bg-signal/18 text-signal ring-signal/45",
 };
 
 const dot: Record<StatusTone, string> = {
@@ -35,13 +35,13 @@ export function StatusBadge({
   return (
     <span
       className={cn(
-        "inline-flex h-7 items-center gap-2 whitespace-nowrap rounded-xl px-2.5 text-[13px] font-semibold leading-none ring-1 ring-inset",
+        "inline-flex h-6 items-center gap-1.5 whitespace-nowrap rounded px-2 text-xs font-semibold leading-none ring-1 ring-inset",
         tones[tone],
         className,
       )}
     >
       {showDot ? (
-        <span aria-hidden className={cn("size-2 shrink-0 rounded-full", dot[tone])} />
+        <span aria-hidden className={cn("size-1.5 shrink-0 rounded-full", dot[tone])} />
       ) : null}
       {children}
     </span>

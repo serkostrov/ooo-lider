@@ -1,10 +1,10 @@
 /**
  * Общие классы оформления UI.
  *
- * Радиусы (единые):
- * - rounded-xl — поверхности и контролы: таблицы, карточки, инпуты, кнопки, диалоги
- * - rounded-lg — вложенные блоки / активный таб внутри поверхности
- * - rounded-md — бейджи и мелкие чипы
+ * Радиусы (умеренные):
+ * - rounded-xl / rounded-lg — крупные поверхности (реестры, карточки объектов)
+ * - rounded-md — контролы: инпуты, кнопки, диалоги
+ * - rounded-sm — вложенные блоки / активный таб
  */
 
 /** Высота ряда контролов = h-9 (как Input / Select / Button). */
@@ -17,18 +17,20 @@ export const fieldStackClass = "flex flex-col gap-1.5";
 export const fieldLabelClass = "block text-sm font-medium leading-none text-muted-foreground";
 
 export const tabsListClass =
-  "mb-4 inline-flex h-9 max-w-full flex-wrap items-center justify-start gap-0.5 rounded-xl bg-muted p-0.5";
+  "mb-4 inline-flex h-9 max-w-full flex-wrap items-center justify-start gap-0.5 rounded-md bg-muted p-0.5";
 
 export const tabTriggerClass =
-  "h-8 rounded-lg px-3 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground " +
-  "data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-sm " +
+  "h-8 rounded-sm px-3 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground " +
+  "data-[state=active]:bg-card data-[state=active]:text-foreground " +
   "disabled:opacity-40";
 
-/** Обёртка таблицы / списка со скроллом */
-export const tableWrapClass = "overflow-x-auto rounded-xl border border-border bg-card";
+/** Обёртка таблицы: по содержимому, max = высота PageFrame; скролл при переполнении */
+export const tableWrapClass =
+  "max-h-full min-h-0 overflow-auto rounded-xl border border-border/70 bg-card shadow-[var(--surface-glow)] backdrop-blur-[2px]";
 
 /** Панель без горизонтального скролла (clip углов шапки) */
-export const panelClass = "overflow-hidden rounded-xl border border-border bg-card";
+export const panelClass =
+  "h-full min-h-0 overflow-hidden rounded-xl border border-border/70 bg-card shadow-[var(--surface-glow)] backdrop-blur-[2px]";
 
 /** Базовые классы HTML-таблицы (когда ui/table не используется) */
 export const tableClass = "w-full min-w-[720px] border-collapse text-sm";
@@ -51,8 +53,8 @@ export const REORDER_ACTIONS_W = "w-16";
 
 /** Ячейка заголовка таблицы (<th> / TableHead). */
 export const thClass =
-  `${TH_H} border-b border-border bg-muted/40 px-5 text-left align-middle ${thLabelClass}`;
+  `${TH_H} border-b border-border/80 bg-elevated/80 px-5 text-left align-middle ${thLabelClass}`;
 
-export const tdClass = `${TD_H} border-b border-border/70 px-5 py-0 align-middle text-foreground`;
+export const tdClass = `${TD_H} border-b border-border/55 px-5 py-0 align-middle text-foreground`;
 
 export const trHoverClass = "transition-colors hover:bg-elevated/50";

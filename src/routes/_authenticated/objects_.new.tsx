@@ -92,64 +92,66 @@ function NewObjectPage() {
   };
 
   return (
-    <div className="flex w-full flex-col">
-      {back}
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-xl font-semibold tracking-tight">Новый объект</h1>
-        <ol className="inline-flex items-center gap-1 rounded-lg bg-muted/80 p-0.5">
-          {STEPS.map((s, i) => {
-            const active = i === step;
-            const done = i < step;
-            return (
-              <li key={s}>
-                <button
-                  type="button"
-                  onClick={() => (done ? setStep(i) : i === step + 1 ? next() : undefined)}
-                  className={cn(
-                    "inline-flex h-7 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition-colors",
-                    active && "bg-card text-foreground shadow-sm",
-                    done && !active && "text-primary hover:text-primary",
-                    !active && !done && "text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  <span
+    <div className="flex min-h-0 w-full flex-1 flex-col">
+      <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-y-contain pb-6">
+        {back}
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+          <h1 className="text-xl font-semibold tracking-tight">Новый объект</h1>
+          <ol className="inline-flex items-center gap-1 rounded-lg bg-muted/80 p-0.5">
+            {STEPS.map((s, i) => {
+              const active = i === step;
+              const done = i < step;
+              return (
+                <li key={s}>
+                  <button
+                    type="button"
+                    onClick={() => (done ? setStep(i) : i === step + 1 ? next() : undefined)}
                     className={cn(
-                      "inline-flex size-3.5 items-center justify-center rounded-full text-[9px] font-semibold tabular-nums",
-                      active
-                        ? "bg-signal text-[oklch(0.18_0.02_240)]"
-                        : done
-                          ? "bg-primary/15 text-primary"
-                          : "bg-muted-foreground/20 text-muted-foreground",
+                      "inline-flex h-7 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition-colors",
+                      active && "bg-card text-foreground",
+                      done && !active && "text-primary hover:text-primary",
+                      !active && !done && "text-muted-foreground hover:text-foreground",
                     )}
                   >
-                    {done ? <Check className="size-2" strokeWidth={3} /> : i + 1}
-                  </span>
-                  {s}
-                </button>
-              </li>
-            );
-          })}
-        </ol>
+                    <span
+                      className={cn(
+                        "inline-flex size-3.5 items-center justify-center rounded-full text-[9px] font-semibold tabular-nums",
+                        active
+                          ? "bg-signal text-[oklch(0.18_0.02_240)]"
+                          : done
+                            ? "bg-primary/15 text-primary"
+                            : "bg-muted-foreground/20 text-muted-foreground",
+                      )}
+                    >
+                      {done ? <Check className="size-2" strokeWidth={3} /> : i + 1}
+                    </span>
+                    {s}
+                  </button>
+                </li>
+              );
+            })}
+          </ol>
+        </div>
+
+        <div className="min-w-0">
+          {step === 0 && <ObjectCardFields value={draft} onChange={setDraft} />}
+          {step === 1 && (
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Участники видят объект и его заявки. Исполнители этапов подставятся автоматически по ролям из регламента.
+              </p>
+              <MembersPicker
+                value={members}
+                onToggle={(id, on) => setMembers((m) => (on ? [...m, id] : m.filter((x) => x !== id)))}
+              />
+            </div>
+          )}
+          {step === 2 && <StagesPicker templates={templates} selected={stageIds ?? []} onChange={setStageIds} />}
+        </div>
       </div>
 
-      <div className="min-w-0 flex-1">
-        {step === 0 && <ObjectCardFields value={draft} onChange={setDraft} />}
-        {step === 1 && (
-          <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Участники видят объект и его заявки. Исполнители этапов подставятся автоматически по ролям из регламента.
-            </p>
-            <MembersPicker
-              value={members}
-              onToggle={(id, on) => setMembers((m) => (on ? [...m, id] : m.filter((x) => x !== id)))}
-            />
-          </div>
-        )}
-        {step === 2 && <StagesPicker templates={templates} selected={stageIds ?? []} onChange={setStageIds} />}
-      </div>
-
-      <div className="sticky bottom-0 z-20 -mx-4 mt-8 border-t border-border bg-background/95 px-4 py-3 backdrop-blur lg:-mx-8 lg:px-8">
-        <div className="flex flex-wrap items-center gap-3">
+      <div className="shrink-0 border-t border-border bg-background py-3">
+        <div className="flex min-w-0 flex-wrap items-center gap-3">
           {step > 0 && (
             <Button variant="outline" onClick={() => setStep((s) => s - 1)} className="h-9 px-4 text-sm">
               Назад

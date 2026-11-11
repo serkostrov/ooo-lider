@@ -3,7 +3,14 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { showError } from "@/lib/format";
+import {
+  isOptionalEmail,
+  isOptionalPhone,
+  normalizePhone,
+  VALIDATION_MSG,
+} from "@/lib/validation";
 import { Input } from "@/components/ui/input";
+import { PhoneInput } from "@/components/ui/PhoneInput";
 import { Textarea } from "@/components/ui/textarea";
 import { DeleteButton, Field, FormActions, emptyToNull } from "./common";
 
@@ -63,7 +70,7 @@ export function CustomerContactForm({
       const payload = {
         full_name: v.full_name.trim(),
         position: emptyToNull(v.position),
-        phone: emptyToNull(v.phone),
+        phone: normalizePhone(v.phone),
         email: emptyToNull(v.email),
         comment: emptyToNull(v.comment),
       };
@@ -110,6 +117,14 @@ export function CustomerContactForm({
           toast.error("Заполните ФИО");
           return;
         }
+        if (!isOptionalPhone(v.phone)) {
+          toast.error(VALIDATION_MSG.phone);
+          return;
+        }
+        if (!isOptionalEmail(v.email)) {
+          toast.error(VALIDATION_MSG.email);
+          return;
+        }
         m.mutate();
       }}
     >
@@ -132,7 +147,7 @@ export function CustomerContactForm({
       </Field>
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Телефон">
-          <Input value={v.phone} onChange={set("phone")} className={cls} />
+          <PhoneInput value={v.phone} onChange={(phone) => setV((s) => ({ ...s, phone }))} className={cls} />
         </Field>
         <Field label="Email">
           <Input type="email" value={v.email} onChange={set("email")} className={cls} />

@@ -30,15 +30,19 @@ export function Toolbar({
   search,
   onSearch,
   onAdd,
+  addLabel = "Добавить",
   children,
+  className,
 }: {
   search: string;
   onSearch: (v: string) => void;
   onAdd?: (() => void) | undefined;
+  addLabel?: string;
   children?: ReactNode;
+  className?: string;
 }) {
   return (
-    <div className="mb-4 flex w-full flex-wrap items-center gap-2 sm:gap-3">
+    <div className={cn("mb-4 flex w-full flex-wrap items-center gap-2 sm:gap-3", className)}>
       <div className="relative min-w-0 flex-1 basis-48">
         <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input
@@ -50,8 +54,9 @@ export function Toolbar({
       </div>
       {children}
       {onAdd && (
-        <Button onClick={onAdd} size="icon" className="shrink-0" title="Добавить" aria-label="Добавить">
+        <Button onClick={onAdd} className="h-9 shrink-0 gap-1.5 px-3 text-sm">
           <Plus className="size-4" />
+          {addLabel}
         </Button>
       )}
     </div>
@@ -96,7 +101,7 @@ export function ColorField({ value, onChange }: { value: string; onChange: (v: s
         type="color"
         value={valid ? value : "#000000"}
         onChange={(e) => onChange(e.target.value)}
-        className="h-10 w-14 shrink-0 cursor-pointer rounded-xl border border-border bg-transparent p-1"
+        className="h-10 w-14 shrink-0 cursor-pointer rounded-md border border-border bg-transparent p-1"
         aria-label="Выбор цвета"
       />
       <Input value={value} onChange={(e) => onChange(e.target.value)} className="h-10 flex-1 font-mono text-sm" />

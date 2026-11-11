@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { ChevronRight, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useProfile } from "@/lib/profile";
 import { showError } from "@/lib/format";
@@ -42,13 +42,14 @@ export function RequestTypesDirectory() {
       <div className="mb-4 flex h-9 items-center justify-between gap-3">
         <h2 className="text-xl font-semibold tracking-tight">Виды заявок</h2>
         {is_admin && (
-          <Button onClick={() => open("new")} size="icon" title="Добавить" aria-label="Добавить">
+          <Button onClick={() => open("new")} className="h-9 gap-1.5 px-3 text-sm">
             <Plus className="size-4" />
+            Добавить
           </Button>
         )}
       </div>
       {types.length === 0 ? (
-        <p className="rounded-xl border border-border bg-card py-8 text-center text-sm text-muted-foreground">
+        <p className="rounded-md border border-border bg-card py-8 text-center text-sm text-muted-foreground">
           Видов заявок пока нет
         </p>
       ) : (
@@ -56,24 +57,17 @@ export function RequestTypesDirectory() {
           items={types}
           disabled={!is_admin}
           onMove={(ids) => reorder.mutate(ids)}
+          onRowClick={(t) => open(t.id)}
           header={
             <>
               <div className={`${thLabelClass} min-w-0 flex-1`}>Название</div>
               <div className={`${thLabelClass} w-16 shrink-0 text-right`}>Полей</div>
               <div className={`${thLabelClass} w-52 shrink-0`}>Отправка</div>
-              <div className="size-4 shrink-0" aria-hidden />
             </>
           }
           render={(t) => (
-            <button
-              type="button"
-              onClick={() => open(t.id)}
-              className={cn(
-                "flex w-full items-center gap-3 p-0 text-left",
-                !t.is_active && "text-muted-foreground",
-              )}
-            >
-              <div className="min-w-0 flex-1">
+            <>
+              <div className={cn("min-w-0 flex-1", !t.is_active && "text-muted-foreground")}>
                 <div className="truncate text-sm font-medium">
                   {t.name}
                   {!t.is_active && (
@@ -92,8 +86,7 @@ export function RequestTypesDirectory() {
               <span className="w-52 shrink-0 truncate text-xs text-muted-foreground">
                 {t.send_to_email || "не указан"}
               </span>
-              <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
-            </button>
+            </>
           )}
         />
       )}

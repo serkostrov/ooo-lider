@@ -51,20 +51,50 @@ export function useHistory(f: HistoryFilter) {
 }
 
 /** Лента истории: дата, кто, что — таблицей. */
-export function HistoryFeed({ filter, showObject }: { filter: HistoryFilter; showObject?: boolean }) {
+export function HistoryFeed({
+  filter,
+  showObject,
+  fillHeight,
+}: {
+  filter: HistoryFilter;
+  showObject?: boolean;
+  fillHeight?: boolean;
+}) {
   const { data = [], isLoading, error } = useHistory(filter);
-  if (isLoading) return <p className="py-4 text-sm text-muted-foreground">Загрузка…</p>;
-  if (error) return <p className="py-4 text-sm text-destructive">Не удалось загрузить историю</p>;
-  if (data.length === 0) return <p className="py-4 text-sm text-muted-foreground">Записей пока нет</p>;
+  if (isLoading) {
+    return (
+      <p className={`py-4 text-sm text-muted-foreground ${fillHeight ? "h-full" : ""}`}>Загрузка…</p>
+    );
+  }
+  if (error) {
+    return (
+      <p className={`py-4 text-sm text-destructive ${fillHeight ? "h-full" : ""}`}>
+        Не удалось загрузить историю
+      </p>
+    );
+  }
+  if (data.length === 0) {
+    return (
+      <p className={`py-4 text-sm text-muted-foreground ${fillHeight ? "h-full" : ""}`}>
+        Записей пока нет
+      </p>
+    );
+  }
   return (
-    <div className="overflow-x-auto rounded-xl border border-border bg-card">
-      <Table className="text-sm">
+    <div
+      className={
+        fillHeight
+          ? "max-h-full min-h-0 overflow-auto rounded-md border border-border bg-card"
+          : "overflow-x-auto rounded-md border border-border bg-card"
+      }
+    >
+      <Table className="text-sm" containerClassName="max-h-none overflow-visible">
         <TableHeader>
           <TableRow className="hover:bg-transparent">
             <TableHead className="w-44 whitespace-nowrap">Дата</TableHead>
             <TableHead className="w-52">Кто</TableHead>
             <TableHead>Событие</TableHead>
-            {showObject && <TableHead className="w-48">Объект</TableHead>}
+            {showObject && <TableHead className="w-[20rem]">Объект</TableHead>}
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -76,7 +106,11 @@ export function HistoryFeed({ filter, showObject }: { filter: HistoryFilter; sho
               <TableCell className="font-medium">{h.actor?.full_name ?? "Система"}</TableCell>
               <TableCell>{h.message}</TableCell>
               {showObject && (
-                <TableCell className="text-muted-foreground">{h.object?.name ?? "—"}</TableCell>
+                <TableCell className="max-w-[20rem] text-muted-foreground">
+                  <div className="line-clamp-2" title={h.object?.name ?? undefined}>
+                    {h.object?.name ?? "—"}
+                  </div>
+                </TableCell>
               )}
             </TableRow>
           ))}

@@ -1,8 +1,7 @@
 import { toast } from "sonner";
+import * as XLSX from "xlsx";
 
 export type Column<T> = { header: string; value: (row: T) => string | number | null | undefined; width?: number };
-
-const SHEETJS_URL = "https://cdn.sheetjs.com/xlsx-0.20.3/package/xlsx.mjs";
 
 function safeFileName(name: string) {
   return name.replace(/[\\/:*?"<>|]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 120) || "выгрузка";
@@ -20,8 +19,8 @@ function download(blob: Blob, fileName: string) {
 }
 
 /**
- * Выгрузка в .xlsx (SheetJS, ТЗ 7.5). Библиотека подгружается при нажатии.
- * Если она недоступна — CSV с BOM, который Excel открывает с кириллицей.
+ * Выгрузка в .xlsx (SheetJS, ТЗ 7.5).
+ * Если запись файла недоступна — CSV с BOM, который Excel открывает с кириллицей.
  */
 export async function exportXlsx<T>(fileName: string, sheetName: string, columns: Column<T>[], rows: T[]) {
   const aoa: (string | number)[][] = [
@@ -29,7 +28,6 @@ export async function exportXlsx<T>(fileName: string, sheetName: string, columns
     ...rows.map((r) => columns.map((c) => c.value(r) ?? "")),
   ];
   try {
-    const XLSX = await import(/* @vite-ignore */ SHEETJS_URL);
     const ws = XLSX.utils.aoa_to_sheet(aoa);
     ws["!cols"] = columns.map((c) => ({ wch: c.width ?? 18 }));
     const wb = XLSX.utils.book_new();
@@ -42,7 +40,7 @@ export async function exportXlsx<T>(fileName: string, sheetName: string, columns
     };
     const csv = "﻿" + aoa.map((r) => r.map(esc).join(";")).join("\r\n");
     download(new Blob([csv], { type: "text/csv;charset=utf-8" }), `${safeFileName(fileName)}.csv`);
-    toast.info("Excel-библиотека недоступна — выгружен CSV, он открывается в Excel");
+    toast.info("Не удалось записать Excel — выгружен CSV, он открывается в Excel");
   }
 }
 

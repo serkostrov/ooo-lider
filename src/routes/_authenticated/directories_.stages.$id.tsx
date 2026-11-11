@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -8,7 +8,8 @@ import { useProfile } from "@/lib/profile";
 import { showError } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { tabsListClass, tabTriggerClass } from "@/lib/ui";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { cn } from "@/lib/utils";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -30,6 +31,8 @@ export const Route = createFileRoute("/_authenticated/directories_/stages/$id")(
   head: () => ({ meta: [{ title: "Этап — Лидер" }] }),
 });
 
+type StageTab = "main" | "conditions" | "predecessors" | "steps";
+
 function StageCardPage() {
   const { id } = Route.useParams();
   const navigate = useNavigate();
@@ -38,6 +41,8 @@ function StageCardPage() {
   const isNew = id === "new";
   const stage = isNew ? null : stages.find((s) => s.id === id) ?? null;
   const readOnly = !is_admin;
+  const [tab, setTab] = useState<StageTab>("main");
+  useEffect(() => setTab("main"), [id]);
 
   const back = (
     <Link
@@ -68,7 +73,7 @@ function StageCardPage() {
   }
 
   return (
-    <div className="space-y-5 pb-10">
+    <div className="min-h-0 flex-1 space-y-5 overflow-x-hidden overflow-y-auto overscroll-y-contain pb-6">
       {back}
 
       <header className="flex items-start justify-between gap-4">
@@ -89,8 +94,13 @@ function StageCardPage() {
         {stage && !readOnly && <DeleteStage id={stage.id} name={`${stage.number}. ${stage.name}`} />}
       </header>
 
-      <Tabs key={id} defaultValue="main" className="space-y-5">
-        <TabsList className={tabsListClass}>
+      <Tabs
+        key={id}
+        value={isNew ? "main" : tab}
+        onValueChange={(v) => setTab(v as StageTab)}
+        className="space-y-5"
+      >
+        <TabsList className={cn(tabsListClass, "mb-0")}>
           <TabsTrigger value="main" className={tabTriggerClass}>
             Основное
           </TabsTrigger>
@@ -109,7 +119,8 @@ function StageCardPage() {
             Сначала сохраните основные данные — после этого откроются условия, предшествующие этапы и сценарий.
           </p>
         )}
-        <TabsContent value="main" className="mt-0">
+        {/* Только активная вкладка в DOM — иначе неактивные панели раздувают скролл */}
+        {tab === "main" || isNew ? (
           <StageMainForm
             key={stage?.id ?? "new"}
             stage={stage}
@@ -117,20 +128,12 @@ function StageCardPage() {
             readOnly={readOnly}
             onCreated={(newId) => navigate({ to: "/directories/stages/$id", params: { id: newId }, replace: true })}
           />
-        </TabsContent>
-        {stage && (
-          <>
-            <TabsContent value="conditions" className="mt-0">
-              <StageConditions templateId={stage.id} readOnly={readOnly} />
-            </TabsContent>
-            <TabsContent value="predecessors" className="mt-0">
-              <StagePredecessors templateId={stage.id} allStages={stages} readOnly={readOnly} />
-            </TabsContent>
-            <TabsContent value="steps" className="mt-0">
-              <StageSteps templateId={stage.id} readOnly={readOnly} />
-            </TabsContent>
-          </>
-        )}
+        ) : null}
+        {stage && tab === "conditions" ? <StageConditions templateId={stage.id} readOnly={readOnly} /> : null}
+        {stage && tab === "predecessors" ? (
+          <StagePredecessors templateId={stage.id} allStages={stages} readOnly={readOnly} />
+        ) : null}
+        {stage && tab === "steps" ? <StageSteps templateId={stage.id} readOnly={readOnly} /> : null}
       </Tabs>
     </div>
   );
@@ -156,6 +159,7 @@ function DeleteStage({ id, name }: { id: string; name: string }) {
     },
     onError: showError,
   });
+
   return (
     <>
       <Button

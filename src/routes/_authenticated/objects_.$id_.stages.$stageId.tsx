@@ -1,13 +1,14 @@
-import type { ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, ArrowLeft, Flag } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { tabsListClass, tabTriggerClass } from "@/lib/ui";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
 import { HistoryFeed } from "@/components/history/HistoryFeed";
 import { useRefreshStages, useStage } from "@/components/stages/data";
-import { StageMainTab } from "@/components/stages/page/StageMainTab";
+import { StageMainTab, type StageMainHandle } from "@/components/stages/page/StageMainTab";
 import { StageConditionsTab, useStageConditions } from "@/components/stages/page/StageConditionsTab";
 import { StageDocumentsTab } from "@/components/stages/page/StageDocumentsTab";
 import { StageStepsTab, useStageSteps } from "@/components/stages/page/StageStepsTab";
@@ -25,6 +26,9 @@ function StagePage() {
   const { data: stage, isLoading } = useStage(stageId);
   const { data: conditions = [] } = useStageConditions(stageId);
   const { data: steps = [] } = useStageSteps(stageId);
+  const [tab, setTab] = useState("main");
+  const [saving, setSaving] = useState(false);
+  const mainRef = useRef<StageMainHandle>(null);
 
   const refresh = () => {
     refreshStages(id, stageId);
@@ -78,74 +82,104 @@ function StagePage() {
     meta.push({ key: "step", node: <>Сейчас: {stage.current_step_action}</> });
   }
 
+  const showSave = tab === "main" && !stage.is_closed && !stage.is_excluded;
+
   return (
-    <div className="pb-8">
-      {back}
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-y-contain pb-6">
+        {back}
 
-      <Tabs key={stageId} defaultValue="main">
-        <div className="mb-6 grid items-stretch gap-4 sm:grid-cols-[minmax(0,1fr)_16rem] sm:gap-6">
-          <div className="flex min-w-0 flex-col justify-between gap-4">
-            <header>
-              <h1 className="text-xl font-semibold leading-snug tracking-tight">
-                <span className="text-muted-foreground">{stage.number}.</span> {stage.name}
-              </h1>
-              {meta.length > 0 && (
-                <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
-                  {meta.map((m, i) => (
-                    <span key={m.key} className="inline-flex items-center gap-2">
-                      {i > 0 && <span className="text-border" aria-hidden>·</span>}
-                      {m.node}
-                    </span>
-                  ))}
-                </p>
-              )}
-            </header>
-            <TabsList className={cn(tabsListClass, "mb-0")}>
-              <TabsTrigger value="main" className={tabTriggerClass}>
-                Основное
-              </TabsTrigger>
-              <TabsTrigger value="conditions" className={tabTriggerClass}>
-                Условия закрытия
-                {stage.conditions_total > 0 && (
-                  <span className="ml-1.5 rounded bg-muted px-1.5 text-xs tabular-nums text-muted-foreground">
-                    {stage.conditions_done}/{stage.conditions_total}
-                  </span>
+        <Tabs key={stageId} value={tab} onValueChange={setTab}>
+          <div className="mb-5 grid items-stretch gap-4 sm:grid-cols-[minmax(0,1fr)_16rem] sm:gap-5">
+            <div className="flex min-w-0 flex-col justify-between gap-4">
+              <header>
+                <h1 className="text-xl font-semibold leading-snug tracking-tight">
+                  <span className="text-muted-foreground">{stage.number}.</span> {stage.name}
+                </h1>
+                {meta.length > 0 && (
+                  <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
+                    {meta.map((m, i) => (
+                      <span key={m.key} className="inline-flex items-center gap-2">
+                        {i > 0 && <span className="text-border" aria-hidden>·</span>}
+                        {m.node}
+                      </span>
+                    ))}
+                  </p>
                 )}
-              </TabsTrigger>
-              <TabsTrigger value="documents" className={tabTriggerClass}>
-                Документы
-              </TabsTrigger>
-              {steps.length > 0 && (
-                <TabsTrigger value="steps" className={tabTriggerClass}>
-                  Сценарий
+              </header>
+              <TabsList className={cn(tabsListClass, "mb-0 w-fit self-start")}>
+                <TabsTrigger value="main" className={tabTriggerClass}>
+                  Карточка
                 </TabsTrigger>
-              )}
-              <TabsTrigger value="history" className={tabTriggerClass}>
-                История
-              </TabsTrigger>
-            </TabsList>
+                <TabsTrigger value="conditions" className={tabTriggerClass}>
+                  Условия
+                  {stage.conditions_total > 0 && (
+                    <span className="ml-1.5 rounded bg-muted px-1.5 text-xs tabular-nums text-muted-foreground">
+                      {stage.conditions_done}/{stage.conditions_total}
+                    </span>
+                  )}
+                </TabsTrigger>
+                <TabsTrigger value="documents" className={tabTriggerClass}>
+                  Файлы
+                </TabsTrigger>
+                {steps.length > 0 && (
+                  <TabsTrigger value="steps" className={tabTriggerClass}>
+                    Сценарий
+                  </TabsTrigger>
+                )}
+                <TabsTrigger value="history" className={tabTriggerClass}>
+                  История
+                </TabsTrigger>
+              </TabsList>
+            </div>
+            <StageStatusBar stage={stage} conditions={conditions} onChanged={refresh} />
           </div>
-          <StageStatusBar stage={stage} conditions={conditions} onChanged={refresh} />
-        </div>
 
-        <TabsContent value="main">
-          <StageMainTab key={stage.id + stage.updated_at} stage={stage} onSaved={refresh} />
-        </TabsContent>
-        <TabsContent value="conditions">
-          <StageConditionsTab stage={stage} onChanged={refresh} />
-        </TabsContent>
-        <TabsContent value="documents">
-          <StageDocumentsTab stage={stage} />
-        </TabsContent>
-        {steps.length > 0 && (
-          <TabsContent value="steps">
-            <StageStepsTab steps={steps} disabled={stage.is_excluded || stage.is_closed} onChanged={refresh} />
+          <TabsContent value="main" className="mt-0">
+            <StageMainTab
+              ref={mainRef}
+              key={stage.id + stage.updated_at}
+              stage={stage}
+              onSaved={refresh}
+            />
           </TabsContent>
-        )}
-        <TabsContent value="history">
-          <HistoryFeed filter={{ entityType: "stage", entityId: stage.id }} />
-        </TabsContent>
-      </Tabs>
+          <TabsContent value="conditions" className="mt-0">
+            <StageConditionsTab stage={stage} onChanged={refresh} />
+          </TabsContent>
+          <TabsContent value="documents" className="mt-0">
+            <StageDocumentsTab stage={stage} />
+          </TabsContent>
+          {steps.length > 0 && (
+            <TabsContent value="steps" className="mt-0">
+              <StageStepsTab steps={steps} disabled={stage.is_excluded || stage.is_closed} onChanged={refresh} />
+            </TabsContent>
+          )}
+          <TabsContent value="history" className="mt-0">
+            <HistoryFeed filter={{ entityType: "stage", entityId: stage.id }} />
+          </TabsContent>
+        </Tabs>
+      </div>
+
+      {showSave && (
+        <div className="shrink-0 border-t border-border bg-background py-3">
+          <Button
+            className="h-10 px-6 text-sm"
+            disabled={saving}
+            onClick={() => {
+              void (async () => {
+                setSaving(true);
+                try {
+                  await mainRef.current?.save();
+                } finally {
+                  setSaving(false);
+                }
+              })();
+            }}
+          >
+            {saving ? "Сохранение…" : "Сохранить"}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

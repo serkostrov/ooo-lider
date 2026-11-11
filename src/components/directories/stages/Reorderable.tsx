@@ -9,13 +9,14 @@ import { cn } from "@/lib/utils";
  * onMove получает новый порядок id.
  * variant=list — один блок со строками; cards — отдельные карточки (для сложных строк).
  *
- * Шапка и строки делят одну сетку: [контент flex-1][действия w-16].
- * В header передавайте только колонки данных — слот под ↑↓ резервируется здесь.
+ * Шапка и строки: [контент flex-1][действия w-16].
+ * Клик по строке — через onRowClick (попадает во всю площадь ряда, кроме ↑↓).
  */
 export function Reorderable<T extends { id: string }>({
   items,
   disabled,
   onMove,
+  onRowClick,
   render,
   variant = "list",
   header,
@@ -23,6 +24,8 @@ export function Reorderable<T extends { id: string }>({
   items: T[];
   disabled?: boolean;
   onMove: (orderedIds: string[]) => void;
+  /** Клик по строке (кроме кнопок ↑↓). */
+  onRowClick?: (item: T) => void;
   render: (item: T, index: number) => ReactNode;
   variant?: "list" | "cards";
   /** Колонки шапки list-варианта (без слота под ↑↓). */
@@ -43,28 +46,42 @@ export function Reorderable<T extends { id: string }>({
   return (
     <div className={cn(cards ? "space-y-2" : panelClass)}>
       {!cards && header ? (
-        <div className={cn("flex items-center gap-3 border-b border-border bg-muted/40 px-5", TH_H)}>
-          <div className="flex min-w-0 flex-1 items-center gap-3">{header}</div>
-          {showActions && <div className={cn(REORDER_ACTIONS_W, "shrink-0")} aria-hidden />}
+        <div className={cn("flex items-stretch border-b border-border bg-muted/40", TH_H)}>
+          <div className="flex min-w-0 flex-1 items-center gap-3 px-5">{header}</div>
+          {showActions && <div className={cn(REORDER_ACTIONS_W, "shrink-0 pr-3")} aria-hidden />}
         </div>
       ) : null}
       {items.map((item, index) => (
         <div
           key={item.id}
           className={cn(
-            "flex items-center gap-3 px-5 py-2.5 transition-colors",
+            "flex items-stretch transition-colors",
             cards
-              ? "items-start rounded-xl border border-border bg-card/60"
-              : "border-b border-border/60 last:border-b-0",
+              ? "items-start gap-3 rounded-md border border-border bg-card/60 px-5 py-2.5"
+              : cn("border-b border-border/60 last:border-b-0", onRowClick && "hover:bg-muted/40"),
           )}
         >
-          <div className="min-w-0 flex-1">{render(item, index)}</div>
+          {cards ? (
+            <div className="flex min-w-0 flex-1 items-center gap-3">{render(item, index)}</div>
+          ) : onRowClick ? (
+            <button
+              type="button"
+              onClick={() => onRowClick(item)}
+              className="flex min-h-12 min-w-0 flex-1 cursor-pointer items-center gap-3 px-5 py-2.5 text-left outline-none focus-visible:bg-muted/50 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/60"
+            >
+              {render(item, index)}
+            </button>
+          ) : (
+            <div className="flex min-h-12 min-w-0 flex-1 items-center gap-3 px-5 py-2.5">
+              {render(item, index)}
+            </div>
+          )}
           {showActions && (
             <div
               className={cn(
-                "flex shrink-0 items-center",
+                "flex shrink-0 items-center self-center",
                 REORDER_ACTIONS_W,
-                cards && "mt-0.5 flex-col",
+                cards ? "mt-0.5 flex-col" : "pr-3",
               )}
             >
               <Button

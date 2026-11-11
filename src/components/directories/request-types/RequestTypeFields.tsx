@@ -95,17 +95,16 @@ export function RequestTypeFields({ typeId, readOnly }: { typeId: string; readOn
         {!readOnly && (
           <Button
             type="button"
-            size="icon"
+            className="h-9 gap-1.5 px-3 text-sm"
             onClick={() => setEditing("new")}
-            title="Добавить поле"
-            aria-label="Добавить поле"
           >
             <Plus className="size-4" />
+            Добавить поле
           </Button>
         )}
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-border bg-card">
+      <div className="overflow-hidden rounded-md border border-border bg-card">
         <Table className="text-sm">
           <TableHeader>
             <TableRow>

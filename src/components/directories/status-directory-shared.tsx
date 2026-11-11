@@ -23,8 +23,9 @@ export function StatusDirectoryShell({
       <div className="mb-4 flex h-9 items-center justify-between gap-3">
         <h2 className="text-xl font-semibold tracking-tight">{title}</h2>
         {onAdd && (
-          <Button type="button" size="icon" onClick={onAdd} title="Добавить" aria-label="Добавить">
+          <Button type="button" className="h-9 gap-1.5 px-3 text-sm" onClick={onAdd}>
             <Plus className="size-4" />
+            Добавить
           </Button>
         )}
       </div>

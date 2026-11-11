@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/select";
 import { HistoryFeed } from "@/components/history/HistoryFeed";
 import { useObjects } from "@/components/objects/data";
+import { PageFrame } from "@/components/PageFrame";
 import { PageHeader } from "@/components/PageHeader";
 import { FilterBar } from "@/components/FilterBar";
 
@@ -39,74 +40,85 @@ function HistoryPage() {
   const [to, setTo] = useState("");
 
   return (
-    <div>
-      <PageHeader title="История" description="Журнал действий по объектам, этапам и заявкам" />
-      <FilterBar
-        actions={
-          objectId !== ALL || type !== ALL || from || to ? (
-            <Button
-              variant="ghost"
-              className="h-9 text-sm"
-              onClick={() => {
-                setObjectId(ALL);
-                setType(ALL);
-                setFrom("");
-                setTo("");
-              }}
-            >
-              Сбросить
-            </Button>
-          ) : undefined
-        }
-      >
-        <Select value={objectId} onValueChange={setObjectId}>
-          <SelectTrigger className="h-9 w-60 text-sm">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={ALL} className="text-sm">
-              Все объекты
-            </SelectItem>
-            {objects.map((o) => (
-              <SelectItem key={o.id} value={o.id} className="text-sm">
-                {o.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={type} onValueChange={setType}>
-          <SelectTrigger className="h-9 w-48 text-sm">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={ALL} className="text-sm">
-              Всё
-            </SelectItem>
-            {TYPES.map((t) => (
-              <SelectItem key={t.v} value={t.v} className="text-sm">
-                {t.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <label className="flex items-center gap-2 text-sm">
-          с{" "}
-          <Input
-            type="date"
-            value={from}
-            onChange={(e) => setFrom(e.target.value)}
-            className="h-9 w-44 text-sm"
+    <PageFrame
+      header={
+        <>
+          <PageHeader
+            title="История"
+            description="Журнал действий по объектам, этапам и заявкам"
+            className="mb-3"
           />
-          по{" "}
-          <Input
-            type="date"
-            value={to}
-            onChange={(e) => setTo(e.target.value)}
-            className="h-9 w-44 text-sm"
-          />
-        </label>
-      </FilterBar>
+          <FilterBar
+            className="mb-0"
+            actions={
+              objectId !== ALL || type !== ALL || from || to ? (
+                <Button
+                  variant="ghost"
+                  className="h-9 text-sm"
+                  onClick={() => {
+                    setObjectId(ALL);
+                    setType(ALL);
+                    setFrom("");
+                    setTo("");
+                  }}
+                >
+                  Сбросить
+                </Button>
+              ) : undefined
+            }
+          >
+            <Select value={objectId} onValueChange={setObjectId}>
+              <SelectTrigger className="h-9 w-60 text-sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL} className="text-sm">
+                  Все объекты
+                </SelectItem>
+                {objects.map((o) => (
+                  <SelectItem key={o.id} value={o.id} className="text-sm">
+                    {o.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={type} onValueChange={setType}>
+              <SelectTrigger className="h-9 w-48 text-sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL} className="text-sm">
+                  Всё
+                </SelectItem>
+                {TYPES.map((t) => (
+                  <SelectItem key={t.v} value={t.v} className="text-sm">
+                    {t.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <label className="flex items-center gap-2 text-sm">
+              с{" "}
+              <Input
+                type="date"
+                value={from}
+                onChange={(e) => setFrom(e.target.value)}
+                className="h-9 w-44 text-sm"
+              />
+              по{" "}
+              <Input
+                type="date"
+                value={to}
+                onChange={(e) => setTo(e.target.value)}
+                className="h-9 w-44 text-sm"
+              />
+            </label>
+          </FilterBar>
+        </>
+      }
+    >
       <HistoryFeed
+        fillHeight
         showObject={objectId === ALL}
         filter={{
           ...(objectId !== ALL ? { objectId } : {}),
@@ -115,6 +127,6 @@ function HistoryPage() {
           ...(to ? { to } : {}),
         }}
       />
-    </div>
+    </PageFrame>
   );
 }

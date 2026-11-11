@@ -3,9 +3,16 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { showError } from "@/lib/format";
+import {
+  digitsOnlyOrNull,
+  isOptionalInn,
+  isOptionalKpp,
+  isOptionalOgrn,
+  VALIDATION_MSG,
+} from "@/lib/validation";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { DeleteButton, Field, FormActions, emptyToNull } from "./common";
+import { DeleteButton, Field, FormActions } from "./common";
 
 export type Customer = {
   id: string;
@@ -45,11 +52,11 @@ export function CustomerForm({
     mutationFn: async () => {
       const payload = {
         name: v.name.trim(),
-        inn: emptyToNull(v.inn),
-        kpp: emptyToNull(v.kpp),
-        ogrn: emptyToNull(v.ogrn),
-        legal_address: emptyToNull(v.legal_address),
-        comment: emptyToNull(v.comment),
+        inn: digitsOnlyOrNull(v.inn),
+        kpp: digitsOnlyOrNull(v.kpp),
+        ogrn: digitsOnlyOrNull(v.ogrn),
+        legal_address: v.legal_address.trim() || null,
+        comment: v.comment.trim() || null,
       };
       const cols = "id, name, inn, kpp, ogrn, legal_address, comment";
       const { data, error } = customer
@@ -71,15 +78,48 @@ export function CustomerForm({
       className="space-y-5"
       onSubmit={(e) => {
         e.preventDefault();
-        if (!v.name.trim()) { toast.error("Заполните название"); return; }
+        if (!v.name.trim()) {
+          toast.error("Заполните название");
+          return;
+        }
+        if (!isOptionalInn(v.inn)) {
+          toast.error(VALIDATION_MSG.inn);
+          return;
+        }
+        if (!isOptionalKpp(v.kpp)) {
+          toast.error(VALIDATION_MSG.kpp);
+          return;
+        }
+        if (!isOptionalOgrn(v.ogrn)) {
+          toast.error(VALIDATION_MSG.ogrn);
+          return;
+        }
         m.mutate();
       }}
     >
       <Field label="Название" required><Input value={v.name} onChange={set("name")} className={cls} /></Field>
       <div className="grid gap-4 sm:grid-cols-3">
-        <Field label="ИНН"><Input value={v.inn} onChange={set("inn")} className={cls} /></Field>
-        <Field label="КПП"><Input value={v.kpp} onChange={set("kpp")} className={cls} /></Field>
-        <Field label="ОГРН"><Input value={v.ogrn} onChange={set("ogrn")} className={cls} /></Field>
+        <Field label="ИНН">
+          <Input
+            value={v.inn}
+            onChange={set("inn")}
+            inputMode="numeric"
+            placeholder="10 или 12 цифр"
+            className={cls}
+          />
+        </Field>
+        <Field label="КПП">
+          <Input value={v.kpp} onChange={set("kpp")} inputMode="numeric" placeholder="9 цифр" className={cls} />
+        </Field>
+        <Field label="ОГРН">
+          <Input
+            value={v.ogrn}
+            onChange={set("ogrn")}
+            inputMode="numeric"
+            placeholder="13 или 15 цифр"
+            className={cls}
+          />
+        </Field>
       </div>
       <Field label="Адрес"><Input value={v.legal_address} onChange={set("legal_address")} className={cls} /></Field>
       <Field label="Комментарий"><Textarea value={v.comment} onChange={set("comment")} className="text-sm" /></Field>

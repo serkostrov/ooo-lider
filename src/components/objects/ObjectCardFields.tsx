@@ -227,7 +227,7 @@ export function ObjectCardFields({
             </p>
           </div>
           {contacts.length === 0 && (
-            <div className="rounded-xl border border-dashed border-border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
+            <div className="rounded-md border border-dashed border-border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
               У этого заказчика ещё нет специалистов. Нажмите «+» у нужной роли или{" "}
               <button
                 type="button"

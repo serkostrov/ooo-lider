@@ -57,7 +57,7 @@ export function StageConditionsTab({ stage, onChanged }: { stage: ObjectStage; o
         {conds.map((c) => {
           const condFiles = files.filter((f) => f.entity_id === c.id);
           return (
-            <li key={c.id} className={`rounded-xl border p-4 ${c.is_done ? "border-success/25 bg-success-soft" : "border-border bg-card"}`}>
+            <li key={c.id} className={`rounded-md border p-4 ${c.is_done ? "border-success/25 bg-success-soft" : "border-border bg-card"}`}>
               <div className="flex items-start gap-4">
                 <div className="pt-0.5">
                   <ConditionToggle cond={c} disabled={stage.is_excluded} onDone={onChanged} />

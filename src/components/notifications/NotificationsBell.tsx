@@ -11,10 +11,11 @@ import { cn } from "@/lib/utils";
  * «Просмотреть все» помечает текущие как прочитанные — бейдж исчезает.
  */
 export function NotificationsBell({
-  rail = false,
+  collapsed = false,
   onNavigate,
 }: {
-  rail?: boolean;
+  /** true — только иконка; false — иконка + подпись */
+  collapsed?: boolean;
   onNavigate?: (() => void) | undefined;
 }) {
   const navigate = useNavigate();
@@ -46,39 +47,30 @@ export function NotificationsBell({
           title={tip}
           aria-label={tip}
           className={cn(
-            "group/item relative flex h-9 w-full items-center justify-start rounded-xl text-left text-sm transition-colors duration-150",
+            "group/item relative flex h-9 w-full items-center rounded-md text-left text-sm transition-colors duration-150",
             "text-sidebar-foreground hover:bg-sidebar-accent/55 hover:text-sidebar-accent-foreground",
-            rail ? "gap-0 group-hover/nav:gap-2.5 group-focus-within/nav:gap-2.5" : "gap-2.5",
+            collapsed ? "justify-center" : "gap-2.5",
           )}
         >
           <span className="inline-flex w-10 shrink-0 items-center justify-center">
-            <span className="relative inline-flex size-8 items-center justify-center rounded-xl">
+            <span className="relative inline-flex size-8 items-center justify-center rounded-md">
               <Bell className="size-[1.125rem] opacity-75 group-hover/item:opacity-100" />
               {count > 0 && (
                 <span
                   aria-hidden
-                  className="absolute -right-0.5 -top-0.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-danger px-0.5 text-[8px] font-bold leading-none tabular-nums text-danger-foreground shadow-sm"
+                  className="absolute -right-0.5 -top-0.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-danger px-0.5 text-[8px] font-bold leading-none tabular-nums text-danger-foreground"
                 >
                   {badge}
                 </span>
               )}
             </span>
           </span>
-          <span
-            className={cn(
-              "min-w-0 truncate",
-              rail
-                ? "w-0 overflow-hidden opacity-0 transition-[width,opacity] duration-150 group-hover/nav:w-auto group-hover/nav:flex-1 group-hover/nav:opacity-100 group-focus-within/nav:w-auto group-focus-within/nav:flex-1 group-focus-within/nav:opacity-100"
-                : "flex-1",
-            )}
-          >
-            Уведомления
-          </span>
+          {!collapsed && <span className="min-w-0 flex-1 truncate">Уведомления</span>}
         </button>
       </PopoverTrigger>
       <PopoverContent
-        side={rail ? "right" : "top"}
-        align={rail ? "end" : "start"}
+        side={collapsed ? "right" : "top"}
+        align={collapsed ? "end" : "start"}
         sideOffset={8}
         className="flex w-[min(100vw-1.5rem,24rem)] flex-col gap-0 overflow-hidden p-0"
       >

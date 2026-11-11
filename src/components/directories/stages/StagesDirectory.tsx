@@ -50,7 +50,7 @@ export function StagesDirectory() {
           <Switch checked={showInactive} onCheckedChange={setShowInactive} /> Показать неактивные
         </label>
       </Toolbar>
-      <div className="overflow-x-auto rounded-xl border border-border bg-card">
+      <div className="overflow-x-auto rounded-md border border-border bg-card">
         <Table className="text-sm">
           <TableHeader>
             <TableRow>

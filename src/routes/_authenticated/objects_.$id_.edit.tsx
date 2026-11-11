@@ -73,7 +73,7 @@ function EditObjectPage() {
   };
 
   return (
-    <div>
+    <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-y-contain pb-6">
       {back}
       <h1 className="mb-4 text-xl font-bold">{obj.name}</h1>
       <Tabs defaultValue="card">
@@ -259,7 +259,7 @@ function StagesTab({ id }: { id: string }) {
           <Plus className="size-4" />
         </Button>
       </div>
-      <div className="divide-y overflow-hidden rounded-xl border border-border bg-card">
+      <div className="divide-y overflow-hidden rounded-md border border-border bg-card">
         {stages.length === 0 && <p className="p-4 text-sm text-muted-foreground">Этапов нет</p>}
         {stages.map((s) => (
           <div key={s.id} className={`flex flex-wrap items-center gap-4 px-4 py-2 text-sm ${s.is_excluded ? "bg-muted/50" : ""}`}>

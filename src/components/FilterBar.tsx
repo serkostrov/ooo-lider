@@ -12,12 +12,7 @@ export function FilterBar({
   className?: string;
 }) {
   return (
-    <div
-      className={cn(
-        "mb-4 flex flex-wrap items-center gap-2 sm:gap-3",
-        className,
-      )}
-    >
+    <div className={cn("mb-4 flex flex-wrap items-center gap-2 sm:gap-3", className)}>
       <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">{children}</div>
       {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
     </div>

@@ -72,7 +72,7 @@ export function RolesDirectory() {
         Можно править название и признак полного доступа. Системные роли удалить нельзя.
       </p>
       <Toolbar search={search} onSearch={setSearch} onAdd={is_admin ? () => setEditing("new") : undefined} />
-      <div className="overflow-hidden rounded-xl border border-border bg-card">
+      <div className="overflow-hidden rounded-md border border-border bg-card">
         <Table className="text-sm">
           <TableHeader>
             <TableRow>

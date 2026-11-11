@@ -154,7 +154,7 @@ export function StageSteps({ templateId, readOnly }: { templateId: string; readO
       />
       {!readOnly && (
         <form
-          className="space-y-4 rounded-xl border border-dashed p-4"
+          className="space-y-4 rounded-md border border-dashed p-4"
           onSubmit={(e) => {
             e.preventDefault();
             add.mutate();
@@ -195,8 +195,9 @@ export function StageSteps({ templateId, readOnly }: { templateId: string; readO
             <Field label="Срок, дней">
               <Input value={days} onChange={(e) => setDays(e.target.value)} inputMode="numeric" className="h-9 w-32 text-sm" />
             </Field>
-            <Button type="submit" disabled={add.isPending} size="icon" title="Добавить шаг" aria-label="Добавить шаг">
+            <Button type="submit" disabled={add.isPending} className="h-9 gap-1.5 px-3 text-sm">
               <Plus className="size-4" />
+              Добавить
             </Button>
           </div>
         </form>

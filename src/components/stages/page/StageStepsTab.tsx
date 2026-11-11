@@ -62,7 +62,7 @@ export function StageStepsTab({ steps, disabled, onChanged }: { steps: ObjectSte
   return (
     <div className="space-y-3">
       {allDone && (
-        <p className="rounded-xl border border-success/25 bg-success-soft p-4 text-sm text-success">
+        <p className="rounded-md border border-success/25 bg-success-soft p-4 text-sm text-success">
           Все шаги сценария выполнены.
         </p>
       )}
@@ -72,7 +72,7 @@ export function StageStepsTab({ steps, disabled, onChanged }: { steps: ObjectSte
           return (
             <li
               key={s.id}
-              className={`rounded-xl border p-4 ${
+              className={`rounded-md border p-4 ${
                 current ? "border-primary bg-accent" : s.state === "done" ? "border-success/20 bg-success-soft/50" : "border-border bg-card"
               }`}
             >

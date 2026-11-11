@@ -49,7 +49,7 @@ export function CustomersDirectory() {
   return (
     <div>
       <Toolbar search={search} onSearch={setSearch} onAdd={is_admin ? () => setCreating(true) : undefined} />
-      <div className="overflow-hidden rounded-xl border border-border bg-card">
+      <div className="overflow-hidden rounded-md border border-border bg-card">
         <Table className="text-sm">
           <TableHeader>
             <TableRow>
@@ -177,17 +177,15 @@ function Contacts({ customerId }: { customerId: string }) {
           <Button
             type="button"
             onClick={() => setEditing("new")}
-            size="icon"
-            className="size-8 shrink-0"
-            title="Добавить"
-            aria-label="Добавить"
+            className="h-8 shrink-0 gap-1.5 px-2.5 text-sm"
           >
             <Plus className="size-4" />
+            Добавить
           </Button>
         )}
       </div>
       {editing === "new" && (
-        <div className="rounded-xl border border-border bg-muted/40 p-4">
+        <div className="rounded-md border border-border bg-muted/40 p-4">
           <CustomerContactForm customerId={customerId} contact={null} onClose={() => setEditing(null)} />
         </div>
       )}
@@ -195,7 +193,7 @@ function Contacts({ customerId }: { customerId: string }) {
         <p className="text-sm text-muted-foreground">Пока никого нет — добавьте технадзора или другого специалиста</p>
       )}
       {data.length > 0 && (
-        <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border">
+        <ul className="divide-y divide-border overflow-hidden rounded-md border border-border">
           {data.map((c, i) =>
             editing !== null && editing !== "new" && editing.id === c.id ? (
               <li key={c.id} className="bg-muted/40 p-4">

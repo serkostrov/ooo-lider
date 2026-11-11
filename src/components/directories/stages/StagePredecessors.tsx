@@ -72,7 +72,7 @@ export function StagePredecessors({
       ) : (
         <ul className="space-y-2">
           {selected.map((s) => (
-            <li key={s.id} className="flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-2 text-sm">
+            <li key={s.id} className="flex items-center gap-3 rounded-md border border-border bg-card px-4 py-2 text-sm">
               <span className="flex-1">
                 <span className="font-semibold">{s.number}.</span> {s.name}
               </span>
@@ -95,8 +95,9 @@ export function StagePredecessors({
       {!readOnly && (
         <Popover open={open} onOpenChange={setOpen}>
           <PopoverTrigger asChild>
-            <Button variant="outline" size="icon" title="Добавить предшествующий этап" aria-label="Добавить предшествующий этап">
+            <Button variant="outline" className="h-9 gap-1.5 px-3 text-sm">
               <Plus className="size-4" />
+              Добавить этап
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-[min(36rem,calc(100vw-2rem))] p-0" align="start">

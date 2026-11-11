@@ -46,7 +46,7 @@ function RequestTypeCardPage() {
   }
 
   return (
-    <div>
+    <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-y-contain pb-6">
       {back}
       <h1 className="mb-4 text-xl font-bold">{type ? type.name : "Новый вид заявки"}</h1>
       <Tabs key={id} defaultValue={isNew ? "main" : "fields"}>

@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { forwardRef, useImperativeHandle, useState, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -9,7 +9,6 @@ import { addDays } from "@/lib/dates";
 import { formatSize, listTemplateFiles, openTemplateFile, type TemplateFile } from "@/lib/files";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Field } from "@/components/directories/common";
 import { toIntOrNull } from "@/components/directories/stages/data";
@@ -18,16 +17,40 @@ import { StatusBadge, useObjectStages, type ObjectStage } from "../data";
 
 const NONE = "__none";
 
-function Section({ title, children }: { title: string; children: ReactNode }) {
+export type StageMainHandle = {
+  save: () => Promise<void>;
+};
+
+function Section({
+  title,
+  hint,
+  children,
+  className,
+}: {
+  title: string;
+  hint?: string;
+  children: ReactNode;
+  className?: string;
+}) {
   return (
-    <section className="rounded-xl border border-border bg-card p-4 sm:p-5">
-      <h3 className="mb-5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">{title}</h3>
+    <section className={className}>
+      <div className="mb-2.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+        <h3 className="text-sm font-semibold tracking-tight text-foreground">{title}</h3>
+        {hint ? <span className="text-xs text-muted-foreground">{hint}</span> : null}
+      </div>
       {children}
     </section>
   );
 }
 
-export function StageMainTab({ stage, onSaved }: { stage: ObjectStage; onSaved: () => void }) {
+function Block({ children }: { children: ReactNode }) {
+  return (
+    <div className="rounded-md border border-border/80 bg-card/40 px-3.5 py-3 sm:px-4 sm:py-3.5">{children}</div>
+  );
+}
+
+export const StageMainTab = forwardRef<StageMainHandle, { stage: ObjectStage; onSaved: () => void }>(
+  function StageMainTab({ stage, onSaved }, ref) {
   const { data: profiles = [] } = useActiveProfiles();
   const [v, setV] = useState({
     executor_id: stage.executor_id ?? "",
@@ -56,6 +79,7 @@ export function StageMainTab({ stage, onSaved }: { stage: ObjectStage; onSaved: 
 
   const save = useMutation({
     mutationFn: async () => {
+      if (!v.executor_id) throw new Error("Укажите исполнителя — кто делает этап");
       const rd = toIntOrNull(v.response_days);
       const rm = toIntOrNull(v.remind_days);
       if (rd === "bad" || rm === "bad") throw new Error("Дни — целое число от 0 или пусто");
@@ -85,6 +109,8 @@ export function StageMainTab({ stage, onSaved }: { stage: ObjectStage; onSaved: 
     onError: showError,
   });
 
+  useImperativeHandle(ref, () => ({ save: () => save.mutateAsync().then(() => undefined) }), [save]);
+
   const person = (k: "executor_id" | "coexecutor_id" | "confirmer_id", placeholder: string) => (
     <Select value={v[k] || NONE} onValueChange={(x) => set(k, x === NONE ? "" : x)}>
       <SelectTrigger className="h-9 w-full text-sm">
@@ -107,109 +133,110 @@ export function StageMainTab({ stage, onSaved }: { stage: ObjectStage; onSaved: 
   );
 
   return (
-    <div className="w-full space-y-4">
-      {stage.description && <p className="whitespace-pre-line text-sm text-muted-foreground">{stage.description}</p>}
+    <div className="w-full space-y-3">
+      {stage.description && (
+        <p className="whitespace-pre-line text-sm leading-snug text-muted-foreground">{stage.description}</p>
+      )}
       {stage.return_reason && stage.status_code !== "closed" && (
-        <div className="rounded-xl border border-warning/40 bg-warning-soft px-4 py-3 text-sm">
+        <div className="rounded-md border border-warning/40 bg-warning-soft px-3 py-2 text-sm">
           <span className="font-semibold text-warning">Возвращён на доработку:</span> {stage.return_reason}
         </div>
       )}
 
-      <Section title="Кто">
-        <div className="grid w-full gap-4 sm:grid-cols-3">
-          <Field label="Исполнитель">{person("executor_id", "не назначен")}</Field>
-          <Field label="Соисполнитель">{person("coexecutor_id", "Нет")}</Field>
-          <div className="min-w-0 space-y-3">
-            <Field label="Адресат">{person("confirmer_id", "По роли")}</Field>
-            {stage.confirmer_role_name && (
-              <p className="text-xs text-muted-foreground">По регламенту: {stage.confirmer_role_name}</p>
-            )}
+      <Block>
+        <div className="space-y-3">
+          <Section title="Кто делает" hint="исполнитель обязателен">
+            <div className="grid gap-2.5 sm:grid-cols-3">
+              <Field label="Исполнитель" required>
+                {person("executor_id", "не назначен")}
+              </Field>
+              <Field label="Соисполнитель">{person("coexecutor_id", "Нет")}</Field>
+              <div className="min-w-0">
+                <Field label="Кто принимает">{person("confirmer_id", "По роли")}</Field>
+                {stage.confirmer_role_name && (
+                  <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
+                    По регламенту: {stage.confirmer_role_name}
+                  </p>
+                )}
+              </div>
+            </div>
+          </Section>
+
+          <div className="border-t border-border/70 pt-3">
+            <Section title="Сроки">
+              <div className="grid gap-2.5 grid-cols-2 sm:grid-cols-[1fr_1fr_7.5rem]">
+                <Field label="Дата начала">{date("start_date")}</Field>
+                <Field label="Срок окончания">{date("due_date")}</Field>
+                <Field label="Напомнить, дн.">
+                  <Input
+                    value={v.remind_days}
+                    onChange={(e) => set("remind_days", e.target.value)}
+                    inputMode="numeric"
+                    className="h-9 w-full text-sm"
+                  />
+                </Field>
+              </div>
+            </Section>
           </div>
         </div>
-      </Section>
-
-      <Section title="Когда">
-        <div className="grid w-full gap-4 sm:grid-cols-3">
-          <Field label="Дата начала">{date("start_date")}</Field>
-          <Field label="Срок окончания">{date("due_date")}</Field>
-          <Field label="Напомнить за, дней">
-            <Input
-              value={v.remind_days}
-              onChange={(e) => set("remind_days", e.target.value)}
-              inputMode="numeric"
-              className="h-9 w-full text-sm"
-            />
-          </Field>
-        </div>
-      </Section>
+      </Block>
 
       {showDoc && (
-        <Section title="Документ">
-          <div className="space-y-4">
-            {(stage.outgoing_doc || stage.expected_doc) && (
-              <p className="text-sm text-foreground">
-                {stage.outgoing_doc ? (
-                  <>
-                    От нас: <span className="font-medium">«{stage.outgoing_doc}»</span>
-                  </>
-                ) : (
-                  <span className="text-muted-foreground">От нас не задан</span>
-                )}
-                <span className="mx-2 text-muted-foreground">→</span>
-                {stage.expected_doc ? (
-                  <>
-                    ждём <span className="font-medium">«{stage.expected_doc}»</span>
-                  </>
-                ) : (
-                  <span className="text-muted-foreground">ожидание не задано</span>
-                )}
-              </p>
-            )}
-            <TemplateSamples templateId={stage.template_id} />
-            <div className="grid w-full gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <Field label="Отправлен">{date("doc_sent_at")}</Field>
-              <Field label="Дней на ответ">
-                <Input
-                  value={v.response_days}
-                  onChange={(e) => set("response_days", e.target.value)}
-                  inputMode="numeric"
-                  className="h-9 w-full text-sm"
-                />
-              </Field>
-              <Field label="Ждём до">
-                <div className="flex h-9 w-full items-center rounded-xl border border-border bg-muted/40 px-3 text-sm tabular-nums text-muted-foreground">
-                  {formatDate(responseDue) || "—"}
-                </div>
-              </Field>
-              <Field label="Получен">{date("response_received_at")}</Field>
+        <Block>
+          <Section
+            title="Исходящий документ"
+            {...(stage.outgoing_doc || stage.expected_doc
+              ? {
+                  hint: [
+                    stage.outgoing_doc ? `от нас «${stage.outgoing_doc}»` : null,
+                    stage.expected_doc ? `ждём «${stage.expected_doc}»` : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" → "),
+                }
+              : {})}
+          >
+            <div className="space-y-2.5">
+              <TemplateSamples templateId={stage.template_id} />
+              <div className="grid gap-2.5 grid-cols-2 sm:grid-cols-4">
+                <Field label="Дата отправки">{date("doc_sent_at")}</Field>
+                <Field label="Дней на ответ">
+                  <Input
+                    value={v.response_days}
+                    onChange={(e) => set("response_days", e.target.value)}
+                    inputMode="numeric"
+                    className="h-9 w-full text-sm"
+                  />
+                </Field>
+                <Field label="Ждём ответ до">
+                  <div className="flex h-9 w-full items-center rounded-md border border-border bg-muted/40 px-3 text-sm tabular-nums text-muted-foreground">
+                    {formatDate(responseDue) || "—"}
+                  </div>
+                </Field>
+                <Field label="Ответ получен">{date("response_received_at")}</Field>
+              </div>
             </div>
-          </div>
-        </Section>
+          </Section>
+        </Block>
       )}
 
-      <Section title="Примечание">
-        <Textarea
-          value={v.note}
-          onChange={(e) => set("note", e.target.value)}
-          rows={3}
-          placeholder="Что мешает, когда обещали"
-          className="w-full text-sm"
-        />
-      </Section>
+      <Block>
+        <Section title="Заметка" hint="что мешает или когда обещали">
+          <Textarea
+            value={v.note}
+            onChange={(e) => set("note", e.target.value)}
+            rows={3}
+            placeholder="Например: ждут подпись заказчика до пятницы"
+            className="min-h-[4.5rem] w-full resize-y text-sm"
+          />
+        </Section>
+      </Block>
 
-      <div className="pt-1">
-        <Button onClick={() => save.mutate()} disabled={save.isPending} className="h-9 w-full text-sm">
-          {save.isPending ? "Сохранение…" : "Сохранить"}
-        </Button>
-      </div>
-
-      <div className="space-y-4 pt-2">
-        <Predecessors stage={stage} />
-        <LinkedRequests stage={stage} />
-      </div>
+      <Predecessors stage={stage} />
+      <LinkedRequests stage={stage} />
     </div>
   );
-}
+});
 
 function Predecessors({ stage }: { stage: ObjectStage }) {
   const { data: all = [] } = useObjectStages(stage.object_id);
@@ -227,23 +254,25 @@ function Predecessors({ stage }: { stage: ObjectStage }) {
   const preds = all.filter((s) => ids.includes(s.id));
   if (preds.length === 0) return null;
   return (
-    <Section title="Предшествующие этапы">
-      <ul className="-mx-1 divide-y divide-border">
-        {preds.map((p) => (
-          <li key={p.id}>
-            <Link
-              to="/objects/$id/stages/$stageId"
-              params={{ id: stage.object_id, stageId: p.id }}
-              className="flex items-center gap-3 px-1 py-2.5 text-sm transition-colors hover:text-primary"
-            >
-              <span className="w-8 shrink-0 tabular-nums text-muted-foreground">{p.number}</span>
-              <span className="min-w-0 flex-1 truncate">{p.name}</span>
-              <StatusBadge name={p.status_name} color={p.status_color} />
-            </Link>
-          </li>
-        ))}
-      </ul>
-    </Section>
+    <Block>
+      <Section title="Предшествующие этапы">
+        <ul className="divide-y divide-border">
+          {preds.map((p) => (
+            <li key={p.id}>
+              <Link
+                to="/objects/$id/stages/$stageId"
+                params={{ id: stage.object_id, stageId: p.id }}
+                className="flex items-center gap-3 py-2 text-sm transition-colors hover:text-primary"
+              >
+                <span className="w-8 shrink-0 tabular-nums text-muted-foreground">{p.number}</span>
+                <span className="min-w-0 flex-1 truncate">{p.name}</span>
+                <StatusBadge name={p.status_name} color={p.status_color} />
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </Section>
+    </Block>
   );
 }
 
@@ -262,24 +291,26 @@ function LinkedRequests({ stage }: { stage: ObjectStage }) {
   });
   if (data.length === 0) return null;
   return (
-    <Section title="Связанные заявки">
-      <ul className="-mx-1 divide-y divide-border">
-        {data.map((r) => (
-          <li key={r.id}>
-            <Link
-              to="/requests/$requestId"
-              params={{ requestId: r.id! }}
-              search={{ from: "object" }}
-              className="flex flex-wrap items-center gap-x-3 gap-y-1 px-1 py-2.5 text-sm transition-colors hover:text-primary"
-            >
-              <span className="font-medium tabular-nums">№{r.number}</span>
-              <span className="min-w-0 flex-1 truncate">{r.type_name}</span>
-              <span className="text-muted-foreground">вызов на {formatDate(r.call_date)}</span>
-            </Link>
-          </li>
-        ))}
-      </ul>
-    </Section>
+    <Block>
+      <Section title="Связанные заявки">
+        <ul className="divide-y divide-border">
+          {data.map((r) => (
+            <li key={r.id}>
+              <Link
+                to="/requests/$requestId"
+                params={{ requestId: r.id! }}
+                search={{ from: "object" }}
+                className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2 text-sm transition-colors hover:text-primary"
+              >
+                <span className="font-medium tabular-nums">№{r.number}</span>
+                <span className="min-w-0 flex-1 truncate">{r.type_name}</span>
+                <span className="text-muted-foreground">вызов на {formatDate(r.call_date)}</span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </Section>
+    </Block>
   );
 }
 
