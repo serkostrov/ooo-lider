@@ -4,6 +4,7 @@ import { Plus, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { showError } from "@/lib/format";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import type { StageTemplate } from "./data";
@@ -60,14 +61,20 @@ export function StagePredecessors({
   const selected = allStages.filter((s) => predIds.includes(s.id)).sort((a, b) => a.number - b.number);
   const available = allStages.filter((s) => s.id !== templateId && !predIds.includes(s.id));
 
-  if (isLoading) return null;
-
   return (
     <div className="w-full space-y-4">
       <p className="text-sm text-muted-foreground">
         Этап можно взять в работу раньше — он будет отмечен «вне очереди».
       </p>
-      {selected.length === 0 ? (
+      {isLoading ? (
+        <ul className="space-y-2">
+          {Array.from({ length: 3 }, (_, i) => (
+            <li key={i} className="flex items-center gap-3 rounded-md border border-border bg-card px-4 py-2.5">
+              <Skeleton height={16} width={`${40 + i * 15}%`} containerClassName="flex-1" />
+            </li>
+          ))}
+        </ul>
+      ) : selected.length === 0 ? (
         <p className="py-2.5 text-sm text-muted-foreground">Предшествующих этапов нет</p>
       ) : (
         <ul className="space-y-2">

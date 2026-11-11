@@ -1,14 +1,15 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { showError } from "@/lib/format";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Table, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { REORDER_ACTIONS_W } from "@/lib/ui";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,6 +21,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { EditSheet, EmptyRow, Field, FormActions } from "../common";
+import { DirectoryTableSkeleton } from "../DirectorySkeleton";
+import { SortableTableBody, SortableTableRow } from "../SortableTableRows";
 import { CONDITION_KINDS, useDocumentsShort } from "./data";
 
 type Cond = {
@@ -72,12 +75,10 @@ export function StageConditions({ templateId, readOnly }: { templateId: string; 
     onError: showError,
   });
 
-  const move = (from: number, to: number) => {
-    if (to < 0 || to >= rows.length) return;
-    const next = [...rows];
-    const [item] = next.splice(from, 1);
-    if (!item) return;
-    next.splice(to, 0, item);
+  const applyOrder = (orderedIds: string[]) => {
+    const map = new Map(rows.map((c) => [c.id, c]));
+    const next = orderedIds.map((id) => map.get(id)).filter((c): c is Cond => !!c);
+    if (next.length !== rows.length) return;
     reorder.mutate(next.map((c, i) => ({ ...c, sort: i + 1 })));
   };
 
@@ -86,8 +87,6 @@ export function StageConditions({ templateId, readOnly }: { templateId: string; 
     const d = docs.find((x) => x.id === id);
     return d ? `${d.section}: ${d.name}` : "—";
   };
-
-  if (isLoading) return null;
 
   return (
     <div className="w-full space-y-4">
@@ -117,16 +116,20 @@ export function StageConditions({ templateId, readOnly }: { templateId: string; 
               <TableHead>Документ</TableHead>
               <TableHead className="w-24 text-center">Обяз.</TableHead>
               <TableHead className="w-24 text-center">В ИД</TableHead>
-              {!readOnly && <TableHead className="w-16" />}
+              {!readOnly && <TableHead className={REORDER_ACTIONS_W} />}
             </TableRow>
           </TableHeader>
-          <TableBody>
-            {rows.length === 0 ? (
+          <SortableTableBody ids={rows.map((c) => c.id)} disabled={readOnly || isLoading} onReorder={applyOrder}>
+            {isLoading ? (
+              <DirectoryTableSkeleton cols={6} withActions={!readOnly} />
+            ) : rows.length === 0 ? (
               <EmptyRow cols={readOnly ? 6 : 7} />
             ) : (
               rows.map((c, i) => (
-                <TableRow
+                <SortableTableRow
                   key={c.id}
+                  id={c.id}
+                  disabled={readOnly}
                   className={readOnly ? "" : "cursor-pointer"}
                   onClick={() => !readOnly && setEditing(c)}
                 >
@@ -136,40 +139,10 @@ export function StageConditions({ templateId, readOnly }: { templateId: string; 
                   <TableCell className="max-w-[14rem] truncate text-muted-foreground">{docName(c.document_id)}</TableCell>
                   <TableCell className="text-center">{c.is_required ? "Да" : "—"}</TableCell>
                   <TableCell className="text-center">{c.to_id_folder ? "Да" : "—"}</TableCell>
-                  {!readOnly && (
-                    <TableCell onClick={(e) => e.stopPropagation()}>
-                      <div className="flex items-center justify-end">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          disabled={i === 0 || reorder.isPending}
-                          onClick={() => move(i, i - 1)}
-                          className="size-8 text-muted-foreground"
-                          title="Выше"
-                          aria-label="Выше"
-                        >
-                          <ArrowUp className="size-4" />
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          disabled={i >= rows.length - 1 || reorder.isPending}
-                          onClick={() => move(i, i + 1)}
-                          className="size-8 text-muted-foreground"
-                          title="Ниже"
-                          aria-label="Ниже"
-                        >
-                          <ArrowDown className="size-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  )}
-                </TableRow>
+                </SortableTableRow>
               ))
             )}
-          </TableBody>
+          </SortableTableBody>
         </Table>
       </div>
 

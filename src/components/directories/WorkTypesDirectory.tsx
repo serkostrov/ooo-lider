@@ -21,6 +21,8 @@ import { thLabelClass } from "@/lib/ui";
 import { Reorderable } from "./stages/Reorderable";
 import { STAGES_KEY, useStageTemplatesFull, useWorkTypes } from "./stages/data";
 import { EditSheet, Field, FormActions } from "./common";
+import { DirectoryListSkeleton, directoryListHeader } from "./DirectorySkeleton";
+import { escapeIlike, normalizeDirectoryName, validateNamedDirectoryItem } from "./rules";
 
 /** Тот же ключ, что у useWorkTypes: список обновляется и в карточке этапа, и в мастере объекта. */
 const KEY = ["dir-work-types"];
@@ -50,8 +52,6 @@ export function WorkTypesDirectory() {
     onError: showError,
   });
 
-  if (isLoading) return null;
-
   return (
     <div className="w-full">
       <div className="mb-4 flex h-9 items-center justify-between gap-3">
@@ -63,7 +63,12 @@ export function WorkTypesDirectory() {
           </Button>
         )}
       </div>
-      {types.length === 0 ? (
+      {isLoading ? (
+        <DirectoryListSkeleton
+          withActions={is_admin}
+          header={directoryListHeader(["№", "Название"])}
+        />
+      ) : types.length === 0 ? (
         <p className="rounded-md border border-border bg-card py-8 text-center text-sm text-muted-foreground">
           Групп пока нет
         </p>
@@ -129,9 +134,12 @@ function WorkTypeForm({
 
   const save = useMutation({
     mutationFn: async () => {
-      const value = name.trim().replace(/\s+/g, " ");
+      const value = normalizeDirectoryName(name);
       // Название уникально в базе, в том числе среди удалённых. Удалённый с тем же названием — восстанавливаем.
-      const { data: same, error: e1 } = await supabase.from("work_types").select("id, deleted_at").ilike("name", value.replace(/[\\%_]/g, (c) => `\\${c}`));
+      const { data: same, error: e1 } = await supabase
+        .from("work_types")
+        .select("id, deleted_at")
+        .ilike("name", escapeIlike(value));
       if (e1) throw e1;
       const other = (same ?? []).find((r) => r.id !== wt?.id);
       if (other && !other.deleted_at) throw new Error(`Вид работ «${value}» уже есть`);
@@ -175,7 +183,11 @@ function WorkTypeForm({
       className="space-y-5"
       onSubmit={(e) => {
         e.preventDefault();
-        if (!name.trim()) { toast.error("Заполните название"); return; }
+        const err = validateNamedDirectoryItem(name);
+        if (err) {
+          toast.error(err);
+          return;
+        }
         save.mutate();
       }}
     >

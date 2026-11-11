@@ -10,6 +10,11 @@ lerna-debug.log*
 node_modules
 dist
 *.local
+coverage
+test-results
+playwright-report
+blob-report
+playwright/.cache
 
 # Env / secrets (оставляем только .env.example)
 .env

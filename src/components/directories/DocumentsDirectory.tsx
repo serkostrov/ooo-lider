@@ -12,8 +12,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
 import { SortableTh } from "@/components/SortableTh";
 import { DeleteButton, EditSheet, EmptyRow, Field, FormActions, Toolbar, emptyToNull, matches } from "./common";
+import { DirectoryTableSkeleton } from "./DirectorySkeleton";
 
-export const DOC_SECTIONS = ["ГСН", "ГСВ", "МосГаз", "МГГТ и Геотрест", "Органы города"];
+import { DOC_SECTIONS, validateDocument } from "./rules";
+
+export { DOC_SECTIONS };
 const NONE = "__none";
 const KEY = ["dir-documents"];
 
@@ -108,7 +111,9 @@ export function DocumentsDirectory() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {isLoading ? null : rows.length === 0 ? (
+            {isLoading ? (
+              <DirectoryTableSkeleton cols={5} />
+            ) : rows.length === 0 ? (
               <EmptyRow cols={5} />
             ) : (
               rows.map((d) => (
@@ -178,7 +183,11 @@ function DocForm({
       className="space-y-5"
       onSubmit={(e) => {
         e.preventDefault();
-        if (!name.trim() || !section) { toast.error("Заполните название и раздел"); return; }
+        const err = validateDocument({ name, section });
+        if (err) {
+          toast.error(err);
+          return;
+        }
         m.mutate();
       }}
     >

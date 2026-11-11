@@ -9,6 +9,7 @@ import { addDays } from "@/lib/dates";
 import { formatSize, listTemplateFiles, openTemplateFile, type TemplateFile } from "@/lib/files";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { DateField } from "@/components/ui/DateField";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Field } from "@/components/directories/common";
 import { toIntOrNull } from "@/components/directories/stages/data";
@@ -129,7 +130,7 @@ export const StageMainTab = forwardRef<StageMainHandle, { stage: ObjectStage; on
     </Select>
   );
   const date = (k: keyof typeof v) => (
-    <Input type="date" value={v[k]} onChange={(e) => set(k, e.target.value)} className="h-9 w-full text-sm" />
+    <DateField value={v[k]} onChange={(ymd) => set(k, ymd)} />
   );
 
   return (
@@ -164,7 +165,7 @@ export const StageMainTab = forwardRef<StageMainHandle, { stage: ObjectStage; on
 
           <div className="border-t border-border/70 pt-3">
             <Section title="Сроки">
-              <div className="grid gap-2.5 grid-cols-2 sm:grid-cols-[1fr_1fr_7.5rem]">
+              <div className="flex flex-wrap items-end gap-x-3 gap-y-2.5">
                 <Field label="Дата начала">{date("start_date")}</Field>
                 <Field label="Срок окончания">{date("due_date")}</Field>
                 <Field label="Напомнить, дн.">
@@ -172,7 +173,7 @@ export const StageMainTab = forwardRef<StageMainHandle, { stage: ObjectStage; on
                     value={v.remind_days}
                     onChange={(e) => set("remind_days", e.target.value)}
                     inputMode="numeric"
-                    className="h-9 w-full text-sm"
+                    className="h-9 w-[5.5rem] text-sm tabular-nums"
                   />
                 </Field>
               </div>
@@ -198,18 +199,18 @@ export const StageMainTab = forwardRef<StageMainHandle, { stage: ObjectStage; on
           >
             <div className="space-y-2.5">
               <TemplateSamples templateId={stage.template_id} />
-              <div className="grid gap-2.5 grid-cols-2 sm:grid-cols-4">
+              <div className="flex flex-wrap items-end gap-x-3 gap-y-2.5">
                 <Field label="Дата отправки">{date("doc_sent_at")}</Field>
                 <Field label="Дней на ответ">
                   <Input
                     value={v.response_days}
                     onChange={(e) => set("response_days", e.target.value)}
                     inputMode="numeric"
-                    className="h-9 w-full text-sm"
+                    className="h-9 w-[5.5rem] text-sm tabular-nums"
                   />
                 </Field>
                 <Field label="Ждём ответ до">
-                  <div className="flex h-9 w-full items-center rounded-md border border-border bg-muted/40 px-3 text-sm tabular-nums text-muted-foreground">
+                  <div className="flex h-9 w-[11.5rem] items-center rounded-md border border-border bg-muted/40 px-2.5 text-sm tabular-nums text-muted-foreground">
                     {formatDate(responseDue) || "—"}
                   </div>
                 </Field>

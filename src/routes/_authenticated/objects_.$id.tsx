@@ -5,6 +5,7 @@ import { ArrowLeft, Pencil } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useProfile } from "@/lib/profile";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { tabTriggerClass } from "@/lib/ui";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -49,7 +50,22 @@ function ObjectPage() {
     </div>
   );
 
-  if (isLoading) return <div className="text-base text-muted-foreground">Загрузка…</div>;
+  if (isLoading) {
+    return (
+      <div className="flex h-full min-h-0 flex-col gap-3">
+        <div className="shrink-0 space-y-3">
+          {topBar()}
+          <ObjectHeaderSkeleton />
+        </div>
+        <div className="mb-2 flex h-9 w-1/2 min-w-0 gap-0.5 rounded-md bg-muted p-0.5 sm:w-[28rem]">
+          {Array.from({ length: 4 }, (_, i) => (
+            <Skeleton key={i} height="100%" width="100%" containerClassName="flex-1" borderRadius={6} />
+          ))}
+        </div>
+        <StagesTable objectId={id} />
+      </div>
+    );
+  }
   if (!o) {
     return (
       <div>
@@ -189,7 +205,7 @@ function MembersList({ objectId }: { objectId: string }) {
       );
     },
   });
-  if (isLoading) return null;
+  if (isLoading) return <MembersTableSkeleton />;
   if (data.length === 0) {
     return <p className="py-4 text-sm text-muted-foreground">Участники не назначены</p>;
   }
@@ -211,6 +227,59 @@ function MembersList({ objectId }: { objectId: string }) {
               <TableCell>{m.profile?.role?.name ?? "—"}</TableCell>
               <TableCell className="tabular-nums">{m.profile?.phone || "—"}</TableCell>
               <TableCell className="text-muted-foreground">{m.profile?.email || "—"}</TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
+  );
+}
+
+function ObjectHeaderSkeleton() {
+  return (
+    <div className="rounded-md border border-border bg-card">
+      <div className="space-y-3 px-4 py-3">
+        <Skeleton height={22} width="42%" />
+        <div className="flex flex-wrap items-center gap-2">
+          <Skeleton height={28} width={168} borderRadius={6} />
+          <Skeleton height={28} width={220} borderRadius={6} />
+          <Skeleton height={14} width={160} />
+        </div>
+      </div>
+      <div className="border-t border-border px-4 py-2">
+        <Skeleton height={12} width={96} />
+      </div>
+    </div>
+  );
+}
+
+function MembersTableSkeleton({ rows = 6 }: { rows?: number }) {
+  return (
+    <div className="overflow-x-auto rounded-md border border-border bg-card">
+      <Table className="text-sm">
+        <TableHeader>
+          <TableRow className="border-b border-border bg-muted/40 hover:bg-muted/40">
+            <TableHead>ФИО</TableHead>
+            <TableHead>Должность</TableHead>
+            <TableHead>Телефон</TableHead>
+            <TableHead>Email</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {Array.from({ length: rows }, (_, i) => (
+            <TableRow key={i} className="hover:bg-transparent">
+              <TableCell>
+                <Skeleton height={16} width={`${48 + (i % 3) * 10}%`} />
+              </TableCell>
+              <TableCell>
+                <Skeleton height={16} width="70%" />
+              </TableCell>
+              <TableCell>
+                <Skeleton height={16} width={112} />
+              </TableCell>
+              <TableCell>
+                <Skeleton height={16} width="80%" />
+              </TableCell>
             </TableRow>
           ))}
         </TableBody>

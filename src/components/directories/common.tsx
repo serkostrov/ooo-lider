@@ -25,6 +25,9 @@ import {
 import { showError } from "@/lib/format";
 import { fieldLabelClass, fieldStackClass } from "@/lib/ui";
 import { cn } from "@/lib/utils";
+import { emptyToNull, isHexColor, matches } from "./rules";
+
+export { emptyToNull, isHexColor, matches };
 
 export function Toolbar({
   search,
@@ -73,12 +76,6 @@ export function Field({ label, required, children }: { label: string; required?:
       {children}
     </div>
   );
-}
-
-const HEX = /^#[0-9a-f]{6}$/i;
-
-export function isHexColor(v: string) {
-  return HEX.test(v);
 }
 
 /** Кружок цвета в таблице справочников. */
@@ -134,17 +131,6 @@ export function EditSheet({
       </DialogContent>
     </Dialog>
   );
-}
-
-export function matches(search: string, ...values: (string | null | undefined)[]) {
-  const q = search.trim().toLowerCase();
-  if (!q) return true;
-  return values.some((v) => v?.toLowerCase().includes(q));
-}
-
-export function emptyToNull(v: string) {
-  const t = v.trim();
-  return t === "" ? null : t;
 }
 
 type SoftTable = "documents" | "representatives" | "customers" | "customer_contacts" | "profiles";

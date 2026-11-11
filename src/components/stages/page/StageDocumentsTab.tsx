@@ -1,7 +1,8 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { listFiles } from "@/lib/files";
+import { Skeleton } from "@/components/ui/skeleton";
 import type { ObjectStage } from "../data";
-import { FileList, UploadButton } from "./FileButtons";
+import { FileList, StageFilesDropZones } from "./FileButtons";
 
 /** Документы этапа: черновик на согласование и подписанный скан, обе версии хранятся (ТЗ 7.6). */
 export function StageDocumentsTab({ stage }: { stage: ObjectStage }) {
@@ -18,33 +19,27 @@ export function StageDocumentsTab({ stage }: { stage: ObjectStage }) {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap gap-3">
-        <UploadButton
-          objectId={stage.object_id}
-          entityType="stage"
-          entityId={stage.id}
-          kind="draft"
-          label="+ Черновик на согласование"
-          onUploaded={refresh}
-        />
-        <UploadButton
-          objectId={stage.object_id}
-          entityType="stage"
-          entityId={stage.id}
-          kind="signed"
-          label="+ Подписанный скан"
-          variant="default"
-          onUploaded={refresh}
-        />
-      </div>
       <p className="text-sm text-muted-foreground">
-        Фото с телефона или планшета загружаются так же — кнопка предложит камеру или галерею.
+        Перетащите файлы в зону или нажмите на неё. С телефона или планшета откроются камера или галерея.
       </p>
-      {isLoading ? null : files.length === 0 ? (
-        <p className="py-4 text-sm text-muted-foreground">Документов пока нет</p>
-      ) : (
-        <FileList files={files} showKind />
-      )}
+
+      <StageFilesDropZones objectId={stage.object_id} entityId={stage.id} onUploaded={refresh}>
+        {isLoading ? (
+          <ul className="divide-y overflow-hidden rounded-md border border-border bg-card">
+            {Array.from({ length: 3 }, (_, i) => (
+              <li key={i} className="flex items-center gap-3 px-3 py-3">
+                <Skeleton height={16} width={16} borderRadius={4} />
+                <Skeleton height={16} width={`${45 + i * 12}%`} containerClassName="flex-1" />
+                <Skeleton height={12} width={96} />
+              </li>
+            ))}
+          </ul>
+        ) : files.length === 0 ? (
+          <p className="text-center text-sm text-muted-foreground">Документов пока нет — перетащите или выберите файлы</p>
+        ) : (
+          <FileList files={files} showKind />
+        )}
+      </StageFilesDropZones>
     </div>
   );
 }

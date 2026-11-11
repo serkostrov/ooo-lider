@@ -1,17 +1,18 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ArrowDown, ArrowUp } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useProfile } from "@/lib/profile";
 import { showError } from "@/lib/format";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { TableCell, TableRow } from "@/components/ui/table";
+import { TableCell } from "@/components/ui/table";
 import { ToneBadge } from "@/components/ToneBadge";
 import { REQUEST_STATUSES_KEY, useRequestStatuses, type RequestStatusDef } from "@/components/requests/data";
 import { ColorField, ColorSwatch, EditSheet, Field, FormActions, isHexColor } from "./common";
 import { StatusDirectoryShell } from "./status-directory-shared";
+import { SortableTableRow } from "./SortableTableRows";
+import { validateRequestStatus } from "./rules";
 
 /**
  * Справочник «Статусы заявок» — шаги хода заявки.
@@ -35,12 +36,10 @@ export function RequestStatusesDirectory() {
     onError: showError,
   });
 
-  const move = (from: number, to: number) => {
-    if (to < 0 || to >= statuses.length) return;
-    const next = [...statuses];
-    const [item] = next.splice(from, 1);
-    if (!item) return;
-    next.splice(to, 0, item);
+  const applyOrder = (orderedIds: string[]) => {
+    const map = new Map(statuses.map((s) => [String(s.v), s]));
+    const next = orderedIds.map((id) => map.get(id)).filter((s): s is RequestStatusDef => !!s);
+    if (next.length !== statuses.length) return;
     reorder.mutate(next.map((s, i) => ({ ...s, sort: i + 1 })));
   };
 
@@ -50,10 +49,15 @@ export function RequestStatusesDirectory() {
         title="Статусы заявок"
         hint="Шаги «Хода заявки». Можно поменять название, текст кнопки, цвет и порядок. Коды шагов фиксированы."
         showActions={is_admin}
+        {...(is_admin
+          ? { sortable: { ids: statuses.map((s) => String(s.v)), onReorder: applyOrder } }
+          : {})}
       >
         {statuses.map((s, i) => (
-          <TableRow
+          <SortableTableRow
             key={s.v}
+            id={String(s.v)}
+            disabled={!is_admin}
             className={is_admin ? "cursor-pointer" : ""}
             onClick={() => is_admin && setEditing({ s, i })}
           >
@@ -67,37 +71,7 @@ export function RequestStatusesDirectory() {
             <TableCell>
               <ColorSwatch color={s.color} />
             </TableCell>
-            {is_admin && (
-              <TableCell onClick={(e) => e.stopPropagation()}>
-                <div className="flex items-center justify-end">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    disabled={i === 0 || reorder.isPending}
-                    onClick={() => move(i, i - 1)}
-                    className="size-8 text-muted-foreground"
-                    title="Выше"
-                    aria-label="Выше"
-                  >
-                    <ArrowUp className="size-4" />
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    disabled={i >= statuses.length - 1 || reorder.isPending}
-                    onClick={() => move(i, i + 1)}
-                    className="size-8 text-muted-foreground"
-                    title="Ниже"
-                    aria-label="Ниже"
-                  >
-                    <ArrowDown className="size-4" />
-                  </Button>
-                </div>
-              </TableCell>
-            )}
-          </TableRow>
+          </SortableTableRow>
         ))}
       </StatusDirectoryShell>
 
@@ -144,16 +118,9 @@ function StatusForm({ s, first, onClose }: { s: RequestStatusDef; first: boolean
       className="space-y-6"
       onSubmit={(e) => {
         e.preventDefault();
-        if (!name.trim()) {
-          toast.error("Заполните название");
-          return;
-        }
-        if (!first && !action.trim()) {
-          toast.error("Заполните текст кнопки");
-          return;
-        }
-        if (!valid) {
-          toast.error("Цвет должен быть в формате #RRGGBB");
+        const err = validateRequestStatus({ name, action, color, first });
+        if (err) {
+          toast.error(err);
           return;
         }
         save.mutate();

@@ -3,11 +3,11 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { showError } from "@/lib/format";
-import { isOptionalEmail, VALIDATION_MSG } from "@/lib/validation";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Field, emptyToNull } from "../common";
+import { validateRequestType } from "../rules";
 import { REQUEST_TYPES_KEY, type RequestType } from "./data";
 
 export function RequestTypeForm({
@@ -29,8 +29,8 @@ export function RequestTypeForm({
 
   const m = useMutation({
     mutationFn: async () => {
-      if (!name.trim()) throw new Error("Укажите название вида заявки");
-      if (!isOptionalEmail(email)) throw new Error(VALIDATION_MSG.email);
+      const err = validateRequestType({ name, send_to_email: email });
+      if (err) throw new Error(err);
       const payload = {
         name: name.trim(),
         send_to_email: emptyToNull(email),

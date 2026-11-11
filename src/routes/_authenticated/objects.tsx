@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
   TableBody,
@@ -223,28 +224,32 @@ function ObjectsPage() {
 
       {!archive && (
         <div className="mb-3 overflow-hidden rounded-xl border border-border/70 bg-card shadow-[var(--surface-glow)]">
-          <div className="grid divide-y divide-border/60 lg:grid-cols-2 lg:divide-x lg:divide-y-0">
-            <ProblemGroup
-              label="Этапы"
-              problem={problem}
-              onSelect={setProblem}
-              items={[
-                ["stages_overdue", "Просрочено", summary.stages_overdue, "danger"],
-                ["stages_no_response", "Нет ответа", summary.stages_no_response, "danger"],
-                ["stages_on_review", "На проверке", summary.stages_on_review, "warn"],
-                ["stages_no_executor", "Без исполнителя", summary.stages_no_executor, "warn"],
-              ]}
-            />
-            <ProblemGroup
-              label="Заявки"
-              problem={problem}
-              onSelect={setProblem}
-              items={[
-                ["requests_new", "Новые", summary.requests_new, "signal"],
-                ["requests_overdue", "Просрочено", summary.requests_overdue, "danger"],
-              ]}
-            />
-          </div>
+          {isLoading ? (
+            <ProblemsSkeleton />
+          ) : (
+            <div className="grid divide-y divide-border/60 lg:grid-cols-2 lg:divide-x lg:divide-y-0">
+              <ProblemGroup
+                label="Этапы"
+                problem={problem}
+                onSelect={setProblem}
+                items={[
+                  ["stages_overdue", "Просрочено", summary.stages_overdue, "danger"],
+                  ["stages_no_response", "Нет ответа", summary.stages_no_response, "danger"],
+                  ["stages_on_review", "На проверке", summary.stages_on_review, "warn"],
+                  ["stages_no_executor", "Без исполнителя", summary.stages_no_executor, "warn"],
+                ]}
+              />
+              <ProblemGroup
+                label="Заявки"
+                problem={problem}
+                onSelect={setProblem}
+                items={[
+                  ["requests_new", "Новые", summary.requests_new, "signal"],
+                  ["requests_overdue", "Просрочено", summary.requests_overdue, "danger"],
+                ]}
+              />
+            </div>
+          )}
         </div>
       )}
 
@@ -414,7 +419,9 @@ function ObjectsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {isLoading ? null : rows.length === 0 ? (
+              {isLoading ? (
+                <ObjectsTableSkeleton rows={8} />
+              ) : rows.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="py-10 text-center text-sm text-muted-foreground">
                     <EmptyObjectsMessage empty={objects.length === 0} isAdmin={is_admin} />
@@ -435,7 +442,9 @@ function ObjectsPage() {
         </div>
       ) : (
         <div className="max-h-full min-h-0 overflow-auto">
-          {isLoading ? null : rows.length === 0 ? (
+          {isLoading ? (
+            <ObjectsCardsSkeleton />
+          ) : rows.length === 0 ? (
             <div className="rounded-xl border border-border/70 bg-card py-12 text-center text-sm text-muted-foreground shadow-[var(--surface-glow)]">
               <EmptyObjectsMessage empty={objects.length === 0} isAdmin={is_admin} />
             </div>
@@ -463,6 +472,112 @@ function objectsWord(n: number) {
   if (mod10 === 1 && mod100 !== 11) return "объект";
   if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return "объекта";
   return "объектов";
+}
+
+const td = "max-w-0 px-5 py-3";
+
+function ProblemsSkeleton() {
+  return (
+    <div className="grid divide-y divide-border/60 lg:grid-cols-2 lg:divide-x lg:divide-y-0">
+      {[4, 2].map((count, gi) => (
+        <div key={gi} className="min-w-0 p-2.5 sm:p-3">
+          <Skeleton height={12} width={56} className="mb-2 ml-1" />
+          <div
+            className={cn(
+              "grid gap-1",
+              count <= 2 ? "grid-cols-2" : "grid-cols-2 sm:grid-cols-4",
+            )}
+          >
+            {Array.from({ length: count }, (_, i) => (
+              <div key={i} className="flex flex-col gap-1.5 rounded-lg px-2.5 py-2">
+                <Skeleton height={24} width={32} />
+                <Skeleton height={12} width={64} />
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ObjectsTableSkeleton({ rows = 8 }: { rows?: number }) {
+  return (
+    <>
+      {Array.from({ length: rows }, (_, i) => (
+        <TableRow key={i} className="hover:bg-transparent">
+          <TableCell className={td}>
+            <Skeleton height={16} width="85%" />
+            <Skeleton height={12} width={64} className="mt-1.5" />
+          </TableCell>
+          <TableCell className={td}>
+            <Skeleton height={16} width="90%" />
+          </TableCell>
+          <TableCell className={td}>
+            <Skeleton height={16} width="70%" />
+          </TableCell>
+          <TableCell className={td}>
+            <Skeleton height={16} width={48} />
+          </TableCell>
+          <TableCell className={td}>
+            <Skeleton height={16} width="75%" />
+          </TableCell>
+          <TableCell className={td}>
+            <Skeleton height={16} width="80%" />
+            <Skeleton height={12} width={80} className="mt-1.5" />
+          </TableCell>
+          <TableCell className={td}>
+            <Skeleton height={12} width={64} />
+            <Skeleton height={6} width="100%" borderRadius={999} className="mt-2" />
+          </TableCell>
+          <TableCell className={td}>
+            <Skeleton height={16} width={80} />
+            <Skeleton height={12} width={40} className="mt-1.5" />
+          </TableCell>
+        </TableRow>
+      ))}
+    </>
+  );
+}
+
+function ObjectsCardsSkeleton({ count = 8 }: { count?: number }) {
+  return (
+    <div className="grid gap-3.5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+      {Array.from({ length: count }, (_, i) => (
+        <div
+          key={i}
+          className="flex flex-col gap-3.5 rounded-xl border border-border/70 bg-card p-4 shadow-[var(--surface-glow)]"
+        >
+          <div className="space-y-2 pl-1">
+            <Skeleton height={16} width="90%" />
+            <Skeleton height={12} width="70%" />
+            <Skeleton height={20} width={56} />
+          </div>
+          <div className="grid grid-cols-2 gap-3 pl-1">
+            <div className="space-y-1.5">
+              <Skeleton height={10} width={56} />
+              <Skeleton height={14} width="80%" />
+            </div>
+            <div className="space-y-1.5">
+              <Skeleton height={10} width={80} />
+              <Skeleton height={14} width="70%" />
+            </div>
+            <div className="col-span-2 space-y-1.5">
+              <Skeleton height={10} width={64} />
+              <Skeleton height={14} width="85%" />
+            </div>
+          </div>
+          <div className="mt-auto space-y-2 border-t border-border/55 pt-3 pl-1">
+            <div className="flex justify-between">
+              <Skeleton height={10} width={64} />
+              <Skeleton height={10} width={80} />
+            </div>
+            <Skeleton height={6} width="100%" borderRadius={999} />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 function ProblemHit({
@@ -572,8 +687,6 @@ function ProblemGroup({
     </div>
   );
 }
-
-const td = "max-w-0 px-5 py-3";
 
 function ObjectCard({
   o,

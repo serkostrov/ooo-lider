@@ -12,6 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { ToneBadge } from "@/components/ToneBadge";
 import { PageFrame } from "@/components/PageFrame";
 import { PageHeader } from "@/components/PageHeader";
@@ -122,7 +123,38 @@ function OverduePage() {
         </>
       }
     >
-      {isLoading ? null : items.length === 0 ? (
+      {isLoading ? (
+        <div className={tableWrapClass}>
+          <table className="w-full min-w-[760px] text-sm">
+            <thead className="sticky top-0 z-10 bg-card">
+              <tr className="text-left">
+                <SortableTh column="what" sort={sort} onToggle={toggle}>
+                  Что
+                </SortableTh>
+                <SortableTh column="object" sort={sort} onToggle={toggle}>
+                  Объект
+                </SortableTh>
+                <SortableTh column="status" sort={sort} onToggle={toggle}>
+                  Статус
+                </SortableTh>
+                <SortableTh column="responsible" sort={sort} onToggle={toggle}>
+                  Ответственный
+                </SortableTh>
+                <SortableTh column="due" sort={sort} onToggle={toggle}>
+                  Срок
+                </SortableTh>
+                <SortableTh column="days" sort={sort} onToggle={toggle}>
+                  Просрочено
+                </SortableTh>
+                <th className={thClass} />
+              </tr>
+            </thead>
+            <tbody>
+              <OverdueTableSkeleton />
+            </tbody>
+          </table>
+        </div>
+      ) : items.length === 0 ? (
         <div className="flex h-full flex-col items-center justify-center gap-2 rounded-md border border-border bg-card py-12 text-center">
           <CheckCircle2 className="size-8 text-success" />
           <p className="text-sm font-semibold">Просроченного нет</p>
@@ -208,5 +240,39 @@ function OverduePage() {
         </div>
       )}
     </PageFrame>
+  );
+}
+
+function OverdueTableSkeleton({ rows = 8 }: { rows?: number }) {
+  const cell = "px-5 py-3";
+  return (
+    <>
+      {Array.from({ length: rows }, (_, i) => (
+        <tr key={i} className="border-t border-border/60">
+          <td className={cell}>
+            <Skeleton height={16} width="75%" />
+            <Skeleton height={12} width="40%" className="mt-1.5" />
+          </td>
+          <td className={cell}>
+            <Skeleton height={16} width="85%" />
+          </td>
+          <td className={cell}>
+            <Skeleton height={22} width={88} borderRadius={6} />
+          </td>
+          <td className={cell}>
+            <Skeleton height={16} width="70%" />
+          </td>
+          <td className={cell}>
+            <Skeleton height={16} width={80} />
+          </td>
+          <td className={cell}>
+            <Skeleton height={16} width={64} />
+          </td>
+          <td className={`${cell} text-right`}>
+            <Skeleton height={36} width={88} borderRadius={6} inline />
+          </td>
+        </tr>
+      ))}
+    </>
   );
 }

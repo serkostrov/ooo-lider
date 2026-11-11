@@ -81,24 +81,4 @@ export function useDocumentsShort() {
   });
 }
 
-/** Целое ≥ 0 или null из текстового поля. */
-export function toIntOrNull(v: string): number | null | "bad" {
-  const t = v.trim();
-  if (t === "") return null;
-  if (!/^\d+$/.test(t)) return "bad";
-  return Number(t);
-}
-
-export const CONDITION_KINDS: { v: "check" | "file" | "field"; label: string }[] = [
-  { v: "check", label: "Отметка" },
-  { v: "file", label: "Файл" },
-  { v: "field", label: "Поле" },
-];
-
-export const ACTION_KINDS: { v: "fill" | "attach" | "send" | "confirm" | "other"; label: string }[] = [
-  { v: "fill", label: "Заполнить" },
-  { v: "attach", label: "Прикрепить" },
-  { v: "send", label: "Отправить" },
-  { v: "confirm", label: "Подтвердить" },
-  { v: "other", label: "Другое" },
-];
+export { ACTION_KINDS, CONDITION_KINDS, toIntOrNull } from "../rules";

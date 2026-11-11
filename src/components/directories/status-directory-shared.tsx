@@ -3,6 +3,7 @@ import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { panelClass, REORDER_ACTIONS_W } from "@/lib/ui";
+import { SortableTableBody } from "./SortableTableRows";
 
 /** Общая оболочка справочников статусов — вид 1:1. */
 export function StatusDirectoryShell({
@@ -10,14 +11,26 @@ export function StatusDirectoryShell({
   hint,
   onAdd,
   showActions,
+  sortable,
   children,
 }: {
   title: string;
   hint: string;
   onAdd?: () => void;
   showActions?: boolean;
+  /** DnD порядок строк (id = code). */
+  sortable?: { ids: string[]; onReorder: (orderedIds: string[]) => void };
   children: ReactNode;
 }) {
+  const body =
+    sortable && showActions ? (
+      <SortableTableBody ids={sortable.ids} onReorder={sortable.onReorder}>
+        {children}
+      </SortableTableBody>
+    ) : (
+      <TableBody>{children}</TableBody>
+    );
+
   return (
     <div className="w-full">
       <div className="mb-4 flex h-9 items-center justify-between gap-3">
@@ -41,7 +54,7 @@ export function StatusDirectoryShell({
               {showActions && <TableHead className={REORDER_ACTIONS_W} />}
             </TableRow>
           </TableHeader>
-          <TableBody>{children}</TableBody>
+          {body}
         </Table>
       </div>
     </div>

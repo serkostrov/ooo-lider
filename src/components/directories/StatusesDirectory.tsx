@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ArrowDown, ArrowUp, Trash2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import { ToneBadge } from "@/components/ToneBadge";
 import { supabase } from "@/integrations/supabase/client";
 import { useProfile } from "@/lib/profile";
@@ -9,7 +9,7 @@ import { showError } from "@/lib/format";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
-import { TableCell, TableRow } from "@/components/ui/table";
+import { TableCell } from "@/components/ui/table";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -30,34 +30,12 @@ import {
   isHexColor,
 } from "./common";
 import { StatusDirectoryShell } from "./status-directory-shared";
+import { DirectoryTableSkeleton } from "./DirectorySkeleton";
+import { SortableTableRow } from "./SortableTableRows";
+import { isSystemStageStatus, nextSort, slugCode, uniqueCode, validateStageStatus } from "./rules";
 
 const KEY = ["dir-stage-statuses"] as const;
 type St = { code: string; name: string; color: string; sort: number; is_closed: boolean };
-
-/** Системные коды сценария этапа — удалять нельзя. */
-const SYSTEM = new Set([
-  "not_started",
-  "in_work",
-  "sent",
-  "waiting_visit",
-  "on_approval",
-  "on_review",
-  "closed",
-]);
-
-function slugCode(name: string) {
-  const map: Record<string, string> = {
-    а: "a", б: "b", в: "v", г: "g", д: "d", е: "e", ё: "e", ж: "zh", з: "z", и: "i", й: "y",
-    к: "k", л: "l", м: "m", н: "n", о: "o", п: "p", р: "r", с: "s", т: "t", у: "u", ф: "f",
-    х: "h", ц: "c", ч: "ch", ш: "sh", щ: "sch", ъ: "", ы: "y", ь: "", э: "e", ю: "yu", я: "ya",
-  };
-  const latin = name
-    .toLowerCase()
-    .split("")
-    .map((ch) => map[ch] ?? ch)
-    .join("");
-  return latin.replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "").slice(0, 40) || "status";
-}
 
 export function StatusesDirectory() {
   const { is_admin } = useProfile();
@@ -88,12 +66,10 @@ export function StatusesDirectory() {
     onError: showError,
   });
 
-  const move = (from: number, to: number) => {
-    if (to < 0 || to >= data.length) return;
-    const next = [...data];
-    const [item] = next.splice(from, 1);
-    if (!item) return;
-    next.splice(to, 0, item);
+  const applyOrder = (orderedIds: string[]) => {
+    const map = new Map(data.map((s) => [s.code, s]));
+    const next = orderedIds.map((id) => map.get(id)).filter((s): s is St => !!s);
+    if (next.length !== data.length) return;
     reorder.mutate(next.map((s, i) => ({ ...s, sort: i + 1 })));
   };
 
@@ -104,13 +80,20 @@ export function StatusesDirectory() {
         hint="Статусы этапов на объектах. Можно добавить свои, поменять название и цвет. Системные статусы удалить нельзя."
         {...(is_admin ? { onAdd: () => setEditing("new") } : {})}
         showActions={is_admin}
+        {...(is_admin
+          ? { sortable: { ids: data.map((s) => s.code), onReorder: applyOrder } }
+          : {})}
       >
-        {isLoading ? null : data.length === 0 ? (
+        {isLoading ? (
+          <DirectoryTableSkeleton cols={4} withActions={is_admin} />
+        ) : data.length === 0 ? (
           <EmptyRow cols={is_admin ? 5 : 4} />
         ) : (
           data.map((s, i) => (
-            <TableRow
+            <SortableTableRow
               key={s.code}
+              id={s.code}
+              disabled={!is_admin}
               className={is_admin ? "cursor-pointer" : ""}
               onClick={() => is_admin && setEditing(s)}
             >
@@ -122,37 +105,7 @@ export function StatusesDirectory() {
               <TableCell>
                 <ColorSwatch color={s.color} />
               </TableCell>
-              {is_admin && (
-                <TableCell onClick={(e) => e.stopPropagation()}>
-                  <div className="flex items-center justify-end">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      disabled={i === 0 || reorder.isPending}
-                      onClick={() => move(i, i - 1)}
-                      className="size-8 text-muted-foreground"
-                      title="Выше"
-                      aria-label="Выше"
-                    >
-                      <ArrowUp className="size-4" />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      disabled={i >= data.length - 1 || reorder.isPending}
-                      onClick={() => move(i, i + 1)}
-                      className="size-8 text-muted-foreground"
-                      title="Ниже"
-                      aria-label="Ниже"
-                    >
-                      <ArrowDown className="size-4" />
-                    </Button>
-                  </div>
-                </TableCell>
-              )}
-            </TableRow>
+            </SortableTableRow>
           ))
         )}
       </StatusDirectoryShell>
@@ -190,13 +143,13 @@ function StForm({
   const [closed, setClosed] = useState(st?.is_closed ?? false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const valid = isHexColor(color);
-  const canDelete = !!st && !SYSTEM.has(st.code);
+  const canDelete = !!st && !isSystemStageStatus(st.code);
 
   const save = useMutation({
     mutationFn: async () => {
+      const err = validateStageStatus({ name, color });
+      if (err) throw new Error(err);
       const n = name.trim();
-      if (!n) throw new Error("Заполните название");
-      if (!valid) throw new Error("Цвет должен быть в формате #RRGGBB");
       if (st) {
         const { error } = await supabase
           .from("stage_statuses")
@@ -204,17 +157,13 @@ function StForm({
           .eq("code", st.code);
         if (error) throw error;
       } else {
-        let code = slugCode(n);
-        const taken = new Set(existing.map((s) => s.code));
-        if (taken.has(code)) {
-          let i = 2;
-          while (taken.has(`${code}_${i}`)) i += 1;
-          code = `${code}_${i}`;
-        }
-        const sort = Math.max(0, ...existing.map((s) => s.sort)) + 1;
+        const code = uniqueCode(
+          slugCode(n, "status"),
+          existing.map((s) => s.code),
+        );
         const { error } = await supabase
           .from("stage_statuses")
-          .insert({ code, name: n, color, sort, is_closed: closed });
+          .insert({ code, name: n, color, sort: nextSort(existing), is_closed: closed });
         if (error) throw error;
       }
     },

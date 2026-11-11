@@ -208,7 +208,6 @@ function Nav({
     <div className="flex h-full flex-col border-r border-sidebar-border bg-sidebar bg-gradient-to-b from-[#28282a] via-sidebar to-[#0a0a0b] text-sidebar-foreground dark:from-transparent dark:via-transparent dark:to-transparent">
       {collapsed ? (
         <div className="flex shrink-0 flex-col items-center gap-1 px-2 py-2">
-          <BrandMark className="size-8 shrink-0 text-sm" />
           {onToggleCollapsed && (
             <button
               type="button"
@@ -220,6 +219,7 @@ function Nav({
               <PanelLeftOpen className="size-4" />
             </button>
           )}
+          <BrandMark className="size-8 shrink-0 text-sm" />
         </div>
       ) : (
         <div className="flex h-14 shrink-0 items-center gap-2.5 px-2">
@@ -420,7 +420,8 @@ function Shell({ profile, onSignOut }: { profile: CurrentProfile; onSignOut: () 
             Высота фиксирована: списки (PageFrame) крутят только таблицу, шапка страницы стоит.
             Длинные карточки сами ставят overflow-y-auto на корень.
           */}
-          <div className="mx-auto flex h-full min-h-0 w-full max-w-[1600px] flex-col overflow-hidden px-5 py-4 lg:px-8 lg:py-5">
+          {/* Без max-width: на 27″/ультравайде таблица тянется на всю ширину, а не «колонка по центру» */}
+          <div className="flex h-full min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden px-5 py-4 lg:px-8 lg:py-5 xl:px-10">
             <Outlet />
           </div>
         </main>

@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { FIELD_TYPES as FIELD_TYPES_SRC, FILLED_BY as FILLED_BY_SRC } from "../rules";
 
 export const REQUEST_TYPES_KEY = ["dir-request-types"] as const;
 
@@ -12,7 +13,7 @@ export type RequestType = {
   send_to_email: string | null;
 };
 
-export type FieldType = "text" | "textarea" | "number" | "date" | "select" | "checkbox" | "file" | "picket_range";
+export type FieldType = (typeof FIELD_TYPES_SRC)[number]["v"];
 
 export type RequestField = {
   id: string;
@@ -26,21 +27,8 @@ export type RequestField = {
   is_active: boolean;
 };
 
-export const FIELD_TYPES: { v: FieldType; label: string }[] = [
-  { v: "text", label: "Текст" },
-  { v: "textarea", label: "Многострочный текст" },
-  { v: "number", label: "Число" },
-  { v: "date", label: "Дата" },
-  { v: "select", label: "Выпадающий список" },
-  { v: "checkbox", label: "Галочка" },
-  { v: "file", label: "Файл (фото, видео, PDF)" },
-  { v: "picket_range", label: "Пикеты (от – до)" },
-];
-
-export const FILLED_BY: { v: RequestField["filled_by"]; label: string }[] = [
-  { v: "initiator", label: "Прораб при создании" },
-  { v: "office", label: "Офис-менеджер" },
-];
+export const FIELD_TYPES: { v: FieldType; label: string }[] = [...FIELD_TYPES_SRC];
+export const FILLED_BY: { v: RequestField["filled_by"]; label: string }[] = [...FILLED_BY_SRC];
 
 export function useRequestTypes() {
   return useQuery({

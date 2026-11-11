@@ -1,6 +1,7 @@
 @import "tailwindcss" source(none);
 @source "../src";
 @import "tw-animate-css";
+@import "react-loading-skeleton/dist/skeleton.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -222,6 +223,12 @@
     background-color: var(--background);
     color: var(--foreground);
   }
+}
+
+/* Вне @layer — иначе дефолтный белый из skeleton.css перебивает */
+.react-loading-skeleton {
+  --base-color: var(--muted);
+  --highlight-color: color-mix(in srgb, var(--muted-foreground) 28%, var(--muted));
 }
 
 @layer base {

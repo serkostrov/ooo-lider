@@ -3,25 +3,14 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { showError } from "@/lib/format";
-import {
-  isOptionalEmail,
-  isOptionalPhone,
-  normalizePhone,
-  VALIDATION_MSG,
-} from "@/lib/validation";
+import { normalizePhone } from "@/lib/validation";
 import { Input } from "@/components/ui/input";
 import { PhoneInput } from "@/components/ui/PhoneInput";
 import { Textarea } from "@/components/ui/textarea";
 import { DeleteButton, Field, FormActions, emptyToNull } from "./common";
+import { CONTACT_POSITIONS, validateCustomerContact } from "./rules";
 
-/** Типовые роли специалистов заказчика — подсказки в поле «Должность». */
-export const CONTACT_POSITIONS = [
-  "Куратор",
-  "Технадзор",
-  "Технадзор ЭХЗ",
-  "ГИП",
-  "Геотрест",
-] as const;
+export { CONTACT_POSITIONS };
 
 export type CustomerContact = {
   id: string;
@@ -113,16 +102,9 @@ export function CustomerContactForm({
       className="space-y-4"
       onSubmit={(e) => {
         e.preventDefault();
-        if (!v.full_name.trim()) {
-          toast.error("Заполните ФИО");
-          return;
-        }
-        if (!isOptionalPhone(v.phone)) {
-          toast.error(VALIDATION_MSG.phone);
-          return;
-        }
-        if (!isOptionalEmail(v.email)) {
-          toast.error(VALIDATION_MSG.email);
+        const err = validateCustomerContact(v);
+        if (err) {
+          toast.error(err);
           return;
         }
         m.mutate();

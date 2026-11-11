@@ -7,6 +7,7 @@ import { daysBetween, mskToday } from "@/lib/dates";
 import { sortRows, useTableSort, type SortState } from "@/lib/table-sort";
 import { fieldLabelClass, fieldStackClass } from "@/lib/ui";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -144,7 +145,7 @@ export function StagesTable({
 
   const closedSorted = useMemo(() => sortRows(closed, sort, STAGE_GETTERS), [closed, sort]);
 
-  if (isLoading) return <p className="py-4 text-sm text-muted-foreground">Загрузка…</p>;
+  if (isLoading) return <StagesTableSkeleton showExecutor={showExecutor} />;
 
   const set = <K extends keyof StagesTableFilters>(k: K, v: StagesTableFilters[K]) => setF((x) => ({ ...x, [k]: v }));
   const onChanged = () => refresh(objectId);
@@ -338,6 +339,73 @@ export function StagesTable({
             )}
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+function StagesTableSkeleton({ showExecutor, groups = 2, rows = 5 }: { showExecutor: boolean; groups?: number; rows?: number }) {
+  const td = "px-5 py-2.5 align-middle";
+  return (
+    <div className="min-h-0 flex-1 overflow-auto">
+      <div className="min-w-[1180px] space-y-3 pb-1">
+        <div className="overflow-hidden rounded-md border border-border bg-muted/30">
+          <table className="w-full table-fixed text-sm">
+            <StagesColgroup showExecutor={showExecutor} />
+            <thead>
+              <tr>
+                <th className="px-5 py-2.5 text-left text-xs font-medium text-muted-foreground">N</th>
+                <th className="px-5 py-2.5 text-left text-xs font-medium text-muted-foreground">Этап</th>
+                <th className="px-5 py-2.5 text-left text-xs font-medium text-muted-foreground">Условия</th>
+                <th className="px-5 py-2.5 text-left text-xs font-medium text-muted-foreground">Срок</th>
+                <th className="px-5 py-2.5 text-left text-xs font-medium text-muted-foreground">Статус</th>
+                {showExecutor && (
+                  <th className="px-5 py-2.5 pr-6 text-left text-xs font-medium text-muted-foreground">Исполнитель</th>
+                )}
+                <th className="px-5 py-2.5 text-left text-xs font-medium text-muted-foreground">Адресат</th>
+              </tr>
+            </thead>
+          </table>
+        </div>
+        {Array.from({ length: groups }, (_, g) => (
+          <section key={g} className="overflow-hidden rounded-md border border-border bg-card">
+            <header className="border-b border-border/80 bg-muted/40 px-4 py-2">
+              <Skeleton height={16} width={`${38 + g * 10}%`} />
+            </header>
+            <table className="w-full table-fixed text-sm">
+              <StagesColgroup showExecutor={showExecutor} />
+              <tbody>
+                {Array.from({ length: rows }, (_, i) => (
+                  <tr key={i} className="border-t border-border/50">
+                    <td className={td}>
+                      <Skeleton height={16} width={28} />
+                    </td>
+                    <td className={td}>
+                      <Skeleton height={16} width={`${55 + ((i + g) % 4) * 8}%`} />
+                    </td>
+                    <td className={td}>
+                      <Skeleton height={14} width={72} />
+                    </td>
+                    <td className={td}>
+                      <Skeleton height={16} width={88} />
+                    </td>
+                    <td className={td}>
+                      <Skeleton height={22} width={96} borderRadius={6} />
+                    </td>
+                    {showExecutor && (
+                      <td className={cn(td, "pr-6")}>
+                        <Skeleton height={16} width="70%" />
+                      </td>
+                    )}
+                    <td className={td}>
+                      <Skeleton height={16} width="65%" />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </section>
+        ))}
       </div>
     </div>
   );

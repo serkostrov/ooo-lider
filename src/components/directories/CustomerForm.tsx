@@ -3,16 +3,11 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { showError } from "@/lib/format";
-import {
-  digitsOnlyOrNull,
-  isOptionalInn,
-  isOptionalKpp,
-  isOptionalOgrn,
-  VALIDATION_MSG,
-} from "@/lib/validation";
+import { digitsOnlyOrNull } from "@/lib/validation";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { DeleteButton, Field, FormActions } from "./common";
+import { validateCustomer } from "./rules";
 
 export type Customer = {
   id: string;
@@ -78,20 +73,9 @@ export function CustomerForm({
       className="space-y-5"
       onSubmit={(e) => {
         e.preventDefault();
-        if (!v.name.trim()) {
-          toast.error("Заполните название");
-          return;
-        }
-        if (!isOptionalInn(v.inn)) {
-          toast.error(VALIDATION_MSG.inn);
-          return;
-        }
-        if (!isOptionalKpp(v.kpp)) {
-          toast.error(VALIDATION_MSG.kpp);
-          return;
-        }
-        if (!isOptionalOgrn(v.ogrn)) {
-          toast.error(VALIDATION_MSG.ogrn);
+        const err = validateCustomer(v);
+        if (err) {
+          toast.error(err);
           return;
         }
         m.mutate();

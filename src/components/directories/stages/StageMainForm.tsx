@@ -9,7 +9,8 @@ import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Field, emptyToNull } from "../common";
-import { STAGES_KEY, toIntOrNull, useRoles, useWorkTypes, type StageTemplate } from "./data";
+import { validateStageTemplate } from "../rules";
+import { STAGES_KEY, useRoles, useWorkTypes, type StageTemplate } from "./data";
 import { useProfile } from "@/lib/profile";
 import { listTemplateFiles, removeTemplateFile, uploadTemplateFile, type TemplateDocKind } from "@/lib/files";
 import { TemplateDocField, docTitleFromFile, type StagedFile } from "./TemplateDocField";
@@ -99,17 +100,22 @@ export function StageMainForm({
 
   const m = useMutation({
     mutationFn: async () => {
-      const num = toIntOrNull(number);
-      const dur = toIntOrNull(duration);
-      const resp = toIntOrNull(responseDays);
-      const rem = toIntOrNull(remindDays);
-      if (num === null || num === "bad" || num < 1) throw new Error("Номер этапа — целое число больше 0");
-      if (dur === "bad" || resp === "bad" || rem === "bad")
-        throw new Error("Сроки — целые числа от 0 или пусто");
-      if (!name.trim()) throw new Error("Укажите название этапа");
-      if (!workType) throw new Error("Выберите группу");
-      if (allStages.some((s) => s.number === num && s.id !== stage?.id))
-        throw new Error(`Этап с номером ${num} уже есть`);
+      const err = validateStageTemplate({
+        number,
+        name,
+        workTypeId: workType,
+        duration,
+        responseDays,
+        remindDays,
+        existing: allStages.map((s) => ({ id: s.id, number: s.number })),
+        currentId: stage?.id ?? null,
+      });
+      if (err) throw new Error(err);
+
+      const num = Number(number.trim());
+      const dur = duration.trim() === "" ? null : Number(duration.trim());
+      const resp = responseDays.trim() === "" ? null : Number(responseDays.trim());
+      const rem = remindDays.trim() === "" ? null : Number(remindDays.trim());
 
       const payload = {
         number: num,

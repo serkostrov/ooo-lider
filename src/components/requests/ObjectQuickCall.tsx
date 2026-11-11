@@ -3,6 +3,7 @@ import { Plus } from "lucide-react";
 import { useRequestTypes } from "@/components/directories/request-types/data";
 import { useRequests } from "@/components/requests/data";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { NewRequestDialog } from "./NewRequestDialog";
 
@@ -20,7 +21,7 @@ export function ObjectRequestTypeButtons({
   /** Повторный клик по активному виду снимает фильтр. */
   onSelectType: (typeId: string | undefined) => void;
 }) {
-  const { data: types = [] } = useRequestTypes();
+  const { data: types = [], isLoading } = useRequestTypes();
   const { data: requests = [] } = useRequests(objectId);
   const active = useMemo(() => types.filter((t) => t.is_active), [types]);
   const [createTypeId, setCreateTypeId] = useState<string | undefined>();
@@ -34,6 +35,20 @@ export function ObjectRequestTypeButtons({
     }
     return map;
   }, [requests]);
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col gap-1.5">
+        <p className="px-0.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Вызовы</p>
+        {Array.from({ length: 4 }, (_, i) => (
+          <div key={i} className="flex gap-1">
+            <Skeleton height={36} width="100%" containerClassName="flex-1" borderRadius={6} />
+            <Skeleton height={36} width={36} borderRadius={6} />
+          </div>
+        ))}
+      </div>
+    );
+  }
 
   if (active.length === 0) return null;
 

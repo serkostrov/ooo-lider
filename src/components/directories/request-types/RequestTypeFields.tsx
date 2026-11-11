@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { showError } from "@/lib/format";
 import { Input } from "@/components/ui/input";
@@ -9,7 +9,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Table, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { REORDER_ACTIONS_W } from "@/lib/ui";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -21,6 +22,9 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { EditSheet, EmptyRow, Field, FormActions } from "../common";
+import { DirectoryTableSkeleton } from "../DirectorySkeleton";
+import { SortableTableBody, SortableTableRow } from "../SortableTableRows";
+import { parseFieldOptions, validateRequestField } from "../rules";
 import { FIELD_TYPES, FILLED_BY, useRequestFields, type FieldType, type RequestField } from "./data";
 
 type Draft = {
@@ -40,12 +44,6 @@ const emptyDraft = (): Draft => ({
   is_active: true,
   options: "",
 });
-
-const parseOptions = (text: string) =>
-  text
-    .split("\n")
-    .map((s) => s.trim())
-    .filter(Boolean);
 
 const typeLabel = (v: string) => FIELD_TYPES.find((t) => t.v === v)?.label ?? v;
 const filledLabel = (v: string) => FILLED_BY.find((t) => t.v === v)?.label ?? v;
@@ -74,16 +72,12 @@ export function RequestTypeFields({ typeId, readOnly }: { typeId: string; readOn
     onError: showError,
   });
 
-  const move = (from: number, to: number) => {
-    if (to < 0 || to >= fields.length) return;
-    const next = [...fields];
-    const [item] = next.splice(from, 1);
-    if (!item) return;
-    next.splice(to, 0, item);
+  const applyOrder = (orderedIds: string[]) => {
+    const map = new Map(fields.map((f) => [f.id, f]));
+    const next = orderedIds.map((id) => map.get(id)).filter((f): f is RequestField => !!f);
+    if (next.length !== fields.length) return;
     reorder.mutate(next.map((f, i) => ({ ...f, sort: i + 1 })));
   };
-
-  if (isLoading) return null;
 
   return (
     <div className="w-full space-y-4">
@@ -114,16 +108,24 @@ export function RequestTypeFields({ typeId, readOnly }: { typeId: string; readOn
               <TableHead>Кто заполняет</TableHead>
               <TableHead className="w-24 text-center">Обяз.</TableHead>
               <TableHead className="w-24 text-center">Активно</TableHead>
-              {!readOnly && <TableHead className="w-16" />}
+              {!readOnly && <TableHead className={REORDER_ACTIONS_W} />}
             </TableRow>
           </TableHeader>
-          <TableBody>
-            {fields.length === 0 ? (
+          <SortableTableBody
+            ids={fields.map((f) => f.id)}
+            disabled={readOnly || isLoading}
+            onReorder={applyOrder}
+          >
+            {isLoading ? (
+              <DirectoryTableSkeleton cols={6} withActions={!readOnly} />
+            ) : fields.length === 0 ? (
               <EmptyRow cols={readOnly ? 6 : 7} />
             ) : (
               fields.map((f, i) => (
-                <TableRow
+                <SortableTableRow
                   key={f.id}
+                  id={f.id}
+                  disabled={readOnly}
                   className={`${readOnly ? "" : "cursor-pointer"} ${f.is_active ? "" : "text-muted-foreground"}`}
                   onClick={() => !readOnly && setEditing(f)}
                 >
@@ -133,40 +135,10 @@ export function RequestTypeFields({ typeId, readOnly }: { typeId: string; readOn
                   <TableCell>{filledLabel(f.filled_by)}</TableCell>
                   <TableCell className="text-center">{f.is_required ? "Да" : "—"}</TableCell>
                   <TableCell className="text-center">{f.is_active ? "Да" : "Нет"}</TableCell>
-                  {!readOnly && (
-                    <TableCell onClick={(e) => e.stopPropagation()}>
-                      <div className="flex items-center justify-end">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          disabled={i === 0 || reorder.isPending}
-                          onClick={() => move(i, i - 1)}
-                          className="size-8 text-muted-foreground"
-                          title="Выше"
-                          aria-label="Выше"
-                        >
-                          <ArrowUp className="size-4" />
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          disabled={i >= fields.length - 1 || reorder.isPending}
-                          onClick={() => move(i, i + 1)}
-                          className="size-8 text-muted-foreground"
-                          title="Ниже"
-                          aria-label="Ниже"
-                        >
-                          <ArrowDown className="size-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  )}
-                </TableRow>
+                </SortableTableRow>
               ))
             )}
-          </TableBody>
+          </SortableTableBody>
         </Table>
       </div>
 
@@ -220,12 +192,14 @@ function FieldForm({
 
   const save = useMutation({
     mutationFn: async () => {
+      const err = validateRequestField({
+        label: draft.label,
+        field_type: draft.field_type,
+        optionsText: draft.options,
+      });
+      if (err) throw new Error(err);
       const label = draft.label.trim();
-      if (!label) throw new Error("Укажите подпись поля");
-      const opts = parseOptions(draft.options);
-      if (draft.field_type === "select" && opts.length === 0) {
-        throw new Error("Для выпадающего списка укажите варианты");
-      }
+      const opts = parseFieldOptions(draft.options);
       const payload = {
         label,
         field_type: draft.field_type,

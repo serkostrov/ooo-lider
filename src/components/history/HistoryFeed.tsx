@@ -1,6 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDateTime } from "@/lib/dates";
+import { cn } from "@/lib/utils";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 export type HistoryFilter = {
@@ -61,25 +63,23 @@ export function HistoryFeed({
   fillHeight?: boolean;
 }) {
   const { data = [], isLoading, error } = useHistory(filter);
-  if (isLoading) {
-    return (
-      <p className={`py-4 text-sm text-muted-foreground ${fillHeight ? "h-full" : ""}`}>Загрузка…</p>
-    );
-  }
+
   if (error) {
     return (
-      <p className={`py-4 text-sm text-destructive ${fillHeight ? "h-full" : ""}`}>
+      <p className={cn("py-4 text-sm text-destructive", fillHeight && "h-full")}>
         Не удалось загрузить историю
       </p>
     );
   }
-  if (data.length === 0) {
+
+  if (!isLoading && data.length === 0) {
     return (
-      <p className={`py-4 text-sm text-muted-foreground ${fillHeight ? "h-full" : ""}`}>
+      <p className={cn("py-4 text-sm text-muted-foreground", fillHeight && "h-full")}>
         Записей пока нет
       </p>
     );
   }
+
   return (
     <div
       className={
@@ -98,24 +98,53 @@ export function HistoryFeed({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {data.map((h) => (
-            <TableRow key={h.id}>
-              <TableCell className="whitespace-nowrap tabular-nums text-muted-foreground">
-                {formatDateTime(h.created_at)}
-              </TableCell>
-              <TableCell className="font-medium">{h.actor?.full_name ?? "Система"}</TableCell>
-              <TableCell>{h.message}</TableCell>
-              {showObject && (
-                <TableCell className="max-w-[20rem] text-muted-foreground">
-                  <div className="line-clamp-2" title={h.object?.name ?? undefined}>
-                    {h.object?.name ?? "—"}
-                  </div>
+          {isLoading ? (
+            <HistoryTableSkeleton showObject={!!showObject} />
+          ) : (
+            data.map((h) => (
+              <TableRow key={h.id}>
+                <TableCell className="whitespace-nowrap tabular-nums text-muted-foreground">
+                  {formatDateTime(h.created_at)}
                 </TableCell>
-              )}
-            </TableRow>
-          ))}
+                <TableCell className="font-medium">{h.actor?.full_name ?? "Система"}</TableCell>
+                <TableCell>{h.message}</TableCell>
+                {showObject && (
+                  <TableCell className="max-w-[20rem] text-muted-foreground">
+                    <div className="line-clamp-2" title={h.object?.name ?? undefined}>
+                      {h.object?.name ?? "—"}
+                    </div>
+                  </TableCell>
+                )}
+              </TableRow>
+            ))
+          )}
         </TableBody>
       </Table>
     </div>
+  );
+}
+
+function HistoryTableSkeleton({ showObject, rows = 10 }: { showObject: boolean; rows?: number }) {
+  return (
+    <>
+      {Array.from({ length: rows }, (_, i) => (
+        <TableRow key={i} className="hover:bg-transparent">
+          <TableCell>
+            <Skeleton height={16} width={128} />
+          </TableCell>
+          <TableCell>
+            <Skeleton height={16} width="70%" />
+          </TableCell>
+          <TableCell>
+            <Skeleton height={16} width="92%" />
+          </TableCell>
+          {showObject && (
+            <TableCell>
+              <Skeleton height={16} width="80%" />
+            </TableCell>
+          )}
+        </TableRow>
+      ))}
+    </>
   );
 }

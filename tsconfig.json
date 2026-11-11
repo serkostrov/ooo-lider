@@ -2,7 +2,9 @@
   "include": [
     "src/**/*.ts",
     "src/**/*.tsx",
+    "e2e/**/*.ts",
     "vite.config.ts",
+    "playwright.config.ts",
     "eslint.config.js"
   ],
   "compilerOptions": {
@@ -10,7 +12,7 @@
     "jsx": "react-jsx",
     "module": "ESNext",
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "types": ["vite/client"],
+    "types": ["vite/client", "vitest/globals"],
     "moduleResolution": "Bundler",
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": false,

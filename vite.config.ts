@@ -1,8 +1,9 @@
+/// <reference types="vitest/config" />
 import path from "node:path";
 import tailwindcss from "@tailwindcss/vite";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import react from "@vitejs/plugin-react";
-import { defineConfig } from "vite";
+import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   plugins: [
@@ -30,6 +31,21 @@ export default defineConfig({
         ws: true,
         rewrite: (p) => p.replace(/^\/supabase/, ""),
       },
+    },
+  },
+  test: {
+    globals: true,
+    environment: "node",
+    include: ["src/**/*.{test,spec}.{ts,tsx}"],
+    coverage: {
+      provider: "v8",
+      reporter: ["text", "html"],
+      include: [
+        "src/lib/**/*.ts",
+        "src/components/directories/rules.ts",
+        "src/components/objects/ObjectCardFields.tsx",
+        "src/components/requests/FieldInput.tsx",
+      ],
     },
   },
 });

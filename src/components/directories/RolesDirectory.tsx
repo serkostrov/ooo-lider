@@ -1,32 +1,20 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ArrowDown, ArrowUp } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useProfile } from "@/lib/profile";
 import { showError } from "@/lib/format";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { Button } from "@/components/ui/button";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Table, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { REORDER_ACTIONS_W } from "@/lib/ui";
 import { EditSheet, EmptyRow, Field, FormActions, Toolbar, matches } from "./common";
+import { DirectoryTableSkeleton } from "./DirectorySkeleton";
+import { SortableTableBody, SortableTableRow } from "./SortableTableRows";
+import { nextSort, slugCode, uniqueCode, validateRole } from "./rules";
 
 const KEY = ["dir-roles"] as const;
 type Role = { code: string; name: string; is_admin: boolean; sort: number };
-
-function slugCode(name: string) {
-  const map: Record<string, string> = {
-    а: "a", б: "b", в: "v", г: "g", д: "d", е: "e", ё: "e", ж: "zh", з: "z", и: "i", й: "y",
-    к: "k", л: "l", м: "m", н: "n", о: "o", п: "p", р: "r", с: "s", т: "t", у: "u", ф: "f",
-    х: "h", ц: "c", ч: "ch", ш: "sh", щ: "sch", ъ: "", ы: "y", ь: "", э: "e", ю: "yu", я: "ya",
-  };
-  const latin = name
-    .toLowerCase()
-    .split("")
-    .map((ch) => map[ch] ?? ch)
-    .join("");
-  return latin.replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "").slice(0, 40) || "role";
-}
 
 /** Справочник ролей (§3.15): можно добавить роль без доработки кода. */
 export function RolesDirectory() {
@@ -43,6 +31,8 @@ export function RolesDirectory() {
     },
   });
   const filtered = data.filter((r) => matches(search, r.name));
+  /** При поиске DnD выключаем — иначе ломается порядок полного списка. */
+  const canReorder = is_admin && !search.trim();
 
   const reorder = useMutation({
     mutationFn: async (ordered: Role[]) => {
@@ -57,12 +47,10 @@ export function RolesDirectory() {
     onError: showError,
   });
 
-  const move = (from: number, to: number) => {
-    if (to < 0 || to >= data.length) return;
-    const next = [...data];
-    const [item] = next.splice(from, 1);
-    if (!item) return;
-    next.splice(to, 0, item);
+  const applyOrder = (orderedIds: string[]) => {
+    const map = new Map(data.map((r) => [r.code, r]));
+    const next = orderedIds.map((id) => map.get(id)).filter((r): r is Role => !!r);
+    if (next.length !== data.length) return;
     reorder.mutate(next.map((r, i) => ({ ...r, sort: i + 1 })));
   };
 
@@ -70,6 +58,7 @@ export function RolesDirectory() {
     <div className="w-full">
       <p className="mb-3 text-sm text-muted-foreground">
         Можно править название и признак полного доступа. Системные роли удалить нельзя.
+        {is_admin && search.trim() ? " Сбросьте поиск, чтобы менять порядок." : null}
       </p>
       <Toolbar search={search} onSearch={setSearch} onAdd={is_admin ? () => setEditing("new") : undefined} />
       <div className="overflow-hidden rounded-md border border-border bg-card">
@@ -78,58 +67,33 @@ export function RolesDirectory() {
             <TableRow>
               <TableHead>Название</TableHead>
               <TableHead>Полный доступ</TableHead>
-              {is_admin && <TableHead className="w-16" />}
+              {canReorder && <TableHead className={REORDER_ACTIONS_W} />}
             </TableRow>
           </TableHeader>
-          <TableBody>
-            {isLoading ? null : filtered.length === 0 ? (
-              <EmptyRow cols={is_admin ? 3 : 2} />
+          <SortableTableBody
+            ids={filtered.map((r) => r.code)}
+            disabled={!canReorder}
+            onReorder={applyOrder}
+          >
+            {isLoading ? (
+              <DirectoryTableSkeleton cols={2} withActions={canReorder} />
+            ) : filtered.length === 0 ? (
+              <EmptyRow cols={canReorder ? 3 : 2} />
             ) : (
-              filtered.map((r) => {
-                const idx = data.findIndex((x) => x.code === r.code);
-                return (
-                  <TableRow
-                    key={r.code}
-                    className={is_admin ? "cursor-pointer" : ""}
-                    onClick={() => is_admin && setEditing(r)}
-                  >
-                    <TableCell className="font-medium">{r.name}</TableCell>
-                    <TableCell>{r.is_admin ? "Да" : "Нет"}</TableCell>
-                    {is_admin && (
-                      <TableCell onClick={(e) => e.stopPropagation()}>
-                        <div className="flex items-center justify-end">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            disabled={idx <= 0 || reorder.isPending}
-                            onClick={() => move(idx, idx - 1)}
-                            className="size-8 text-muted-foreground"
-                            title="Выше"
-                            aria-label="Выше"
-                          >
-                            <ArrowUp className="size-4" />
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            disabled={idx < 0 || idx >= data.length - 1 || reorder.isPending}
-                            onClick={() => move(idx, idx + 1)}
-                            className="size-8 text-muted-foreground"
-                            title="Ниже"
-                            aria-label="Ниже"
-                          >
-                            <ArrowDown className="size-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    )}
-                  </TableRow>
-                );
-              })
+              filtered.map((r) => (
+                <SortableTableRow
+                  key={r.code}
+                  id={r.code}
+                  disabled={!canReorder}
+                  className={is_admin ? "cursor-pointer" : ""}
+                  onClick={() => is_admin && setEditing(r)}
+                >
+                  <TableCell className="font-medium">{r.name}</TableCell>
+                  <TableCell>{r.is_admin ? "Да" : "Нет"}</TableCell>
+                </SortableTableRow>
+              ))
             )}
-          </TableBody>
+          </SortableTableBody>
         </Table>
       </div>
       <EditSheet
@@ -165,8 +129,9 @@ function RoleForm({
 
   const m = useMutation({
     mutationFn: async () => {
+      const err = validateRole(name);
+      if (err) throw new Error(err);
       const n = name.trim();
-      if (!n) throw new Error("Укажите название");
       if (role) {
         const { error } = await supabase
           .from("roles")
@@ -174,15 +139,13 @@ function RoleForm({
           .eq("code", role.code);
         if (error) throw error;
       } else {
-        let c = slugCode(n);
-        const taken = new Set(existing.map((r) => r.code));
-        if (taken.has(c)) {
-          let i = 2;
-          while (taken.has(`${c}_${i}`)) i += 1;
-          c = `${c}_${i}`;
-        }
-        const sortN = Math.max(0, ...existing.map((r) => r.sort)) + 1;
-        const { error } = await supabase.from("roles").insert({ code: c, name: n, is_admin: isAdmin, sort: sortN });
+        const c = uniqueCode(
+          slugCode(n, "role"),
+          existing.map((r) => r.code),
+        );
+        const { error } = await supabase
+          .from("roles")
+          .insert({ code: c, name: n, is_admin: isAdmin, sort: nextSort(existing) });
         if (error) throw error;
       }
     },

@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Field } from "../common";
+import { DirectoryListSkeleton } from "../DirectorySkeleton";
 import { Reorderable } from "./Reorderable";
 import { ACTION_KINDS, toIntOrNull, useRoles } from "./data";
 
@@ -129,14 +130,17 @@ export function StageSteps({ templateId, readOnly }: { templateId: string; readO
     onError: showError,
   });
 
-  if (isLoading) return null;
-
   return (
     <div className="w-full space-y-4">
       <p className="text-sm text-muted-foreground">
         Сценарий копируется на объект при добавлении этапа. Изменения не затрагивают уже созданные объекты.
       </p>
-      {steps.length === 0 && <p className="py-4 text-center text-sm text-muted-foreground">Шагов пока нет</p>}
+      {isLoading ? (
+        <DirectoryListSkeleton rows={4} withActions={!readOnly} />
+      ) : steps.length === 0 ? (
+        <p className="py-4 text-center text-sm text-muted-foreground">Шагов пока нет</p>
+      ) : null}
+      {!isLoading && (
       <Reorderable
         items={steps}
         disabled={readOnly}
@@ -152,7 +156,8 @@ export function StageSteps({ templateId, readOnly }: { templateId: string; readO
           />
         )}
       />
-      {!readOnly && (
+      )}
+      {!isLoading && !readOnly && (
         <form
           className="space-y-4 rounded-md border border-dashed p-4"
           onSubmit={(e) => {

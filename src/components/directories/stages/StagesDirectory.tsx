@@ -5,6 +5,7 @@ import { useProfile } from "@/lib/profile";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { EmptyRow, Toolbar } from "../common";
+import { DirectoryTableSkeleton } from "../DirectorySkeleton";
 import { useRoles, useStageTemplatesFull, useWorkTypes, type StageTemplate } from "./data";
 
 const NO_GROUP = "__none";
@@ -62,7 +63,9 @@ export function StagesDirectory() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {isLoading ? null : groups.length === 0 ? (
+            {isLoading ? (
+              <DirectoryTableSkeleton cols={5} />
+            ) : groups.length === 0 ? (
               <EmptyRow cols={5} />
             ) : (
               groups.flatMap((g) => [

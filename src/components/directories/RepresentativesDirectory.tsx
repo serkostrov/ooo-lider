@@ -5,12 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useProfile } from "@/lib/profile";
 import { showError } from "@/lib/format";
 import { useSortedRows, useTableSort } from "@/lib/table-sort";
-import {
-  isOptionalEmail,
-  isOptionalPhone,
-  normalizePhone,
-  VALIDATION_MSG,
-} from "@/lib/validation";
+import { normalizePhone } from "@/lib/validation";
 import { Input } from "@/components/ui/input";
 import { PhoneInput } from "@/components/ui/PhoneInput";
 import { Textarea } from "@/components/ui/textarea";
@@ -18,6 +13,8 @@ import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
 import { SortableTh } from "@/components/SortableTh";
 import { DeleteButton, EditSheet, EmptyRow, Field, FormActions, Toolbar, emptyToNull, matches } from "./common";
+import { DirectoryTableSkeleton } from "./DirectorySkeleton";
+import { validateRepresentative } from "./rules";
 
 const KEY = ["dir-representatives"];
 type Rep = { id: string; name: string; phone: string | null; email: string | null; comment: string | null; is_active: boolean };
@@ -64,7 +61,9 @@ export function RepresentativesDirectory() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {isLoading ? null : rows.length === 0 ? (
+            {isLoading ? (
+              <DirectoryTableSkeleton cols={5} />
+            ) : rows.length === 0 ? (
               <EmptyRow cols={5} />
             ) : (
               rows.map((r) => (
@@ -122,16 +121,9 @@ function RepForm({ rep, onClose }: { rep: Rep | null; onClose: () => void }) {
       className="space-y-5"
       onSubmit={(e) => {
         e.preventDefault();
-        if (!name.trim()) {
-          toast.error("Заполните название");
-          return;
-        }
-        if (!isOptionalPhone(phone)) {
-          toast.error(VALIDATION_MSG.phone);
-          return;
-        }
-        if (!isOptionalEmail(email)) {
-          toast.error(VALIDATION_MSG.email);
+        const err = validateRepresentative({ name, phone, email });
+        if (err) {
+          toast.error(err);
           return;
         }
         m.mutate();

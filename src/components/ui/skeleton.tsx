@@ -1,7 +1,30 @@
+import LibSkeleton, {
+  SkeletonTheme,
+  type SkeletonProps as LibSkeletonProps,
+} from "react-loading-skeleton";
 import { cn } from "@/lib/utils";
 
-function Skeleton({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("animate-pulse rounded-md bg-primary/10", className)} {...props} />;
+export type SkeletonProps = LibSkeletonProps;
+
+/** Обёртка над react-loading-skeleton; base/highlight из CSS-токенов темы. */
+function Skeleton({
+  className,
+  containerClassName,
+  borderRadius = "0.375rem",
+  baseColor = "var(--muted)",
+  highlightColor = "color-mix(in srgb, var(--muted-foreground) 28%, var(--muted))",
+  ...props
+}: SkeletonProps) {
+  return (
+    <LibSkeleton
+      borderRadius={borderRadius}
+      baseColor={baseColor}
+      highlightColor={highlightColor}
+      {...props}
+      {...(className ? { className: cn(className) } : {})}
+      {...(containerClassName ? { containerClassName } : {})}
+    />
+  );
 }
 
-export { Skeleton };
+export { Skeleton, SkeletonTheme };

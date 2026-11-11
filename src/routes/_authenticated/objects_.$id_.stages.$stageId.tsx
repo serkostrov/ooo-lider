@@ -90,8 +90,8 @@ function StagePage() {
         {back}
 
         <Tabs key={stageId} value={tab} onValueChange={setTab}>
-          <div className="mb-5 grid items-stretch gap-4 sm:grid-cols-[minmax(0,1fr)_16rem] sm:gap-5">
-            <div className="flex min-w-0 flex-col justify-between gap-4">
+          <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between lg:gap-6">
+            <div className="flex min-w-0 flex-1 flex-col gap-4">
               <header>
                 <h1 className="text-xl font-semibold leading-snug tracking-tight">
                   <span className="text-muted-foreground">{stage.number}.</span> {stage.name}
@@ -132,7 +132,9 @@ function StagePage() {
                 </TabsTrigger>
               </TabsList>
             </div>
-            <StageStatusBar stage={stage} conditions={conditions} onChanged={refresh} />
+            <div className="w-full shrink-0 lg:w-64">
+              <StageStatusBar stage={stage} conditions={conditions} onChanged={refresh} />
+            </div>
           </div>
 
           <TabsContent value="main" className="mt-0">

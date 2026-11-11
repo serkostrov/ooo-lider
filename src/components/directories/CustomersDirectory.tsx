@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components
 import { SortableTh } from "@/components/SortableTh";
 import { fieldLabelClass, fieldStackClass } from "@/lib/ui";
 import { DeleteButton, EditSheet, EmptyRow, Toolbar, matches } from "./common";
+import { DirectoryTableSkeleton } from "./DirectorySkeleton";
 import { CustomerForm, CUSTOMERS_KEY, type Customer } from "./CustomerForm";
 import {
   CustomerContactForm,
@@ -60,7 +61,9 @@ export function CustomersDirectory() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {isLoading ? null : rows.length === 0 ? (
+            {isLoading ? (
+              <DirectoryTableSkeleton cols={4} />
+            ) : rows.length === 0 ? (
               <EmptyRow cols={4} />
             ) : (
               rows.map((c) => (

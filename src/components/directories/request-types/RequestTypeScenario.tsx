@@ -5,6 +5,7 @@ import { Plus, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { showError } from "@/lib/format";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useRoles } from "@/components/directories/stages/data";
 import { Field } from "../common";
@@ -90,41 +91,53 @@ export function RequestTypeScenario({ typeId, readOnly }: { typeId: string; read
     onError: showError,
   });
 
-  if (isLoading) return <p className="text-sm text-muted-foreground">Загрузка…</p>;
-
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">
         Цепочка статусов фиксирована. Здесь задаётся, какая роль переводит заявку на статус и какие поля должны быть заполнены к этому шагу.
       </p>
-      {steps.length === 0 && (
+      {isLoading ? (
+        <ol className="space-y-3">
+          {Array.from({ length: 4 }, (_, i) => (
+            <li key={i} className="rounded-md border border-border bg-card p-4 space-y-3">
+              <Skeleton height={16} width="40%" />
+              <Skeleton height={14} width="70%" />
+              <Skeleton height={36} width="100%" borderRadius={6} />
+            </li>
+          ))}
+        </ol>
+      ) : steps.length === 0 ? (
         <p className="rounded-md border border-border bg-card p-4 text-sm text-muted-foreground">
           Шагов пока нет — после миграции 13 они появятся автоматически. Можно добавить вручную.
         </p>
-      )}
-      <ol className="space-y-3">
-        {steps.map((s) => (
-          <StepCard
-            key={s.id}
-            step={s}
-            roles={roles}
-            fields={activeFields}
-            readOnly={!!readOnly}
-            onSaved={refresh}
-          />
-        ))}
-      </ol>
-      {!readOnly && steps.length < STATUSES.length && (
-        <Button
-          type="button"
-          variant="outline"
-          className="h-9 gap-1.5 px-3 text-sm"
-          onClick={() => add.mutate()}
-          disabled={add.isPending}
-        >
-          <Plus className="size-4" />
-          Добавить шаг
-        </Button>
+      ) : null}
+      {!isLoading && (
+        <>
+          <ol className="space-y-3">
+            {steps.map((s) => (
+              <StepCard
+                key={s.id}
+                step={s}
+                roles={roles}
+                fields={activeFields}
+                readOnly={!!readOnly}
+                onSaved={refresh}
+              />
+            ))}
+          </ol>
+          {!readOnly && steps.length < STATUSES.length && (
+            <Button
+              type="button"
+              variant="outline"
+              className="h-9 gap-1.5 px-3 text-sm"
+              onClick={() => add.mutate()}
+              disabled={add.isPending}
+            >
+              <Plus className="size-4" />
+              Добавить шаг
+            </Button>
+          )}
+        </>
       )}
     </div>
   );

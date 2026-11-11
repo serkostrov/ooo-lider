@@ -6,13 +6,11 @@ import { formatSize, openTemplateFile, type TemplateFile } from "@/lib/files";
 import { showError } from "@/lib/format";
 import { Field } from "../common";
 
+import { docTitleFromFile } from "../rules";
+
 export type StagedFile = { key: string; file: File };
 
-/** Подпись документа без расширения — для поля «название», если его не заполнили. */
-export function docTitleFromFile(name: string) {
-  const dot = name.lastIndexOf(".");
-  return (dot > 0 ? name.slice(0, dot) : name).trim();
-}
+export { docTitleFromFile };
 
 /**
  * «От нас» / «Ждём» в карточке этапа справочника (правка 2.3): название документа

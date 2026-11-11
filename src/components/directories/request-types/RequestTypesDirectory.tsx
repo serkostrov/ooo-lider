@@ -7,6 +7,7 @@ import { showError } from "@/lib/format";
 import { thLabelClass } from "@/lib/ui";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { DirectoryListSkeleton } from "../DirectorySkeleton";
 import { Reorderable } from "../stages/Reorderable";
 import { REQUEST_TYPES_KEY, useRequestFields, useRequestTypes, type RequestType } from "./data";
 
@@ -35,8 +36,6 @@ export function RequestTypesDirectory() {
   const open = (id: string) => navigate({ to: "/directories/request-types/$id", params: { id } });
   const countFields = (id: string) => fields.filter((f) => f.request_type_id === id && f.is_active).length;
 
-  if (isLoading) return null;
-
   return (
     <div className="w-full">
       <div className="mb-4 flex h-9 items-center justify-between gap-3">
@@ -48,7 +47,18 @@ export function RequestTypesDirectory() {
           </Button>
         )}
       </div>
-      {types.length === 0 ? (
+      {isLoading ? (
+        <DirectoryListSkeleton
+          withActions={is_admin}
+          header={
+            <>
+              <div className={`${thLabelClass} min-w-0 flex-1`}>Название</div>
+              <div className={`${thLabelClass} w-16 shrink-0 text-right`}>Полей</div>
+              <div className={`${thLabelClass} w-52 shrink-0`}>Отправка</div>
+            </>
+          }
+        />
+      ) : types.length === 0 ? (
         <p className="rounded-md border border-border bg-card py-8 text-center text-sm text-muted-foreground">
           Видов заявок пока нет
         </p>

@@ -5,12 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useProfile } from "@/lib/profile";
 import { showError } from "@/lib/format";
 import { useSortedRows, useTableSort } from "@/lib/table-sort";
-import {
-  isOptionalEmail,
-  isOptionalPhone,
-  normalizePhone,
-  VALIDATION_MSG,
-} from "@/lib/validation";
+import { normalizePhone } from "@/lib/validation";
 import { Input } from "@/components/ui/input";
 import { PhoneInput } from "@/components/ui/PhoneInput";
 import { Switch } from "@/components/ui/switch";
@@ -18,6 +13,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
 import { SortableTh } from "@/components/SortableTh";
 import { DeleteButton, EditSheet, EmptyRow, Field, FormActions, Toolbar, emptyToNull, matches } from "./common";
+import { DirectoryTableSkeleton } from "./DirectorySkeleton";
+import { validateEmployee } from "./rules";
 
 const KEY = ["dir-profiles"];
 type Emp = { id: string; full_name: string; role_code: string; phone: string | null; email: string | null; is_active: boolean; user_id: string | null };
@@ -79,7 +76,9 @@ export function EmployeesDirectory() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {isLoading ? null : rows.length === 0 ? (
+            {isLoading ? (
+              <DirectoryTableSkeleton cols={6} />
+            ) : rows.length === 0 ? (
               <EmptyRow cols={6} />
             ) : (
               rows.map((e) => (
@@ -140,16 +139,9 @@ function EmpForm({ emp, roles, onClose }: { emp: Emp | null; roles: { code: stri
       className="space-y-5"
       onSubmit={(e) => {
         e.preventDefault();
-        if (!name.trim() || !role) {
-          toast.error("Заполните ФИО и роль");
-          return;
-        }
-        if (!isOptionalPhone(phone)) {
-          toast.error(VALIDATION_MSG.phone);
-          return;
-        }
-        if (!isOptionalEmail(email)) {
-          toast.error(VALIDATION_MSG.email);
+        const err = validateEmployee({ full_name: name, role_code: role, phone, email });
+        if (err) {
+          toast.error(err);
           return;
         }
         m.mutate();

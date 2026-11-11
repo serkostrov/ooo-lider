@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Toolbar } from "@/components/directories/common";
 import { SortableTh } from "@/components/SortableTh";
 import { useRequestTypes } from "@/components/directories/request-types/data";
@@ -464,7 +465,9 @@ export function RequestsList({
             </tr>
           </thead>
           <tbody>
-            {isLoading ? null : sorted.length === 0 ? (
+            {isLoading ? (
+              <RequestsTableSkeleton showObject={showObject} />
+            ) : sorted.length === 0 ? (
               <tr>
                 <td colSpan={showObject ? 9 : 8} className="px-5 py-12 text-center">
                   <div className="mx-auto flex max-w-sm flex-col items-center gap-3">
@@ -575,5 +578,46 @@ export function RequestsList({
         </table>
       </div>
     </div>
+  );
+}
+
+function RequestsTableSkeleton({ showObject, rows = 8 }: { showObject: boolean; rows?: number }) {
+  const cell = "px-5 py-2.5 align-middle";
+  return (
+    <>
+      {Array.from({ length: rows }, (_, i) => (
+        <tr key={i} className="h-12 border-t border-border/60">
+          <td className={cell}>
+            <Skeleton height={16} width={56} />
+          </td>
+          <td className={cell}>
+            <Skeleton height={16} width={88} />
+          </td>
+          <td className={cell}>
+            <Skeleton height={16} width={88} />
+          </td>
+          <td className={cell}>
+            <Skeleton height={16} width="70%" />
+          </td>
+          {showObject && (
+            <td className={cell}>
+              <Skeleton height={16} width="80%" />
+            </td>
+          )}
+          <td className={cell}>
+            <Skeleton height={14} width="90%" />
+          </td>
+          <td className={cell}>
+            <Skeleton height={22} width={96} borderRadius={6} />
+          </td>
+          <td className={cell}>
+            <Skeleton height={16} width="75%" />
+          </td>
+          <td className={cell}>
+            <Skeleton height={16} width="75%" />
+          </td>
+        </tr>
+      ))}
+    </>
   );
 }
