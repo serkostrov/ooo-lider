@@ -16,48 +16,24 @@ import { validateRequestStatus } from "./rules";
 
 /**
  * Справочник «Статусы заявок» — шаги хода заявки.
- * Коды фиксированы; название, кнопка, цвет и порядок (sort) настраиваются.
+ * Коды и порядок фиксированы. Настраиваются название, кнопка и цвет.
  */
 export function RequestStatusesDirectory() {
   const { is_admin } = useProfile();
-  const qc = useQueryClient();
   const statuses = useRequestStatuses();
   const [editing, setEditing] = useState<{ s: RequestStatusDef; i: number } | null>(null);
-
-  const reorder = useMutation({
-    mutationFn: async (ordered: RequestStatusDef[]) => {
-      const results = await Promise.all(
-        ordered.map((s, i) => supabase.from("request_statuses").update({ sort: i + 1 }).eq("code", s.v)),
-      );
-      const failed = results.find((r) => r.error);
-      if (failed?.error) throw failed.error;
-    },
-    onSettled: () => qc.invalidateQueries({ queryKey: REQUEST_STATUSES_KEY }),
-    onError: showError,
-  });
-
-  const applyOrder = (orderedIds: string[]) => {
-    const map = new Map(statuses.map((s) => [String(s.v), s]));
-    const next = orderedIds.map((id) => map.get(id)).filter((s): s is RequestStatusDef => !!s);
-    if (next.length !== statuses.length) return;
-    reorder.mutate(next.map((s, i) => ({ ...s, sort: i + 1 })));
-  };
 
   return (
     <>
       <StatusDirectoryShell
         title="Статусы заявок"
-        hint="Шаги «Хода заявки». Можно поменять название, текст кнопки, цвет и порядок. Коды шагов фиксированы."
-        showActions={is_admin}
-        {...(is_admin
-          ? { sortable: { ids: statuses.map((s) => String(s.v)), onReorder: applyOrder } }
-          : {})}
+        hint="Шаги «Хода заявки» идут в фиксированном порядке: Новая → Готова к отправке → Отправлена → Принята заказчиком → Исполнена. Можно поменять название, текст кнопки и цвет. Порядок менять нельзя — от него зависит создание заявки и переходы."
       >
         {statuses.map((s, i) => (
           <SortableTableRow
             key={s.v}
             id={String(s.v)}
-            disabled={!is_admin}
+            disabled
             className={is_admin ? "cursor-pointer" : ""}
             onClick={() => is_admin && setEditing({ s, i })}
           >

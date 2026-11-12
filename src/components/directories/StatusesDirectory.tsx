@@ -32,6 +32,7 @@ import {
 import { StatusDirectoryShell } from "./status-directory-shared";
 import { DirectoryTableSkeleton } from "./DirectorySkeleton";
 import { SortableTableRow } from "./SortableTableRows";
+import { ReorderModeButton } from "./ReorderModeButton";
 import { isSystemStageStatus, nextSort, slugCode, uniqueCode, validateStageStatus } from "./rules";
 
 const KEY = ["dir-stage-statuses"] as const;
@@ -41,6 +42,7 @@ export function StatusesDirectory() {
   const { is_admin } = useProfile();
   const qc = useQueryClient();
   const [editing, setEditing] = useState<St | "new" | null>(null);
+  const [reordering, setReordering] = useState(false);
   const { data = [], isLoading } = useQuery({
     queryKey: KEY,
     queryFn: async () => {
@@ -79,21 +81,26 @@ export function StatusesDirectory() {
         title="Статусы этапов"
         hint="Статусы этапов на объектах. Можно добавить свои, поменять название и цвет. Системные статусы удалить нельзя."
         {...(is_admin ? { onAdd: () => setEditing("new") } : {})}
-        showActions={is_admin}
         {...(is_admin
+          ? {
+              headerActions: <ReorderModeButton active={reordering} onChange={setReordering} />,
+            }
+          : {})}
+        showActions={is_admin && reordering}
+        {...(is_admin && reordering
           ? { sortable: { ids: data.map((s) => s.code), onReorder: applyOrder } }
           : {})}
       >
         {isLoading ? (
-          <DirectoryTableSkeleton cols={4} withActions={is_admin} />
+          <DirectoryTableSkeleton cols={4} withActions={is_admin && reordering} />
         ) : data.length === 0 ? (
-          <EmptyRow cols={is_admin ? 5 : 4} />
+          <EmptyRow cols={is_admin && reordering ? 5 : 4} />
         ) : (
           data.map((s, i) => (
             <SortableTableRow
               key={s.code}
               id={s.code}
-              disabled={!is_admin}
+              disabled={!is_admin || !reordering}
               className={is_admin ? "cursor-pointer" : ""}
               onClick={() => is_admin && setEditing(s)}
             >

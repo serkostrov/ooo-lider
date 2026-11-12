@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, ClipboardPen, Pencil } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { showError } from "@/lib/format";
 import { listFiles } from "@/lib/files";
@@ -91,11 +91,18 @@ function RequestCard() {
 
   const initiatorRef = useRef<RequestFieldsHandle>(null);
   const officeRef = useRef<RequestFieldsHandle>(null);
+  const [editing, setEditing] = useState(false);
   const [dirtyInitiator, setDirtyInitiator] = useState(false);
   const [dirtyOffice, setDirtyOffice] = useState(false);
   const [draftRev, setDraftRev] = useState(0);
   const [saving, setSaving] = useState(false);
   const dirty = dirtyInitiator || dirtyOffice;
+
+  useEffect(() => {
+    setEditing(false);
+    setDirtyInitiator(false);
+    setDirtyOffice(false);
+  }, [requestId]);
 
   const onDirtyInitiator = useCallback((d: boolean) => setDirtyInitiator(d), []);
   const onDirtyOffice = useCallback((d: boolean) => setDirtyOffice(d), []);
@@ -108,7 +115,15 @@ function RequestCard() {
     qc.invalidateQueries({ queryKey: ["request-comments", requestId] });
   };
 
-  const saveAll = async (opts?: { silent?: boolean }) => {
+  const exitEditing = () => {
+    initiatorRef.current?.reset();
+    officeRef.current?.reset();
+    setDirtyInitiator(false);
+    setDirtyOffice(false);
+    setEditing(false);
+  };
+
+  const saveAll = async (opts?: { silent?: boolean; keepEditing?: boolean }) => {
     setSaving(true);
     try {
       await initiatorRef.current?.save();
@@ -116,6 +131,7 @@ function RequestCard() {
       if (!opts?.silent) toast.success("Сохранено");
       await qc.invalidateQueries({ queryKey: ["request", requestId, "values"] });
       refreshAll(requestId);
+      if (!opts?.keepEditing) setEditing(false);
     } catch (e) {
       showError(e);
       throw e;
@@ -167,16 +183,21 @@ function RequestCard() {
     if (officeRef.current?.hasField(id)) return officeRef.current.getValue(id);
     return values.find((v) => v.field_id === id)?.value;
   };
-  const missingRequired = active
-    .filter((f) => f.is_required)
-    .filter((f) => {
-      if (f.field_type === "file") return files.length === 0;
-      const raw = valueOf(f.id);
-      if (isEmptyValue(raw)) return true;
-      if (looksLikeEmailField(f) && (typeof raw !== "string" || !isValidEmail(raw))) return true;
-      return false;
-    })
-    .map((f) => f.label);
+  const isMissing = (f: (typeof active)[number]) => {
+    if (f.field_type === "file") return files.length === 0;
+    const raw = valueOf(f.id);
+    if (isEmptyValue(raw)) return true;
+    if (looksLikeEmailField(f) && (typeof raw !== "string" || !isValidEmail(raw))) return true;
+    return false;
+  };
+  // До «Готова к отправке» обязательны поля прораба. До «Отправлена» — ещё и офиса.
+  const requiredNow =
+    r.status === "new"
+      ? active.filter((f) => f.is_required && f.filled_by === "initiator")
+      : r.status === "ready"
+        ? active.filter((f) => f.is_required)
+        : [];
+  const missingRequired = requiredNow.filter(isMissing).map((f) => f.label);
   const orphan = values.filter((v) => !activeIds.has(v.field_id) && v.field_type !== "file");
   const doneByName = r.done_by ? profiles.find((p) => p.id === r.done_by)?.full_name ?? null : null;
   // Админ — всё в окне статуса; прораб/ПТО — поля initiator на «Новая»; офис — office до отправки.
@@ -190,16 +211,26 @@ function RequestCard() {
     (me.is_admin && statusAllowsOffice) ||
     (isInitiatorRole && statusAllowsInitiator) ||
     (isOfficeRole && statusAllowsOffice);
-  const initiatorReadOnly = !canEditInitiator;
-  const officeReadOnly = !canEditOffice;
-  const filesReadOnly = !canEditFiles;
+  const canEditAnything = canEditInitiator || canEditOffice || canEditFiles;
   const initiatorFields = active.filter((f) => f.filled_by === "initiator");
   const officeFields = active.filter((f) => f.filled_by === "office");
+  const initiatorReadOnly = !editing || !canEditInitiator;
+  const officeReadOnly = !editing || !canEditOffice;
+  const filesReadOnly = !editing || !canEditFiles;
+  const editableFields = [
+    ...(canEditInitiator ? initiatorFields.filter((f) => f.field_type !== "file") : []),
+    ...(canEditOffice ? officeFields.filter((f) => f.field_type !== "file") : []),
+  ];
+  const hasFilledData =
+    editableFields.some((f) => !isEmptyValue(values.find((v) => v.field_id === f.id)?.value)) ||
+    (canEditFiles && files.length > 0);
+  const editButtonLabel = hasFilledData ? "Редактировать" : "Заполнить";
+  const EditIcon = hasFilledData ? Pencil : ClipboardPen;
   const initiatorHint = !statusAllowsInitiator
     ? "Зафиксированы после «Готова к отправке»."
     : !canEditInitiator
       ? "Заполняет прораб или ПТО."
-      : undefined;
+      : "Заполните и переведите заявку дальше.";
   const officeHint = !statusAllowsOffice
     ? "Зафиксированы после отправки заявки."
     : !canEditOffice
@@ -332,9 +363,23 @@ function RequestCard() {
 
       {showBar && (
         <div className="shrink-0 border-t border-border bg-background py-3">
-          <div className="flex min-w-0 flex-wrap items-center gap-2 sm:gap-3">
-            {(!initiatorReadOnly || !officeReadOnly) && (
+          <div className="flex min-w-0 flex-wrap items-center justify-end gap-2 sm:gap-3">
+            {canEditAnything && !editing && (
+              <Button className="h-9 shrink-0 gap-1.5 px-4 text-sm" onClick={() => setEditing(true)}>
+                <EditIcon className="size-3.5" />
+                {editButtonLabel}
+              </Button>
+            )}
+            {canEditAnything && editing && (
               <>
+                <Button
+                  variant="outline"
+                  className="h-9 shrink-0 text-sm"
+                  disabled={saving}
+                  onClick={exitEditing}
+                >
+                  Отмена
+                </Button>
                 <Button
                   onClick={() => void saveAll().catch(() => undefined)}
                   disabled={!dirty || saving}
@@ -342,29 +387,19 @@ function RequestCard() {
                 >
                   {saving ? "Сохранение…" : "Сохранить"}
                 </Button>
-                {dirty && (
-                  <Button
-                    variant="outline"
-                    className="h-9 shrink-0 text-sm"
-                    disabled={saving}
-                    onClick={() => {
-                      initiatorRef.current?.reset();
-                      officeRef.current?.reset();
-                      setDirtyInitiator(false);
-                      setDirtyOffice(false);
-                    }}
-                  >
-                    Отмена
-                  </Button>
-                )}
               </>
             )}
             <RequestStatusActions
               r={r}
               missingRequired={missingRequired}
-              beforeChange={() => saveAll({ silent: true })}
-              onChanged={refresh}
-              className="ml-auto shrink-0"
+              beforeChange={() =>
+                editing ? saveAll({ silent: true, keepEditing: true }) : Promise.resolve()
+              }
+              onChanged={() => {
+                setEditing(false);
+                refresh();
+              }}
+              className="shrink-0"
             />
           </div>
         </div>

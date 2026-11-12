@@ -31,6 +31,8 @@ export function DateField({
   disabled,
   placeholder = "дд.мм.гггг",
   clearable = true,
+  min,
+  "aria-label": ariaLabel,
 }: {
   value: string;
   onChange: (ymd: string) => void;
@@ -38,9 +40,13 @@ export function DateField({
   disabled?: boolean;
   placeholder?: string;
   clearable?: boolean;
+  /** YYYY-MM-DD — даты раньше недоступны */
+  min?: string;
+  "aria-label"?: string;
 }) {
   const [open, setOpen] = useState(false);
   const selected = parseYmd(value);
+  const minDate = min ? parseYmd(min) : undefined;
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -49,6 +55,7 @@ export function DateField({
           type="button"
           variant="outline"
           disabled={disabled}
+          aria-label={ariaLabel}
           className={cn(
             "h-9 w-[11.5rem] justify-start gap-2 px-2.5 text-left text-sm font-normal tabular-nums",
             !value && "text-muted-foreground",
@@ -74,11 +81,12 @@ export function DateField({
           ) : null}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-auto p-0" align="start">
+      <PopoverContent className="z-[60] w-auto p-0" align="start">
         <Calendar
           mode="single"
           selected={selected}
           {...(selected ? { defaultMonth: selected } : {})}
+          {...(minDate ? { disabled: { before: minDate } } : {})}
           captionLayout="dropdown"
           onSelect={(d) => {
             onChange(d ? toYmd(d) : "");

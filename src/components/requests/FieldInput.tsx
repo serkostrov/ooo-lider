@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowRight } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { DateField } from "@/components/ui/DateField";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -46,12 +47,11 @@ export function FieldInput({
       );
     case "date":
       return (
-        <Input
-          type="date"
-          disabled={disabled}
+        <DateField
           value={typeof value === "string" ? value : ""}
-          onChange={(e) => onChange(e.target.value || null)}
-          className={controlClass}
+          onChange={(ymd) => onChange(ymd || null)}
+          className="w-full max-w-[11.5rem]"
+          {...(disabled ? { disabled: true } : {})}
         />
       );
     case "select":

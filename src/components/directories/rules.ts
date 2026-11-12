@@ -44,7 +44,7 @@ export const FIELD_TYPES = [
 ];
 
 export const FILLED_BY = [
-  { v: "initiator" as const, label: "Прораб при создании" },
+  { v: "initiator" as const, label: "Прораб" },
   { v: "office" as const, label: "Офис-менеджер" },
 ];
 

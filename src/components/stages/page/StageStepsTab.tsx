@@ -37,7 +37,15 @@ export function useStageSteps(stageId: string) {
 }
 
 /** Сценарий этапа — «эстафета»: текущий шаг выполнен → передать следующему (ТЗ 7.6). */
-export function StageStepsTab({ steps, disabled, onChanged }: { steps: ObjectStep[]; disabled: boolean; onChanged: () => void }) {
+export function StageStepsTab({
+  steps,
+  canAct,
+  onChanged,
+}: {
+  steps: ObjectStep[];
+  canAct: (role: string) => boolean;
+  onChanged: () => void;
+}) {
   const { data: roles = [] } = useRoles();
   const roleName = (code: string) => roles.find((r) => r.code === code)?.name ?? code;
   const [comment, setComment] = useState("");
@@ -97,7 +105,7 @@ export function StageStepsTab({ steps, disabled, onChanged }: { steps: ObjectSte
                       {s.comment && <div className="mt-0.5 text-foreground/80">Комментарий: {s.comment}</div>}
                     </div>
                   )}
-                  {current && !disabled && (
+                  {current && canAct(s.role_code) && (
                     <div className="mt-4 flex flex-wrap gap-3">
                       <Input
                         value={comment}

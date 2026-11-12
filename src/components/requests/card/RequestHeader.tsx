@@ -7,7 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { formatDate, showError } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { DateField } from "@/components/ui/DateField";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Field } from "@/components/directories/common";
@@ -187,7 +187,7 @@ function MoveDate({
             }}
           >
             <Field label="Новая дата" required>
-              <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="h-9 text-sm" />
+              <DateField value={date} onChange={setDate} />
             </Field>
             <Field label="Причина" required>
               <Textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={3} className="text-sm" />

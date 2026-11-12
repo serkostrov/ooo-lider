@@ -14,6 +14,35 @@ export type Database = {
   }
   public: {
     Tables: {
+      user_settings: {
+        Row: {
+          key: string
+          profile_id: string
+          updated_at: string
+          value: Json
+        }
+        Insert: {
+          key: string
+          profile_id: string
+          updated_at?: string
+          value: Json
+        }
+        Update: {
+          key?: string
+          profile_id?: string
+          updated_at?: string
+          value?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_settings_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customer_contacts: {
         Row: {
           comment: string | null

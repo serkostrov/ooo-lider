@@ -193,7 +193,7 @@ export function RequestStatusActions({
           }
           disabled={m.isPending || blockedByFields}
           title={blockedByFields ? `Сначала заполните: ${missingRequired.join(", ")}` : undefined}
-          className="h-9 shrink-0 px-4 text-sm"
+          className="h-9 shrink-0 bg-success px-4 text-sm text-success-foreground shadow-none hover:bg-success/90"
         >
           {next.next}
         </Button>

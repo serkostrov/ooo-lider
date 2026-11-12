@@ -24,6 +24,7 @@ import {
 import { EditSheet, EmptyRow, Field, FormActions } from "../common";
 import { DirectoryTableSkeleton } from "../DirectorySkeleton";
 import { SortableTableBody, SortableTableRow } from "../SortableTableRows";
+import { ReorderModeButton } from "../ReorderModeButton";
 import { parseFieldOptions, validateRequestField } from "../rules";
 import { FIELD_TYPES, FILLED_BY, useRequestFields, type FieldType, type RequestField } from "./data";
 
@@ -53,6 +54,7 @@ export function RequestTypeFields({ typeId, readOnly }: { typeId: string; readOn
   const key = ["dir-request-fields", typeId];
   const { data: fields = [], isLoading } = useRequestFields(typeId);
   const [editing, setEditing] = useState<RequestField | "new" | null>(null);
+  const [reordering, setReordering] = useState(false);
 
   const refresh = () => {
     qc.invalidateQueries({ queryKey: key });
@@ -87,14 +89,17 @@ export function RequestTypeFields({ typeId, readOnly }: { typeId: string; readOn
           созданные заявки.
         </p>
         {!readOnly && (
-          <Button
-            type="button"
-            className="h-9 gap-1.5 px-3 text-sm"
-            onClick={() => setEditing("new")}
-          >
-            <Plus className="size-4" />
-            Добавить поле
-          </Button>
+          <div className="flex shrink-0 items-center gap-2">
+            <ReorderModeButton active={reordering} onChange={setReordering} />
+            <Button
+              type="button"
+              className="h-9 gap-1.5 px-3 text-sm"
+              onClick={() => setEditing("new")}
+            >
+              <Plus className="size-4" />
+              Добавить поле
+            </Button>
+          </div>
         )}
       </div>
 
@@ -108,24 +113,24 @@ export function RequestTypeFields({ typeId, readOnly }: { typeId: string; readOn
               <TableHead>Кто заполняет</TableHead>
               <TableHead className="w-24 text-center">Обяз.</TableHead>
               <TableHead className="w-24 text-center">Активно</TableHead>
-              {!readOnly && <TableHead className={REORDER_ACTIONS_W} />}
+              {!readOnly && reordering && <TableHead className={REORDER_ACTIONS_W} />}
             </TableRow>
           </TableHeader>
           <SortableTableBody
             ids={fields.map((f) => f.id)}
-            disabled={readOnly || isLoading}
+            disabled={readOnly || isLoading || !reordering}
             onReorder={applyOrder}
           >
             {isLoading ? (
-              <DirectoryTableSkeleton cols={6} withActions={!readOnly} />
+              <DirectoryTableSkeleton cols={6} withActions={!readOnly && reordering} />
             ) : fields.length === 0 ? (
-              <EmptyRow cols={readOnly ? 6 : 7} />
+              <EmptyRow cols={readOnly || !reordering ? 6 : 7} />
             ) : (
               fields.map((f, i) => (
                 <SortableTableRow
                   key={f.id}
                   id={f.id}
-                  disabled={readOnly}
+                  disabled={readOnly || !reordering}
                   className={`${readOnly ? "" : "cursor-pointer"} ${f.is_active ? "" : "text-muted-foreground"}`}
                   onClick={() => !readOnly && setEditing(f)}
                 >

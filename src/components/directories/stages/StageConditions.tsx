@@ -23,6 +23,7 @@ import {
 import { EditSheet, EmptyRow, Field, FormActions } from "../common";
 import { DirectoryTableSkeleton } from "../DirectorySkeleton";
 import { SortableTableBody, SortableTableRow } from "../SortableTableRows";
+import { ReorderModeButton } from "../ReorderModeButton";
 import { CONDITION_KINDS, useDocumentsShort } from "./data";
 
 type Cond = {
@@ -56,6 +57,7 @@ export function StageConditions({ templateId, readOnly }: { templateId: string; 
     },
   });
   const [editing, setEditing] = useState<Cond | "new" | null>(null);
+  const [reordering, setReordering] = useState(false);
 
   const refresh = () => {
     qc.invalidateQueries({ queryKey: key });
@@ -95,14 +97,17 @@ export function StageConditions({ templateId, readOnly }: { templateId: string; 
           Этап нельзя отправить на проверку и закрыть, пока не отмечены все обязательные условия.
         </p>
         {!readOnly && (
-          <Button
-            type="button"
-            className="h-9 gap-1.5 px-3 text-sm"
-            onClick={() => setEditing("new")}
-          >
-            <Plus className="size-4" />
-            Добавить условие
-          </Button>
+          <div className="flex shrink-0 items-center gap-2">
+            <ReorderModeButton active={reordering} onChange={setReordering} />
+            <Button
+              type="button"
+              className="h-9 gap-1.5 px-3 text-sm"
+              onClick={() => setEditing("new")}
+            >
+              <Plus className="size-4" />
+              Добавить условие
+            </Button>
+          </div>
         )}
       </div>
 
@@ -116,20 +121,20 @@ export function StageConditions({ templateId, readOnly }: { templateId: string; 
               <TableHead>Документ</TableHead>
               <TableHead className="w-24 text-center">Обяз.</TableHead>
               <TableHead className="w-24 text-center">В ИД</TableHead>
-              {!readOnly && <TableHead className={REORDER_ACTIONS_W} />}
+              {!readOnly && reordering && <TableHead className={REORDER_ACTIONS_W} />}
             </TableRow>
           </TableHeader>
-          <SortableTableBody ids={rows.map((c) => c.id)} disabled={readOnly || isLoading} onReorder={applyOrder}>
+          <SortableTableBody ids={rows.map((c) => c.id)} disabled={readOnly || isLoading || !reordering} onReorder={applyOrder}>
             {isLoading ? (
-              <DirectoryTableSkeleton cols={6} withActions={!readOnly} />
+              <DirectoryTableSkeleton cols={6} withActions={!readOnly && reordering} />
             ) : rows.length === 0 ? (
-              <EmptyRow cols={readOnly ? 6 : 7} />
+              <EmptyRow cols={readOnly || !reordering ? 6 : 7} />
             ) : (
               rows.map((c, i) => (
                 <SortableTableRow
                   key={c.id}
                   id={c.id}
-                  disabled={readOnly}
+                  disabled={readOnly || !reordering}
                   className={readOnly ? "" : "cursor-pointer"}
                   onClick={() => !readOnly && setEditing(c)}
                 >

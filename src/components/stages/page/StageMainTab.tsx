@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { DateField } from "@/components/ui/DateField";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Field } from "@/components/directories/common";
+import { fieldLabelClass, fieldStackClass } from "@/lib/ui";
 import { toIntOrNull } from "@/components/directories/stages/data";
 import { useActiveProfiles } from "@/components/objects/data";
 import { StatusBadge, useObjectStages, type ObjectStage } from "../data";
@@ -20,6 +21,7 @@ const NONE = "__none";
 
 export type StageMainHandle = {
   save: () => Promise<void>;
+  reset: () => void;
 };
 
 function Section({
@@ -50,10 +52,8 @@ function Block({ children }: { children: ReactNode }) {
   );
 }
 
-export const StageMainTab = forwardRef<StageMainHandle, { stage: ObjectStage; onSaved: () => void }>(
-  function StageMainTab({ stage, onSaved }, ref) {
-  const { data: profiles = [] } = useActiveProfiles();
-  const [v, setV] = useState({
+function draftFrom(stage: ObjectStage) {
+  return {
     executor_id: stage.executor_id ?? "",
     coexecutor_id: stage.coexecutor_id ?? "",
     confirmer_id: stage.confirmer_id ?? "",
@@ -64,7 +64,15 @@ export const StageMainTab = forwardRef<StageMainHandle, { stage: ObjectStage; on
     response_received_at: stage.response_received_at ?? "",
     remind_days: stage.remind_days?.toString() ?? "",
     note: stage.note ?? "",
-  });
+  };
+}
+
+export const StageMainTab = forwardRef<
+  StageMainHandle,
+  { stage: ObjectStage; onSaved: () => void; editing: boolean; canAssign: boolean; canWork: boolean }
+>(function StageMainTab({ stage, onSaved, editing, canAssign, canWork }, ref) {
+  const { data: profiles = [] } = useActiveProfiles();
+  const [v, setV] = useState(() => draftFrom(stage));
   const set = (k: keyof typeof v, val: string) => setV((x) => ({ ...x, [k]: val }));
 
   const respDays = toIntOrNull(v.response_days);
@@ -110,7 +118,17 @@ export const StageMainTab = forwardRef<StageMainHandle, { stage: ObjectStage; on
     onError: showError,
   });
 
-  useImperativeHandle(ref, () => ({ save: () => save.mutateAsync().then(() => undefined) }), [save]);
+  useImperativeHandle(
+    ref,
+    () => ({
+      save: () => save.mutateAsync().then(() => undefined),
+      reset: () => setV(draftFrom(stage)),
+    }),
+    [save, stage],
+  );
+
+  const assignOn = editing && canAssign;
+  const workOn = editing && canWork;
 
   const person = (k: "executor_id" | "coexecutor_id" | "confirmer_id", placeholder: string) => (
     <Select value={v[k] || NONE} onValueChange={(x) => set(k, x === NONE ? "" : x)}>
@@ -146,14 +164,33 @@ export const StageMainTab = forwardRef<StageMainHandle, { stage: ObjectStage; on
 
       <Block>
         <div className="space-y-3">
-          <Section title="Кто делает" hint="исполнитель обязателен">
+          <Section
+            title="Кто делает"
+            {...(assignOn
+              ? { hint: "исполнитель обязателен" }
+              : editing && !canAssign
+                ? { hint: "назначает администратор" }
+                : {})}
+          >
             <div className="grid gap-2.5 sm:grid-cols-3">
-              <Field label="Исполнитель" required>
-                {person("executor_id", "не назначен")}
-              </Field>
-              <Field label="Соисполнитель">{person("coexecutor_id", "Нет")}</Field>
+              {assignOn ? (
+                <Field label="Исполнитель" required>
+                  {person("executor_id", "не назначен")}
+                </Field>
+              ) : (
+                <Readout label="Исполнитель" value={stage.executor_name} />
+              )}
+              {assignOn ? (
+                <Field label="Соисполнитель">{person("coexecutor_id", "Нет")}</Field>
+              ) : (
+                <Readout label="Соисполнитель" value={stage.coexecutor_name} />
+              )}
               <div className="min-w-0">
-                <Field label="Кто принимает">{person("confirmer_id", "По роли")}</Field>
+                {assignOn ? (
+                  <Field label="Кто принимает">{person("confirmer_id", "По роли")}</Field>
+                ) : (
+                  <Readout label="Кто принимает" value={stage.confirmer_name ?? stage.confirmer_role_name} />
+                )}
                 {stage.confirmer_role_name && (
                   <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
                     По регламенту: {stage.confirmer_role_name}
@@ -166,16 +203,26 @@ export const StageMainTab = forwardRef<StageMainHandle, { stage: ObjectStage; on
           <div className="border-t border-border/70 pt-3">
             <Section title="Сроки">
               <div className="flex flex-wrap items-end gap-x-3 gap-y-2.5">
-                <Field label="Дата начала">{date("start_date")}</Field>
-                <Field label="Срок окончания">{date("due_date")}</Field>
-                <Field label="Напомнить, дн.">
-                  <Input
-                    value={v.remind_days}
-                    onChange={(e) => set("remind_days", e.target.value)}
-                    inputMode="numeric"
-                    className="h-9 w-[5.5rem] text-sm tabular-nums"
-                  />
-                </Field>
+                {workOn ? (
+                  <>
+                    <Field label="Дата начала">{date("start_date")}</Field>
+                    <Field label="Срок окончания">{date("due_date")}</Field>
+                    <Field label="Напомнить, дн.">
+                      <Input
+                        value={v.remind_days}
+                        onChange={(e) => set("remind_days", e.target.value)}
+                        inputMode="numeric"
+                        className="h-9 w-[5.5rem] text-sm tabular-nums"
+                      />
+                    </Field>
+                  </>
+                ) : (
+                  <>
+                    <Readout label="Дата начала" value={formatDate(stage.start_date)} />
+                    <Readout label="Срок окончания" value={formatDate(stage.due_date)} />
+                    <Readout label="Напомнить, дн." value={stage.remind_days?.toString()} />
+                  </>
+                )}
               </div>
             </Section>
           </div>
@@ -200,21 +247,32 @@ export const StageMainTab = forwardRef<StageMainHandle, { stage: ObjectStage; on
             <div className="space-y-2.5">
               <TemplateSamples templateId={stage.template_id} />
               <div className="flex flex-wrap items-end gap-x-3 gap-y-2.5">
-                <Field label="Дата отправки">{date("doc_sent_at")}</Field>
-                <Field label="Дней на ответ">
-                  <Input
-                    value={v.response_days}
-                    onChange={(e) => set("response_days", e.target.value)}
-                    inputMode="numeric"
-                    className="h-9 w-[5.5rem] text-sm tabular-nums"
-                  />
-                </Field>
-                <Field label="Ждём ответ до">
-                  <div className="flex h-9 w-[11.5rem] items-center rounded-md border border-border bg-muted/40 px-2.5 text-sm tabular-nums text-muted-foreground">
-                    {formatDate(responseDue) || "—"}
-                  </div>
-                </Field>
-                <Field label="Ответ получен">{date("response_received_at")}</Field>
+                {workOn ? (
+                  <>
+                    <Field label="Дата отправки">{date("doc_sent_at")}</Field>
+                    <Field label="Дней на ответ">
+                      <Input
+                        value={v.response_days}
+                        onChange={(e) => set("response_days", e.target.value)}
+                        inputMode="numeric"
+                        className="h-9 w-[5.5rem] text-sm tabular-nums"
+                      />
+                    </Field>
+                    <Field label="Ждём ответ до">
+                      <div className="flex h-9 w-[11.5rem] items-center rounded-md border border-border bg-muted/40 px-2.5 text-sm tabular-nums text-muted-foreground">
+                        {formatDate(responseDue) || "—"}
+                      </div>
+                    </Field>
+                    <Field label="Ответ получен">{date("response_received_at")}</Field>
+                  </>
+                ) : (
+                  <>
+                    <Readout label="Дата отправки" value={formatDate(stage.doc_sent_at)} />
+                    <Readout label="Дней на ответ" value={stage.response_days?.toString()} />
+                    <Readout label="Ждём ответ до" value={formatDate(stage.response_due)} />
+                    <Readout label="Ответ получен" value={formatDate(stage.response_received_at)} />
+                  </>
+                )}
               </div>
             </div>
           </Section>
@@ -222,14 +280,20 @@ export const StageMainTab = forwardRef<StageMainHandle, { stage: ObjectStage; on
       )}
 
       <Block>
-        <Section title="Заметка" hint="что мешает или когда обещали">
-          <Textarea
-            value={v.note}
-            onChange={(e) => set("note", e.target.value)}
-            rows={3}
-            placeholder="Например: ждут подпись заказчика до пятницы"
-            className="min-h-[4.5rem] w-full resize-y text-sm"
-          />
+        <Section title="Заметка" {...(workOn ? { hint: "что мешает или когда обещали" } : {})}>
+          {workOn ? (
+            <Textarea
+              value={v.note}
+              onChange={(e) => set("note", e.target.value)}
+              rows={3}
+              placeholder="Например: ждут подпись заказчика до пятницы"
+              className="min-h-[4.5rem] w-full resize-y text-sm"
+            />
+          ) : (
+            <p className="whitespace-pre-line text-sm">
+              {stage.note?.trim() || <span className="text-muted-foreground">—</span>}
+            </p>
+          )}
         </Section>
       </Block>
 
@@ -238,6 +302,16 @@ export const StageMainTab = forwardRef<StageMainHandle, { stage: ObjectStage; on
     </div>
   );
 });
+
+function Readout({ label, value }: { label: string; value: string | null | undefined }) {
+  const text = value?.trim();
+  return (
+    <div className={fieldStackClass}>
+      <div className={fieldLabelClass}>{label}</div>
+      <div className="flex min-h-9 items-center text-sm">{text || <span className="text-muted-foreground">—</span>}</div>
+    </div>
+  );
+}
 
 function Predecessors({ stage }: { stage: ObjectStage }) {
   const { data: all = [] } = useObjectStages(stage.object_id);

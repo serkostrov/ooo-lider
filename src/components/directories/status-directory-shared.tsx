@@ -10,6 +10,7 @@ export function StatusDirectoryShell({
   title,
   hint,
   onAdd,
+  headerActions,
   showActions,
   sortable,
   children,
@@ -17,6 +18,7 @@ export function StatusDirectoryShell({
   title: string;
   hint: string;
   onAdd?: () => void;
+  headerActions?: ReactNode;
   showActions?: boolean;
   /** DnD порядок строк (id = code). */
   sortable?: { ids: string[]; onReorder: (orderedIds: string[]) => void };
@@ -35,11 +37,16 @@ export function StatusDirectoryShell({
     <div className="w-full">
       <div className="mb-4 flex h-9 items-center justify-between gap-3">
         <h2 className="text-xl font-semibold tracking-tight">{title}</h2>
-        {onAdd && (
-          <Button type="button" className="h-9 gap-1.5 px-3 text-sm" onClick={onAdd}>
-            <Plus className="size-4" />
-            Добавить
-          </Button>
+        {(headerActions || onAdd) && (
+          <div className="flex shrink-0 items-center gap-2">
+            {headerActions}
+            {onAdd && (
+              <Button type="button" className="h-9 gap-1.5 px-3 text-sm" onClick={onAdd}>
+                <Plus className="size-4" />
+                Добавить
+              </Button>
+            )}
+          </div>
         )}
       </div>
       <p className="mb-4 max-w-2xl text-sm leading-relaxed text-muted-foreground">{hint}</p>

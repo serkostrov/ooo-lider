@@ -28,7 +28,15 @@ export function useStageConditions(stageId: string) {
   });
 }
 
-export function StageConditionsTab({ stage, onChanged }: { stage: ObjectStage; onChanged: () => void }) {
+export function StageConditionsTab({
+  stage,
+  readOnly = false,
+  onChanged,
+}: {
+  stage: ObjectStage;
+  readOnly?: boolean;
+  onChanged: () => void;
+}) {
   const qc = useQueryClient();
   const { data: conds = [], isLoading } = useStageConditions(stage.id);
   const fileCondIds = conds.filter((c) => c.kind === "file").map((c) => c.id);
@@ -60,7 +68,7 @@ export function StageConditionsTab({ stage, onChanged }: { stage: ObjectStage; o
             <li key={c.id} className={`rounded-md border p-4 ${c.is_done ? "border-success/25 bg-success-soft" : "border-border bg-card"}`}>
               <div className="flex items-start gap-4">
                 <div className="pt-0.5">
-                  <ConditionToggle cond={c} disabled={stage.is_excluded} onDone={onChanged} />
+                  <ConditionToggle cond={c} disabled={stage.is_excluded || readOnly} onDone={onChanged} />
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className={`text-sm ${c.is_done ? "text-muted-foreground line-through" : "font-medium"}`}>{c.title}</div>
@@ -81,7 +89,7 @@ export function StageConditionsTab({ stage, onChanged }: { stage: ObjectStage; o
                   {c.kind === "file" && (
                     <div className="mt-3 space-y-2">
                       <FileList files={condFiles} />
-                      {!stage.is_excluded && (
+                      {!stage.is_excluded && !readOnly && (
                         <UploadButton
                           objectId={stage.object_id}
                           entityType="stage_condition"

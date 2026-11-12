@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { DateField } from "@/components/ui/DateField";
 import {
   Select,
   SelectContent,
@@ -98,19 +98,13 @@ function HistoryPage() {
               </SelectContent>
             </Select>
             <label className="flex items-center gap-2 text-sm">
-              с{" "}
-              <Input
-                type="date"
-                value={from}
-                onChange={(e) => setFrom(e.target.value)}
-                className="h-9 w-44 text-sm"
-              />
+              с <DateField value={from} onChange={setFrom} aria-label="Дата с" />
               по{" "}
-              <Input
-                type="date"
+              <DateField
                 value={to}
-                onChange={(e) => setTo(e.target.value)}
-                className="h-9 w-44 text-sm"
+                onChange={setTo}
+                aria-label="Дата по"
+                {...(from ? { min: from } : {})}
               />
             </label>
           </FilterBar>

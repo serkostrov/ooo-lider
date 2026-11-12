@@ -17,6 +17,7 @@ import { Route as AuthenticatedHistoryRouteImport } from './routes/_authenticate
 import { Route as AuthenticatedObjectsRouteImport } from './routes/_authenticated/objects'
 import { Route as AuthenticatedOverdueRouteImport } from './routes/_authenticated/overdue'
 import { Route as AuthenticatedRequestsRouteImport } from './routes/_authenticated/requests'
+import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedObjectsIdRouteImport } from './routes/_authenticated/objects_.$id'
 import { Route as AuthenticatedObjectsNewRouteImport } from './routes/_authenticated/objects_.new'
 import { Route as AuthenticatedRequestsRequestIdRouteImport } from './routes/_authenticated/requests_.$requestId'
@@ -64,6 +65,11 @@ const AuthenticatedOverdueRoute = AuthenticatedOverdueRouteImport.update({
 const AuthenticatedRequestsRoute = AuthenticatedRequestsRouteImport.update({
   id: '/requests',
   path: '/requests',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedObjectsIdRoute = AuthenticatedObjectsIdRouteImport.update({
@@ -121,6 +127,7 @@ export interface FileRoutesByFullPath {
   '/objects': typeof AuthenticatedObjectsRoute
   '/overdue': typeof AuthenticatedOverdueRoute
   '/requests': typeof AuthenticatedRequestsRoute
+  '/settings': typeof AuthenticatedSettingsRoute
   '/objects/$id': typeof AuthenticatedObjectsIdRoute
   '/objects/new': typeof AuthenticatedObjectsNewRoute
   '/requests/$requestId': typeof AuthenticatedRequestsRequestIdRoute
@@ -138,6 +145,7 @@ export interface FileRoutesByTo {
   '/objects': typeof AuthenticatedObjectsRoute
   '/overdue': typeof AuthenticatedOverdueRoute
   '/requests': typeof AuthenticatedRequestsRoute
+  '/settings': typeof AuthenticatedSettingsRoute
   '/objects/$id': typeof AuthenticatedObjectsIdRoute
   '/objects/new': typeof AuthenticatedObjectsNewRoute
   '/requests/$requestId': typeof AuthenticatedRequestsRequestIdRoute
@@ -157,6 +165,7 @@ export interface FileRoutesById {
   '/_authenticated/objects': typeof AuthenticatedObjectsRoute
   '/_authenticated/overdue': typeof AuthenticatedOverdueRoute
   '/_authenticated/requests': typeof AuthenticatedRequestsRoute
+  '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/objects_/$id': typeof AuthenticatedObjectsIdRoute
   '/_authenticated/objects_/new': typeof AuthenticatedObjectsNewRoute
   '/_authenticated/requests_/$requestId': typeof AuthenticatedRequestsRequestIdRoute
@@ -176,6 +185,7 @@ export interface FileRouteTypes {
     | '/objects'
     | '/overdue'
     | '/requests'
+    | '/settings'
     | '/objects/$id'
     | '/objects/new'
     | '/requests/$requestId'
@@ -193,6 +203,7 @@ export interface FileRouteTypes {
     | '/objects'
     | '/overdue'
     | '/requests'
+    | '/settings'
     | '/objects/$id'
     | '/objects/new'
     | '/requests/$requestId'
@@ -211,6 +222,7 @@ export interface FileRouteTypes {
     | '/_authenticated/objects'
     | '/_authenticated/overdue'
     | '/_authenticated/requests'
+    | '/_authenticated/settings'
     | '/_authenticated/objects_/$id'
     | '/_authenticated/objects_/new'
     | '/_authenticated/requests_/$requestId'
@@ -285,6 +297,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedRequestsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/settings': {
+      id: '/_authenticated/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof AuthenticatedSettingsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/objects_/$id': {
       id: '/_authenticated/objects_/$id'
       path: '/objects/$id'
@@ -350,6 +369,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedObjectsRoute: typeof AuthenticatedObjectsRoute
   AuthenticatedOverdueRoute: typeof AuthenticatedOverdueRoute
   AuthenticatedRequestsRoute: typeof AuthenticatedRequestsRoute
+  AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
   AuthenticatedObjectsIdRoute: typeof AuthenticatedObjectsIdRoute
   AuthenticatedObjectsNewRoute: typeof AuthenticatedObjectsNewRoute
   AuthenticatedRequestsRequestIdRoute: typeof AuthenticatedRequestsRequestIdRoute
@@ -366,6 +386,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedObjectsRoute: AuthenticatedObjectsRoute,
   AuthenticatedOverdueRoute: AuthenticatedOverdueRoute,
   AuthenticatedRequestsRoute: AuthenticatedRequestsRoute,
+  AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
   AuthenticatedObjectsIdRoute: AuthenticatedObjectsIdRoute,
   AuthenticatedObjectsNewRoute: AuthenticatedObjectsNewRoute,
   AuthenticatedRequestsRequestIdRoute: AuthenticatedRequestsRequestIdRoute,

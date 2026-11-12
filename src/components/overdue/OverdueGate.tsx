@@ -3,6 +3,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { AlertTriangle, ClipboardList, Layers } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useShowOverdueGate } from "@/lib/ui-settings";
 import { formatDay, useOverdueItems, type OverdueItem } from "./data";
 
 /** Показ fullscreen «Просрочено» один раз за сессию входа (ТЗ 7.8). */
@@ -38,6 +39,7 @@ function ack() {
  */
 export function OverdueGate() {
   const { items, isReady } = useOverdueItems();
+  const gatePref = useShowOverdueGate();
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
 
@@ -50,10 +52,13 @@ export function OverdueGate() {
     [items],
   );
 
+  const prefReady = gatePref.isSuccess || gatePref.isError;
+  const showOnLogin = gatePref.isError || gatePref.data !== false;
+
   useEffect(() => {
-    if (!isReady || wasAcked() || items.length === 0) return;
+    if (!isReady || !prefReady || wasAcked() || items.length === 0 || !showOnLogin) return;
     setOpen(true);
-  }, [isReady, items.length]);
+  }, [isReady, prefReady, items.length, showOnLogin]);
 
   if (!open || items.length === 0) return null;
 

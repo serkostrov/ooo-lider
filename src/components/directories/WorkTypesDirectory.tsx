@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { thLabelClass } from "@/lib/ui";
 import { Reorderable } from "./stages/Reorderable";
+import { ReorderModeButton } from "./ReorderModeButton";
 import { STAGES_KEY, useStageTemplatesFull, useWorkTypes } from "./stages/data";
 import { EditSheet, Field, FormActions } from "./common";
 import { DirectoryListSkeleton, directoryListHeader } from "./DirectorySkeleton";
@@ -38,6 +39,7 @@ export function WorkTypesDirectory() {
   const { data: types = [], isLoading } = useWorkTypes();
   const { data: stages = [] } = useStageTemplatesFull();
   const [editing, setEditing] = useState<WorkType | "new" | null>(null);
+  const [reordering, setReordering] = useState(false);
 
   const count = (id: string) => stages.filter((s) => s.work_type_id === id).length;
 
@@ -57,15 +59,18 @@ export function WorkTypesDirectory() {
       <div className="mb-4 flex h-9 items-center justify-between gap-3">
         <h2 className="text-xl font-semibold tracking-tight">Группы</h2>
         {is_admin && (
-          <Button onClick={() => setEditing("new")} className="h-9 gap-1.5 px-3 text-sm">
-            <Plus className="size-4" />
-            Добавить группу
-          </Button>
+          <div className="flex shrink-0 items-center gap-2">
+            <ReorderModeButton active={reordering} onChange={setReordering} />
+            <Button onClick={() => setEditing("new")} className="h-9 gap-1.5 px-3 text-sm">
+              <Plus className="size-4" />
+              Добавить группу
+            </Button>
+          </div>
         )}
       </div>
       {isLoading ? (
         <DirectoryListSkeleton
-          withActions={is_admin}
+          withActions={is_admin && reordering}
           header={directoryListHeader(["№", "Название"])}
         />
       ) : types.length === 0 ? (
@@ -75,7 +80,7 @@ export function WorkTypesDirectory() {
       ) : (
         <Reorderable
           items={types}
-          disabled={!is_admin}
+          disabled={!is_admin || !reordering}
           onMove={(ids) => reorder.mutate(ids)}
           {...(is_admin ? { onRowClick: (t: (typeof types)[number]) => setEditing(t) } : {})}
           header={

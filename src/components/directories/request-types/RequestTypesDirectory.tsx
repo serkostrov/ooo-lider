@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { Plus } from "lucide-react";
@@ -9,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { DirectoryListSkeleton } from "../DirectorySkeleton";
 import { Reorderable } from "../stages/Reorderable";
+import { ReorderModeButton } from "../ReorderModeButton";
 import { REQUEST_TYPES_KEY, useRequestFields, useRequestTypes, type RequestType } from "./data";
 
 export function RequestTypesDirectory() {
@@ -17,6 +19,7 @@ export function RequestTypesDirectory() {
   const qc = useQueryClient();
   const { data: types = [], isLoading } = useRequestTypes();
   const { data: fields = [] } = useRequestFields();
+  const [reordering, setReordering] = useState(false);
 
   const reorder = useMutation({
     mutationFn: async (ids: string[]) => {
@@ -41,15 +44,18 @@ export function RequestTypesDirectory() {
       <div className="mb-4 flex h-9 items-center justify-between gap-3">
         <h2 className="text-xl font-semibold tracking-tight">Виды заявок</h2>
         {is_admin && (
-          <Button onClick={() => open("new")} className="h-9 gap-1.5 px-3 text-sm">
-            <Plus className="size-4" />
-            Добавить
-          </Button>
+          <div className="flex shrink-0 items-center gap-2">
+            <ReorderModeButton active={reordering} onChange={setReordering} />
+            <Button onClick={() => open("new")} className="h-9 gap-1.5 px-3 text-sm">
+              <Plus className="size-4" />
+              Добавить
+            </Button>
+          </div>
         )}
       </div>
       {isLoading ? (
         <DirectoryListSkeleton
-          withActions={is_admin}
+          withActions={is_admin && reordering}
           header={
             <>
               <div className={`${thLabelClass} min-w-0 flex-1`}>Название</div>
@@ -65,7 +71,7 @@ export function RequestTypesDirectory() {
       ) : (
         <Reorderable
           items={types}
-          disabled={!is_admin}
+          disabled={!is_admin || !reordering}
           onMove={(ids) => reorder.mutate(ids)}
           onRowClick={(t) => open(t.id)}
           header={

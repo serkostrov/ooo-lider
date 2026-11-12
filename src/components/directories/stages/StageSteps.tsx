@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Field } from "../common";
 import { DirectoryListSkeleton } from "../DirectorySkeleton";
 import { Reorderable } from "./Reorderable";
+import { ReorderModeButton } from "../ReorderModeButton";
 import { ACTION_KINDS, toIntOrNull, useRoles } from "./data";
 
 type Step = {
@@ -100,6 +101,7 @@ export function StageSteps({ templateId, readOnly }: { templateId: string; readO
     },
   });
 
+  const [reordering, setReordering] = useState(false);
   const [role, setRole] = useState("");
   const [action, setAction] = useState("");
   const [kind, setKind] = useState<Step["action_kind"]>("other");
@@ -136,14 +138,19 @@ export function StageSteps({ templateId, readOnly }: { templateId: string; readO
         Сценарий копируется на объект при добавлении этапа. Изменения не затрагивают уже созданные объекты.
       </p>
       {isLoading ? (
-        <DirectoryListSkeleton rows={4} withActions={!readOnly} />
+        <DirectoryListSkeleton rows={4} />
       ) : steps.length === 0 ? (
         <p className="py-4 text-center text-sm text-muted-foreground">Шагов пока нет</p>
       ) : null}
+      {!isLoading && steps.length > 0 && !readOnly && (
+        <div className="flex justify-end">
+          <ReorderModeButton active={reordering} onChange={setReordering} />
+        </div>
+      )}
       {!isLoading && (
       <Reorderable
         items={steps}
-        disabled={readOnly}
+        disabled={readOnly || !reordering}
         onMove={(ids) => reorder.mutate(ids)}
         render={(s) => (
           <StepRow

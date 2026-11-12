@@ -1,13 +1,14 @@
-import { useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, ArrowLeft, Flag } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Flag, Pencil } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { tabsListClass, tabTriggerClass } from "@/lib/ui";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { HistoryFeed } from "@/components/history/HistoryFeed";
-import { useRefreshStages, useStage } from "@/components/stages/data";
+import { useProfile, type CurrentProfile } from "@/lib/profile";
+import { useRefreshStages, useStage, type ObjectStage } from "@/components/stages/data";
 import { StageMainTab, type StageMainHandle } from "@/components/stages/page/StageMainTab";
 import { StageConditionsTab, useStageConditions } from "@/components/stages/page/StageConditionsTab";
 import { StageDocumentsTab } from "@/components/stages/page/StageDocumentsTab";
@@ -21,14 +22,20 @@ export const Route = createFileRoute("/_authenticated/objects_/$id_/stages/$stag
 
 function StagePage() {
   const { id, stageId } = Route.useParams();
+  const me = useProfile();
   const qc = useQueryClient();
   const refreshStages = useRefreshStages();
   const { data: stage, isLoading } = useStage(stageId);
   const { data: conditions = [] } = useStageConditions(stageId);
   const { data: steps = [] } = useStageSteps(stageId);
   const [tab, setTab] = useState("main");
+  const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const mainRef = useRef<StageMainHandle>(null);
+
+  useEffect(() => {
+    setEditing(false);
+  }, [stageId]);
 
   const refresh = () => {
     refreshStages(id, stageId);
@@ -82,7 +89,8 @@ function StagePage() {
     meta.push({ key: "step", node: <>Сейчас: {stage.current_step_action}</> });
   }
 
-  const showSave = tab === "main" && !stage.is_closed && !stage.is_excluded;
+  const access = stageAccess(me, stage);
+  const workLocked = !editing || !access.work;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -142,18 +150,25 @@ function StagePage() {
               ref={mainRef}
               key={stage.id + stage.updated_at}
               stage={stage}
+              editing={editing}
+              canAssign={access.assign}
+              canWork={access.work}
               onSaved={refresh}
             />
           </TabsContent>
           <TabsContent value="conditions" className="mt-0">
-            <StageConditionsTab stage={stage} onChanged={refresh} />
+            <StageConditionsTab stage={stage} readOnly={workLocked} onChanged={refresh} />
           </TabsContent>
           <TabsContent value="documents" className="mt-0">
-            <StageDocumentsTab stage={stage} />
+            <StageDocumentsTab stage={stage} readOnly={workLocked} />
           </TabsContent>
           {steps.length > 0 && (
             <TabsContent value="steps" className="mt-0">
-              <StageStepsTab steps={steps} disabled={stage.is_excluded || stage.is_closed} onChanged={refresh} />
+              <StageStepsTab
+                steps={steps}
+                canAct={(role) => editing && access.canCompleteStep(role)}
+                onChanged={refresh}
+              />
             </TabsContent>
           )}
           <TabsContent value="history" className="mt-0">
@@ -162,26 +177,65 @@ function StagePage() {
         </Tabs>
       </div>
 
-      {showSave && (
+      {access.any && (
         <div className="shrink-0 border-t border-border bg-background py-3">
-          <Button
-            className="h-10 px-6 text-sm"
-            disabled={saving}
-            onClick={() => {
-              void (async () => {
-                setSaving(true);
-                try {
-                  await mainRef.current?.save();
-                } finally {
-                  setSaving(false);
-                }
-              })();
-            }}
-          >
-            {saving ? "Сохранение…" : "Сохранить"}
-          </Button>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {!editing ? (
+              <Button className="h-10 gap-1.5 px-6 text-sm" onClick={() => setEditing(true)}>
+                <Pencil className="size-3.5" />
+                Редактировать
+              </Button>
+            ) : (
+              <>
+                <Button
+                  variant="outline"
+                  className="h-10 px-6 text-sm"
+                  disabled={saving}
+                  onClick={() => {
+                    mainRef.current?.reset();
+                    setEditing(false);
+                  }}
+                >
+                  Отмена
+                </Button>
+                {tab === "main" && (access.work || access.assign) && (
+                  <Button
+                    className="h-10 px-6 text-sm"
+                    disabled={saving}
+                    onClick={() => {
+                      void (async () => {
+                        setSaving(true);
+                        try {
+                          await mainRef.current?.save();
+                          setEditing(false);
+                        } catch {
+                          // ошибка уже показана в форме
+                        } finally {
+                          setSaving(false);
+                        }
+                      })();
+                    }}
+                  >
+                    {saving ? "Сохранение…" : "Сохранить"}
+                  </Button>
+                )}
+              </>
+            )}
+          </div>
         </div>
       )}
     </div>
   );
+}
+
+/** Кто что может менять на карточке этапа. Закрытый и исключённый — только просмотр. */
+function stageAccess(me: CurrentProfile, stage: ObjectStage) {
+  const locked = stage.is_closed || stage.is_excluded;
+  const work =
+    !locked && (me.is_admin || me.id === stage.executor_id || me.id === stage.coexecutor_id);
+  const assign = !locked && me.is_admin;
+  const canCompleteStep = (role: string) => !locked && (me.is_admin || me.role_code === role);
+  const any =
+    work || assign || (!locked && !!stage.current_step_role && canCompleteStep(stage.current_step_role));
+  return { assign, work, any, canCompleteStep };
 }

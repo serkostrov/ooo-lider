@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
+import { DateField } from "@/components/ui/DateField";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -297,20 +298,13 @@ export function ObjectCardFields({
           </Select>
         </Field>
         <Field label="Дата начала по договору" required>
-          <Input
-            type="date"
-            value={value.contract_start}
-            onChange={(e) => set("contract_start", e.target.value)}
-            className="h-9 text-sm"
-          />
+          <DateField value={value.contract_start} onChange={(ymd) => set("contract_start", ymd)} />
         </Field>
         <Field label="Дата окончания по договору" required>
-          <Input
-            type="date"
+          <DateField
             value={value.contract_end}
-            min={value.contract_start || undefined}
-            onChange={(e) => set("contract_end", e.target.value)}
-            className="h-9 text-sm"
+            {...(value.contract_start ? { min: value.contract_start } : {})}
+            onChange={(ymd) => set("contract_end", ymd)}
           />
         </Field>
         {showStatus && (

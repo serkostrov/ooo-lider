@@ -23,8 +23,8 @@ export const statusInfo = (s: string, list: RequestStatusDef[] = REQUEST_STATUSE
 export const REQUEST_STATUSES_KEY = ["dir-request-statuses"] as const;
 
 /**
- * Шаги «Хода заявки» из справочника «Статусы заявки»: название, кнопка, цвет, порядок (sort).
- * Пока справочник не загрузился — встроенные значения.
+ * Шаги «Хода заявки». Порядок кодов фиксирован (new → ready → sent → accepted → done).
+ * Из справочника берутся только название, текст кнопки и цвет.
  */
 export function useRequestStatuses(): RequestStatusDef[] {
   const { data } = useQuery({
@@ -40,7 +40,7 @@ export function useRequestStatuses(): RequestStatusDef[] {
       return data ?? [];
     },
   });
-  const merged = REQUEST_STATUSES.map((d) => {
+  return REQUEST_STATUSES.map((d) => {
     const row = data?.find((x) => x.code === d.v);
     return row
       ? {
@@ -48,11 +48,9 @@ export function useRequestStatuses(): RequestStatusDef[] {
           label: row.name || d.label,
           next: row.action_label || d.next,
           color: row.color || d.color,
-          sort: row.sort ?? d.sort,
         }
       : d;
   });
-  return [...merged].sort((a, b) => a.sort - b.sort);
 }
 
 export type RequestRow = {

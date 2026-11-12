@@ -9,6 +9,7 @@ import { sortRows, useTableSort } from "@/lib/table-sort";
 import { fieldLabelClass, fieldStackClass } from "@/lib/ui";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { DateField } from "@/components/ui/DateField";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -328,19 +329,18 @@ export function RequestsList({
               <div className={fieldStackClass}>
                 <span className={fieldLabelClass}>Период</span>
                 <div className="grid grid-cols-2 gap-2">
-                  <Input
-                    type="date"
+                  <DateField
                     value={f.from}
-                    onChange={(e) => set("from", e.target.value)}
-                    className="h-9 text-sm"
+                    onChange={(ymd) => set("from", ymd)}
+                    className="w-full"
                     aria-label="Дата с"
                   />
-                  <Input
-                    type="date"
+                  <DateField
                     value={f.to}
-                    onChange={(e) => set("to", e.target.value)}
-                    className="h-9 text-sm"
+                    onChange={(ymd) => set("to", ymd)}
+                    className="w-full"
                     aria-label="Дата по"
+                    {...(f.from ? { min: f.from } : {})}
                   />
                 </div>
               </div>

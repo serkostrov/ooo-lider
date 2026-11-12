@@ -11,6 +11,7 @@ import { REORDER_ACTIONS_W } from "@/lib/ui";
 import { EditSheet, EmptyRow, Field, FormActions, Toolbar, matches } from "./common";
 import { DirectoryTableSkeleton } from "./DirectorySkeleton";
 import { SortableTableBody, SortableTableRow } from "./SortableTableRows";
+import { ReorderModeButton } from "./ReorderModeButton";
 import { nextSort, slugCode, uniqueCode, validateRole } from "./rules";
 
 const KEY = ["dir-roles"] as const;
@@ -22,6 +23,7 @@ export function RolesDirectory() {
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
   const [editing, setEditing] = useState<Role | "new" | null>(null);
+  const [reordering, setReordering] = useState(false);
   const { data = [], isLoading } = useQuery({
     queryKey: KEY,
     queryFn: async () => {
@@ -33,6 +35,7 @@ export function RolesDirectory() {
   const filtered = data.filter((r) => matches(search, r.name));
   /** При поиске DnD выключаем — иначе ломается порядок полного списка. */
   const canReorder = is_admin && !search.trim();
+  const handles = canReorder && reordering;
 
   const reorder = useMutation({
     mutationFn: async (ordered: Role[]) => {
@@ -60,31 +63,39 @@ export function RolesDirectory() {
         Можно править название и признак полного доступа. Системные роли удалить нельзя.
         {is_admin && search.trim() ? " Сбросьте поиск, чтобы менять порядок." : null}
       </p>
-      <Toolbar search={search} onSearch={setSearch} onAdd={is_admin ? () => setEditing("new") : undefined} />
+      <Toolbar search={search} onSearch={setSearch} onAdd={is_admin ? () => setEditing("new") : undefined}>
+        {is_admin ? (
+          <ReorderModeButton
+            active={reordering}
+            onChange={setReordering}
+            disabled={!!search.trim() && !reordering}
+          />
+        ) : null}
+      </Toolbar>
       <div className="overflow-hidden rounded-md border border-border bg-card">
         <Table className="text-sm">
           <TableHeader>
             <TableRow>
               <TableHead>Название</TableHead>
               <TableHead>Полный доступ</TableHead>
-              {canReorder && <TableHead className={REORDER_ACTIONS_W} />}
+              {handles && <TableHead className={REORDER_ACTIONS_W} />}
             </TableRow>
           </TableHeader>
           <SortableTableBody
             ids={filtered.map((r) => r.code)}
-            disabled={!canReorder}
+            disabled={!handles}
             onReorder={applyOrder}
           >
             {isLoading ? (
-              <DirectoryTableSkeleton cols={2} withActions={canReorder} />
+              <DirectoryTableSkeleton cols={2} withActions={handles} />
             ) : filtered.length === 0 ? (
-              <EmptyRow cols={canReorder ? 3 : 2} />
+              <EmptyRow cols={handles ? 3 : 2} />
             ) : (
               filtered.map((r) => (
                 <SortableTableRow
                   key={r.code}
                   id={r.code}
-                  disabled={!canReorder}
+                  disabled={!handles}
                   className={is_admin ? "cursor-pointer" : ""}
                   onClick={() => is_admin && setEditing(r)}
                 >

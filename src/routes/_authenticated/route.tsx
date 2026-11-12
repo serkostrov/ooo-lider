@@ -15,6 +15,7 @@ import {
   History,
   LogOut,
   BookOpen,
+  Settings,
   Menu,
   Moon,
   PanelLeftClose,
@@ -142,7 +143,8 @@ const items = [
   { to: "/requests", label: "Заявки", icon: ClipboardList, badge: "requests" },
   { to: "/overdue", label: "Просрочено", icon: AlertTriangle, badge: "overdue" },
   { to: "/history", label: "История", icon: History },
-  { to: "/directories", label: "Справочники", icon: BookOpen },
+  { to: "/directories", label: "Справочники", icon: BookOpen, admin: true },
+  { to: "/settings", label: "Настройки", icon: Settings },
 ] as const;
 
 function profileInitials(name: string) {
@@ -248,7 +250,7 @@ function Nav({
 
       <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-2">
         {items
-          .filter((it) => profile.is_admin || it.to !== "/directories")
+          .filter((it) => profile.is_admin || !("admin" in it))
           .map((it) => {
             const active = path === it.to || path.startsWith(it.to + "/");
             const badgeKey = "badge" in it ? it.badge : null;

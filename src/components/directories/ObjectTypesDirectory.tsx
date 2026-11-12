@@ -20,6 +20,7 @@ import {
 import { OBJECTS_KEY, OBJECT_TYPES_KEY, useObjectTypes, useObjects, type ObjectType } from "@/components/objects/data";
 import { thLabelClass } from "@/lib/ui";
 import { Reorderable } from "./stages/Reorderable";
+import { ReorderModeButton } from "./ReorderModeButton";
 import { EditSheet, Field, FormActions } from "./common";
 import { DirectoryListSkeleton, directoryListHeader } from "./DirectorySkeleton";
 import { escapeIlike, normalizeDirectoryName, validateNamedDirectoryItem } from "./rules";
@@ -36,6 +37,7 @@ export function ObjectTypesDirectory() {
   const { active, isLoading } = useObjectTypes();
   const { data: objects = [] } = useObjects();
   const [editing, setEditing] = useState<ObjectType | "new" | null>(null);
+  const [reordering, setReordering] = useState(false);
 
   const items: Item[] = active.map((t) => ({ ...t, id: t.code }));
   const count = (code: string) => objects.filter((o) => o.object_type === code).length;
@@ -59,15 +61,18 @@ export function ObjectTypesDirectory() {
       <div className="mb-4 flex h-9 items-center justify-between gap-3">
         <h2 className="text-xl font-semibold tracking-tight">Типы объектов</h2>
         {is_admin && (
-          <Button onClick={() => setEditing("new")} className="h-9 gap-1.5 px-3 text-sm">
-            <Plus className="size-4" />
-            Добавить тип
-          </Button>
+          <div className="flex shrink-0 items-center gap-2">
+            <ReorderModeButton active={reordering} onChange={setReordering} />
+            <Button onClick={() => setEditing("new")} className="h-9 gap-1.5 px-3 text-sm">
+              <Plus className="size-4" />
+              Добавить тип
+            </Button>
+          </div>
         )}
       </div>
       {isLoading ? (
         <DirectoryListSkeleton
-          withActions={is_admin}
+          withActions={is_admin && reordering}
           header={directoryListHeader(["№", "Название"])}
         />
       ) : items.length === 0 ? (
@@ -77,7 +82,7 @@ export function ObjectTypesDirectory() {
       ) : (
         <Reorderable
           items={items}
-          disabled={!is_admin}
+          disabled={!is_admin || !reordering}
           onMove={(codes) => reorder.mutate(codes)}
           {...(is_admin ? { onRowClick: (t: (typeof items)[number]) => setEditing(t) } : {})}
           header={
