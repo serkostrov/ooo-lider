@@ -29,7 +29,7 @@ import { ProfileContext, type CurrentProfile } from "@/lib/profile";
 import { AUTH_BYPASS, BYPASS_PROFILE, BYPASS_USER_ID } from "@/lib/auth-bypass";
 import { BrandMark } from "@/components/BrandMark";
 import { NotificationsBell } from "@/components/notifications/NotificationsBell";
-import { clearOverdueNotificationAck, useOverdueItems } from "@/components/overdue/data";
+import { clearOverdueNotificationAck, useOverdueCounts } from "@/components/overdue/data";
 import { OverdueGate, clearOverdueGateAck } from "@/components/overdue/OverdueGate";
 import { useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
@@ -201,9 +201,9 @@ function Nav({
 }) {
   const path = useRouterState({ select: (s) => s.location.pathname });
   const { data: count = 0 } = useNewRequestsCount();
-  const { items: overdue } = useOverdueItems();
+  const { data: overdueCounts } = useOverdueCounts();
   const { theme, toggleTheme } = useTheme();
-  const badges = { requests: count, overdue: overdue.length };
+  const badges = { requests: count, overdue: overdueCounts?.total ?? 0 };
   const themeLabel = theme === "dark" ? "Светлая тема" : "Тёмная тема";
 
   return (

@@ -22,6 +22,7 @@ import { Route as AuthenticatedObjectsIdRouteImport } from './routes/_authentica
 import { Route as AuthenticatedObjectsNewRouteImport } from './routes/_authenticated/objects_.new'
 import { Route as AuthenticatedRequestsRequestIdRouteImport } from './routes/_authenticated/requests_.$requestId'
 import { Route as AuthenticatedRequestsNewRouteImport } from './routes/_authenticated/requests_.new'
+import { Route as AuthenticatedDirectoriesCustomersIdRouteImport } from './routes/_authenticated/directories_.customers.$id'
 import { Route as AuthenticatedDirectoriesRequestTypesIdRouteImport } from './routes/_authenticated/directories_.request-types.$id'
 import { Route as AuthenticatedDirectoriesStagesIdRouteImport } from './routes/_authenticated/directories_.stages.$id'
 import { Route as AuthenticatedObjectsIdEditRouteImport } from './routes/_authenticated/objects_.$id_.edit'
@@ -94,6 +95,12 @@ const AuthenticatedRequestsNewRoute =
     path: '/requests/new',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedDirectoriesCustomersIdRoute =
+  AuthenticatedDirectoriesCustomersIdRouteImport.update({
+    id: '/directories_/customers/$id',
+    path: '/directories/customers/$id',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedDirectoriesRequestTypesIdRoute =
   AuthenticatedDirectoriesRequestTypesIdRouteImport.update({
     id: '/directories_/request-types/$id',
@@ -132,6 +139,7 @@ export interface FileRoutesByFullPath {
   '/objects/new': typeof AuthenticatedObjectsNewRoute
   '/requests/$requestId': typeof AuthenticatedRequestsRequestIdRoute
   '/requests/new': typeof AuthenticatedRequestsNewRoute
+  '/directories/customers/$id': typeof AuthenticatedDirectoriesCustomersIdRoute
   '/directories/request-types/$id': typeof AuthenticatedDirectoriesRequestTypesIdRoute
   '/directories/stages/$id': typeof AuthenticatedDirectoriesStagesIdRoute
   '/objects/$id/edit': typeof AuthenticatedObjectsIdEditRoute
@@ -150,6 +158,7 @@ export interface FileRoutesByTo {
   '/objects/new': typeof AuthenticatedObjectsNewRoute
   '/requests/$requestId': typeof AuthenticatedRequestsRequestIdRoute
   '/requests/new': typeof AuthenticatedRequestsNewRoute
+  '/directories/customers/$id': typeof AuthenticatedDirectoriesCustomersIdRoute
   '/directories/request-types/$id': typeof AuthenticatedDirectoriesRequestTypesIdRoute
   '/directories/stages/$id': typeof AuthenticatedDirectoriesStagesIdRoute
   '/objects/$id/edit': typeof AuthenticatedObjectsIdEditRoute
@@ -170,6 +179,7 @@ export interface FileRoutesById {
   '/_authenticated/objects_/new': typeof AuthenticatedObjectsNewRoute
   '/_authenticated/requests_/$requestId': typeof AuthenticatedRequestsRequestIdRoute
   '/_authenticated/requests_/new': typeof AuthenticatedRequestsNewRoute
+  '/_authenticated/directories_/customers/$id': typeof AuthenticatedDirectoriesCustomersIdRoute
   '/_authenticated/directories_/request-types/$id': typeof AuthenticatedDirectoriesRequestTypesIdRoute
   '/_authenticated/directories_/stages/$id': typeof AuthenticatedDirectoriesStagesIdRoute
   '/_authenticated/objects_/$id_/edit': typeof AuthenticatedObjectsIdEditRoute
@@ -190,6 +200,7 @@ export interface FileRouteTypes {
     | '/objects/new'
     | '/requests/$requestId'
     | '/requests/new'
+    | '/directories/customers/$id'
     | '/directories/request-types/$id'
     | '/directories/stages/$id'
     | '/objects/$id/edit'
@@ -208,6 +219,7 @@ export interface FileRouteTypes {
     | '/objects/new'
     | '/requests/$requestId'
     | '/requests/new'
+    | '/directories/customers/$id'
     | '/directories/request-types/$id'
     | '/directories/stages/$id'
     | '/objects/$id/edit'
@@ -227,6 +239,7 @@ export interface FileRouteTypes {
     | '/_authenticated/objects_/new'
     | '/_authenticated/requests_/$requestId'
     | '/_authenticated/requests_/new'
+    | '/_authenticated/directories_/customers/$id'
     | '/_authenticated/directories_/request-types/$id'
     | '/_authenticated/directories_/stages/$id'
     | '/_authenticated/objects_/$id_/edit'
@@ -332,6 +345,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedRequestsNewRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/directories_/customers/$id': {
+      id: '/_authenticated/directories_/customers/$id'
+      path: '/directories/customers/$id'
+      fullPath: '/directories/customers/$id'
+      preLoaderRoute: typeof AuthenticatedDirectoriesCustomersIdRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/directories_/request-types/$id': {
       id: '/_authenticated/directories_/request-types/$id'
       path: '/directories/request-types/$id'
@@ -374,6 +394,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedObjectsNewRoute: typeof AuthenticatedObjectsNewRoute
   AuthenticatedRequestsRequestIdRoute: typeof AuthenticatedRequestsRequestIdRoute
   AuthenticatedRequestsNewRoute: typeof AuthenticatedRequestsNewRoute
+  AuthenticatedDirectoriesCustomersIdRoute: typeof AuthenticatedDirectoriesCustomersIdRoute
   AuthenticatedDirectoriesRequestTypesIdRoute: typeof AuthenticatedDirectoriesRequestTypesIdRoute
   AuthenticatedDirectoriesStagesIdRoute: typeof AuthenticatedDirectoriesStagesIdRoute
   AuthenticatedObjectsIdEditRoute: typeof AuthenticatedObjectsIdEditRoute
@@ -391,6 +412,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedObjectsNewRoute: AuthenticatedObjectsNewRoute,
   AuthenticatedRequestsRequestIdRoute: AuthenticatedRequestsRequestIdRoute,
   AuthenticatedRequestsNewRoute: AuthenticatedRequestsNewRoute,
+  AuthenticatedDirectoriesCustomersIdRoute:
+    AuthenticatedDirectoriesCustomersIdRoute,
   AuthenticatedDirectoriesRequestTypesIdRoute:
     AuthenticatedDirectoriesRequestTypesIdRoute,
   AuthenticatedDirectoriesStagesIdRoute: AuthenticatedDirectoriesStagesIdRoute,

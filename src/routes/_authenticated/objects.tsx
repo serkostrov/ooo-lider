@@ -1,9 +1,10 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { LayoutGrid, LayoutList, ListFilter, Plus, X } from "lucide-react";
 import { useProfile } from "@/lib/profile";
 import { formatDate } from "@/lib/format";
 import { useSortedRows, useTableSort } from "@/lib/table-sort";
+import { useDebouncedValue } from "@/lib/useDebouncedValue";
 import { fieldLabelClass, fieldStackClass } from "@/lib/ui";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -24,7 +25,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Toolbar, matches } from "@/components/directories/common";
+import { Toolbar } from "@/components/directories/common";
+import { InfiniteScrollSentinel } from "@/components/InfiniteScrollSentinel";
 import { PageFrame } from "@/components/PageFrame";
 import { PageHeader } from "@/components/PageHeader";
 import { SortableTh } from "@/components/SortableTh";
@@ -33,8 +35,11 @@ import {
   contractTone,
   daysLeftText,
   statusLabel,
+  useObjectProblemSummary,
   useObjectTypes,
-  useObjects,
+  useObjectsInfinite,
+  type ObjectListFilters,
+  type ObjectProblemFilter,
   type ObjectRow,
 } from "@/components/objects/data";
 
@@ -74,15 +79,6 @@ type ObjSort =
   | "progress"
   | "contract";
 
-type ProblemFilter =
-  | "all"
-  | "stages_overdue"
-  | "stages_no_response"
-  | "stages_on_review"
-  | "stages_no_executor"
-  | "requests_new"
-  | "requests_overdue";
-
 type ProblemTone = "danger" | "warn" | "signal";
 
 const OBJ_GETTERS: Record<ObjSort, (o: ObjectRow) => unknown> = {
@@ -96,17 +92,8 @@ const OBJ_GETTERS: Record<ObjSort, (o: ObjectRow) => unknown> = {
   contract: (o) => o.contract_end,
 };
 
-const PROBLEM_MATCH: Record<Exclude<ProblemFilter, "all">, (o: ObjectRow) => boolean> = {
-  stages_overdue: (o) => o.stages_overdue > 0,
-  stages_no_response: (o) => o.stages_no_response > 0,
-  stages_on_review: (o) => o.stages_on_review > 0,
-  stages_no_executor: (o) => o.stages_no_executor > 0,
-  requests_new: (o) => o.requests_new > 0,
-  requests_overdue: (o) => o.requests_overdue > 0,
-};
-
 const PROBLEM_META: Record<
-  Exclude<ProblemFilter, "all">,
+  Exclude<ObjectProblemFilter, "all">,
   { short: string; tone: ProblemTone; count: (o: ObjectRow) => number }
 > = {
   stages_overdue: { short: "просроч. этапов", tone: "danger", count: (o) => o.stages_overdue },
@@ -130,17 +117,40 @@ export const Route = createFileRoute("/_authenticated/objects")({
 function ObjectsPage() {
   const { is_admin } = useProfile();
   const navigate = useNavigate();
-  const { data: objects = [], isLoading } = useObjects();
+  const scrollRef = useRef<HTMLDivElement>(null);
   const [search, setSearch] = useState("");
+  const debouncedSearch = useDebouncedValue(search, 300);
   const [status, setStatus] = useState("all");
   const [type, setType] = useState("all");
-  const { all: objectTypes } = useObjectTypes();
-  const typeOptions = objectTypes.filter(
-    (t) => !t.deleted_at || objects.some((o) => o.object_type === t.code),
-  );
+  const { active: typeOptions } = useObjectTypes();
   const [archive, setArchive] = useState(false);
-  const [problem, setProblem] = useState<ProblemFilter>("all");
+  const [problem, setProblem] = useState<ObjectProblemFilter>("all");
   const [view, setView] = useObjectsView();
+
+  const listFilters: ObjectListFilters = useMemo(
+    () => ({
+      search: debouncedSearch,
+      status,
+      objectType: type,
+      archive,
+      problem,
+    }),
+    [debouncedSearch, status, type, archive, problem],
+  );
+
+  const pageQuery = useObjectsInfinite(listFilters);
+  const objects = pageQuery.data?.pages.flatMap((p) => p.rows) ?? [];
+  const isLoading = pageQuery.isLoading;
+  const { data: summaryData, isLoading: summaryLoading } = useObjectProblemSummary(archive);
+  const summary = summaryData ?? {
+    stages_overdue: 0,
+    stages_no_response: 0,
+    stages_on_review: 0,
+    stages_no_executor: 0,
+    requests_new: 0,
+    requests_overdue: 0,
+    count: 0,
+  };
 
   const activeFilterCount =
     (status !== "all" ? 1 : 0) + (type !== "all" ? 1 : 0) + (archive ? 1 : 0);
@@ -151,49 +161,11 @@ function ObjectsPage() {
     setArchive(false);
   };
 
-  const scope = useMemo(
-    () => objects.filter((o) => (archive ? o.status === "completed" : o.status !== "completed")),
-    [objects, archive],
-  );
-
-  const summary = useMemo(() => {
-    const sum = (pick: (o: ObjectRow) => number) => scope.reduce((a, o) => a + pick(o), 0);
-    return {
-      stages_overdue: sum((o) => o.stages_overdue),
-      stages_no_response: sum((o) => o.stages_no_response),
-      stages_on_review: sum((o) => o.stages_on_review),
-      stages_no_executor: sum((o) => o.stages_no_executor),
-      requests_new: sum((o) => o.requests_new),
-      requests_overdue: sum((o) => o.requests_overdue),
-    };
-  }, [scope]);
-
-  const filtered = useMemo(
-    () =>
-      scope.filter(
-        (o) =>
-          matches(search, o.name, o.address) &&
-          (status === "all" || o.status === status) &&
-          (type === "all" || o.object_type === type) &&
-          (problem === "all" || PROBLEM_MATCH[problem](o)),
-      ),
-    [scope, search, status, type, problem],
-  );
-
-  /** При выбранной проблеме — сначала объекты с большим числом попаданий. */
-  const filteredRanked = useMemo(() => {
-    if (problem === "all") return filtered;
-    const count = PROBLEM_META[problem].count;
-    return [...filtered].sort(
-      (a, b) => count(b) - count(a) || a.name.localeCompare(b.name, "ru"),
-    );
-  }, [filtered, problem]);
-
   const problemTotal =
-    problem === "all" ? 0 : filteredRanked.reduce((s, o) => s + PROBLEM_META[problem].count(o), 0);
+    problem === "all" ? 0 : objects.reduce((s, o) => s + PROBLEM_META[problem].count(o), 0);
 
   const { sort, toggle } = useTableSort<ObjSort>();
-  const rows = useSortedRows(filteredRanked, sort, OBJ_GETTERS);
+  const rows = useSortedRows(objects, sort, OBJ_GETTERS);
 
   return (
     <PageFrame
@@ -206,7 +178,7 @@ function ObjectsPage() {
             ? "Завершённые объекты в архиве"
             : problem === "all"
               ? "Список всех активных объектов"
-              : `${filteredRanked.length} ${objectsWord(filteredRanked.length)} · ${problemTotal} ${PROBLEM_META[problem].short}`
+              : `${objects.length}${pageQuery.hasNextPage ? "+" : ""} ${objectsWord(objects.length)} · ${problemTotal}${pageQuery.hasNextPage ? "+" : ""} ${PROBLEM_META[problem].short}`
         }
         className="mb-3"
         actions={
@@ -224,7 +196,7 @@ function ObjectsPage() {
 
       {!archive && (
         <div className="mb-3 overflow-hidden rounded-xl border border-border/70 bg-card shadow-[var(--surface-glow)]">
-          {isLoading ? (
+          {summaryLoading ? (
             <ProblemsSkeleton />
           ) : (
             <div className="grid divide-y divide-border/60 lg:grid-cols-2 lg:divide-x lg:divide-y-0">
@@ -388,7 +360,10 @@ function ObjectsPage() {
       }
     >
       {view === "table" ? (
-        <div className="max-h-full min-h-0 overflow-auto rounded-xl border border-border/70 bg-card shadow-[var(--surface-glow)] backdrop-blur-[2px]">
+        <div
+          ref={scrollRef}
+          className="max-h-full min-h-0 overflow-auto rounded-xl border border-border/70 bg-card shadow-[var(--surface-glow)] backdrop-blur-[2px]"
+        >
           <Table className="w-full table-fixed text-sm" containerClassName="max-h-none overflow-visible">
             <TableHeader>
               <TableRow>
@@ -424,7 +399,10 @@ function ObjectsPage() {
               ) : rows.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="py-10 text-center text-sm text-muted-foreground">
-                    <EmptyObjectsMessage empty={objects.length === 0} isAdmin={is_admin} />
+                    <EmptyObjectsMessage
+                      empty={objects.length === 0 && !activeFilterCount && !search.trim()}
+                      isAdmin={is_admin}
+                    />
                   </td>
                 </tr>
               ) : (
@@ -439,14 +417,23 @@ function ObjectsPage() {
               )}
             </TableBody>
           </Table>
+          <InfiniteScrollSentinel
+            rootRef={scrollRef}
+            hasMore={!!pageQuery.hasNextPage}
+            loading={pageQuery.isFetchingNextPage}
+            onLoadMore={() => void pageQuery.fetchNextPage()}
+          />
         </div>
       ) : (
-        <div className="max-h-full min-h-0 overflow-auto">
+        <div ref={scrollRef} className="max-h-full min-h-0 overflow-auto">
           {isLoading ? (
             <ObjectsCardsSkeleton />
           ) : rows.length === 0 ? (
             <div className="rounded-xl border border-border/70 bg-card py-12 text-center text-sm text-muted-foreground shadow-[var(--surface-glow)]">
-              <EmptyObjectsMessage empty={objects.length === 0} isAdmin={is_admin} />
+              <EmptyObjectsMessage
+                empty={objects.length === 0 && !activeFilterCount && !search.trim()}
+                isAdmin={is_admin}
+              />
             </div>
           ) : (
             <div className="grid gap-3.5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
@@ -460,6 +447,12 @@ function ObjectsPage() {
               ))}
             </div>
           )}
+          <InfiniteScrollSentinel
+            rootRef={scrollRef}
+            hasMore={!!pageQuery.hasNextPage}
+            loading={pageQuery.isFetchingNextPage}
+            onLoadMore={() => void pageQuery.fetchNextPage()}
+          />
         </div>
       )}
     </PageFrame>
@@ -585,7 +578,7 @@ function ProblemHit({
   o,
   className,
 }: {
-  problem: Exclude<ProblemFilter, "all">;
+  problem: Exclude<ObjectProblemFilter, "all">;
   o: ObjectRow;
   className?: string;
 }) {
@@ -621,7 +614,7 @@ function EmptyObjectsMessage({ empty, isAdmin }: { empty: boolean; isAdmin: bool
   );
 }
 
-type ProblemItem = readonly [Exclude<ProblemFilter, "all">, string, number, ProblemTone];
+type ProblemItem = readonly [Exclude<ObjectProblemFilter, "all">, string, number, ProblemTone];
 
 function ProblemGroup({
   label,
@@ -631,8 +624,8 @@ function ProblemGroup({
 }: {
   label: string;
   items: readonly ProblemItem[];
-  problem: ProblemFilter;
-  onSelect: (v: ProblemFilter) => void;
+  problem: ObjectProblemFilter;
+  onSelect: (v: ObjectProblemFilter) => void;
 }) {
   return (
     <div className="min-w-0 p-2.5 sm:p-3">
@@ -694,7 +687,7 @@ function ObjectCard({
   onOpen,
 }: {
   o: ObjectRow;
-  problem: ProblemFilter;
+  problem: ObjectProblemFilter;
   onOpen: () => void;
 }) {
   const tone = o.status === "completed" ? "none" : contractTone(o.contract_days_left);
@@ -839,7 +832,7 @@ function ObjectTableRow({
   onOpen,
 }: {
   o: ObjectRow;
-  problem: ProblemFilter;
+  problem: ObjectProblemFilter;
   onOpen: () => void;
 }) {
   const tone = o.status === "completed" ? "none" : contractTone(o.contract_days_left);

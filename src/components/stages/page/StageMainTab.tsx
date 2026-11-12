@@ -163,70 +163,68 @@ export const StageMainTab = forwardRef<
       )}
 
       <Block>
-        <div className="space-y-3">
-          <Section
-            title="Кто делает"
-            {...(assignOn
-              ? { hint: "исполнитель обязателен" }
-              : editing && !canAssign
-                ? { hint: "назначает администратор" }
-                : {})}
-          >
-            <div className="grid gap-2.5 sm:grid-cols-3">
+        <Section
+          title="Кто делает"
+          {...(assignOn
+            ? { hint: "исполнитель обязателен" }
+            : editing && !canAssign
+              ? { hint: "назначает администратор" }
+              : {})}
+        >
+          <div className="grid gap-x-10 gap-y-3 sm:grid-cols-3">
+            {assignOn ? (
+              <Field label="Исполнитель" required>
+                {person("executor_id", "не назначен")}
+              </Field>
+            ) : (
+              <Readout label="Исполнитель" value={stage.executor_name} />
+            )}
+            {assignOn ? (
+              <Field label="Соисполнитель">{person("coexecutor_id", "Нет")}</Field>
+            ) : (
+              <Readout label="Соисполнитель" value={stage.coexecutor_name} />
+            )}
+            <div className="min-w-0">
               {assignOn ? (
-                <Field label="Исполнитель" required>
-                  {person("executor_id", "не назначен")}
-                </Field>
+                <Field label="Кто принимает">{person("confirmer_id", "По роли")}</Field>
               ) : (
-                <Readout label="Исполнитель" value={stage.executor_name} />
+                <Readout label="Кто принимает" value={stage.confirmer_name ?? stage.confirmer_role_name} />
               )}
-              {assignOn ? (
-                <Field label="Соисполнитель">{person("coexecutor_id", "Нет")}</Field>
-              ) : (
-                <Readout label="Соисполнитель" value={stage.coexecutor_name} />
+              {stage.confirmer_role_name && (
+                <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
+                  По регламенту: {stage.confirmer_role_name}
+                </p>
               )}
-              <div className="min-w-0">
-                {assignOn ? (
-                  <Field label="Кто принимает">{person("confirmer_id", "По роли")}</Field>
-                ) : (
-                  <Readout label="Кто принимает" value={stage.confirmer_name ?? stage.confirmer_role_name} />
-                )}
-                {stage.confirmer_role_name && (
-                  <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
-                    По регламенту: {stage.confirmer_role_name}
-                  </p>
-                )}
-              </div>
             </div>
-          </Section>
-
-          <div className="border-t border-border/70 pt-3">
-            <Section title="Сроки">
-              <div className="flex flex-wrap items-end gap-x-3 gap-y-2.5">
-                {workOn ? (
-                  <>
-                    <Field label="Дата начала">{date("start_date")}</Field>
-                    <Field label="Срок окончания">{date("due_date")}</Field>
-                    <Field label="Напомнить, дн.">
-                      <Input
-                        value={v.remind_days}
-                        onChange={(e) => set("remind_days", e.target.value)}
-                        inputMode="numeric"
-                        className="h-9 w-[5.5rem] text-sm tabular-nums"
-                      />
-                    </Field>
-                  </>
-                ) : (
-                  <>
-                    <Readout label="Дата начала" value={formatDate(stage.start_date)} />
-                    <Readout label="Срок окончания" value={formatDate(stage.due_date)} />
-                    <Readout label="Напомнить, дн." value={stage.remind_days?.toString()} />
-                  </>
-                )}
-              </div>
-            </Section>
           </div>
-        </div>
+        </Section>
+      </Block>
+
+      <Block>
+        <Section title="Сроки">
+          <div className="flex flex-wrap gap-x-10 gap-y-3">
+            {workOn ? (
+              <>
+                <Field label="Дата начала">{date("start_date")}</Field>
+                <Field label="Срок окончания">{date("due_date")}</Field>
+                <Field label="Напомнить, дн.">
+                  <Input
+                    value={v.remind_days}
+                    onChange={(e) => set("remind_days", e.target.value)}
+                    inputMode="numeric"
+                    className="h-9 w-[5.5rem] text-sm tabular-nums"
+                  />
+                </Field>
+              </>
+            ) : (
+              <>
+                <Readout label="Дата начала" value={formatDate(stage.start_date)} />
+                <Readout label="Срок окончания" value={formatDate(stage.due_date)} />
+                <Readout label="Напомнить, дн." value={stage.remind_days?.toString()} />
+              </>
+            )}
+          </div>
+        </Section>
       </Block>
 
       {showDoc && (
@@ -244,9 +242,9 @@ export const StageMainTab = forwardRef<
                 }
               : {})}
           >
-            <div className="space-y-2.5">
+            <div className="space-y-3">
               <TemplateSamples templateId={stage.template_id} />
-              <div className="flex flex-wrap items-end gap-x-3 gap-y-2.5">
+              <div className="flex flex-wrap gap-x-10 gap-y-3">
                 {workOn ? (
                   <>
                     <Field label="Дата отправки">{date("doc_sent_at")}</Field>
@@ -308,7 +306,7 @@ function Readout({ label, value }: { label: string; value: string | null | undef
   return (
     <div className={fieldStackClass}>
       <div className={fieldLabelClass}>{label}</div>
-      <div className="flex min-h-9 items-center text-sm">{text || <span className="text-muted-foreground">—</span>}</div>
+      <div className="text-sm leading-6">{text || <span className="text-muted-foreground">—</span>}</div>
     </div>
   );
 }

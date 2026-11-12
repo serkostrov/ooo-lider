@@ -1,6 +1,7 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ToneBadge } from "@/components/ToneBadge";
 import { supabase } from "@/integrations/supabase/client";
+import { PAGE_SIZE, likeContains, takePage, type CursorPage } from "@/lib/cursor";
 import { formatDate } from "@/lib/format";
 import { daysBetween, mskToday } from "@/lib/dates";
 import { OBJECTS_KEY } from "@/components/objects/data";
@@ -120,17 +121,133 @@ export function stageCallLabel(
   return `${stageNo}.${idx + 1}`;
 }
 
+export type RequestListFilters = {
+  /** Список одного объекта — без пагинации (нужны все для меток вызова). */
+  objectId?: string;
+  requestTypeId?: string;
+  status?: string;
+  from?: string;
+  to?: string;
+  onlyOpen?: boolean;
+  onlyOverdue?: boolean;
+  archive?: boolean;
+  search?: string;
+  pageSize?: number;
+};
+
+export type RequestCursor = {
+  call_date: string;
+  number: number;
+  id: string;
+};
+
+function mapRequestRow(r: Record<string, unknown>): RequestRow {
+  return {
+    ...(r as unknown as RequestRow),
+    is_new: !!r["is_new"],
+    is_overdue: !!r["is_overdue"],
+  };
+}
+
+function applyRequestFilters(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  q: any,
+  f: RequestListFilters,
+) {
+  if (f.objectId) q = q.eq("object_id", f.objectId);
+  if (f.requestTypeId) q = q.eq("request_type_id", f.requestTypeId);
+  if (f.status) q = q.eq("status", f.status);
+  if (f.from) q = q.gte("call_date", f.from);
+  if (f.to) q = q.lte("call_date", f.to);
+  if (f.archive) q = q.eq("status", "done");
+  else {
+    if (f.onlyOpen) q = q.neq("status", "done");
+    if (f.onlyOverdue) q = q.eq("is_overdue", true);
+  }
+  const like = likeContains(f.search ?? "");
+  if (like) {
+    const parts = [
+      `type_name.ilike.${like}`,
+      `object_name.ilike.${like}`,
+      `representative_name.ilike.${like}`,
+      `result_text.ilike.${like}`,
+      `initiator_name.ilike.${like}`,
+      `office_name.ilike.${like}`,
+    ];
+    const digits = (f.search ?? "").trim().replace(/^№/, "");
+    if (/^\d+$/.test(digits)) parts.push(`number.eq.${digits}`);
+    q = q.or(parts.join(","));
+  }
+  return q;
+}
+
+async function fetchRequestsPage(
+  f: RequestListFilters,
+  cursor: RequestCursor | null,
+): Promise<CursorPage<RequestRow, RequestCursor>> {
+  const pageSize = f.pageSize ?? PAGE_SIZE;
+  let q = supabase
+    .from("v_requests")
+    .select("*")
+    .order("call_date", { ascending: false })
+    .order("number", { ascending: false })
+    .order("id", { ascending: false })
+    .limit(pageSize + 1);
+  q = applyRequestFilters(q, f);
+  if (cursor) {
+    q = q.or(
+      [
+        `call_date.lt.${cursor.call_date}`,
+        `and(call_date.eq.${cursor.call_date},number.lt.${cursor.number})`,
+        `and(call_date.eq.${cursor.call_date},number.eq.${cursor.number},id.lt.${cursor.id})`,
+      ].join(","),
+    );
+  }
+  const { data, error } = await q;
+  if (error) throw error;
+  const mapped = (data ?? []).map((r) => mapRequestRow(r as Record<string, unknown>));
+  const { rows, hasMore } = takePage(mapped, pageSize);
+  const last = rows[rows.length - 1];
+  return {
+    rows,
+    nextCursor:
+      hasMore && last
+        ? { call_date: last.call_date, number: last.number, id: last.id }
+        : null,
+  };
+}
+
+/**
+ * Курсорный список заявок с фильтрами/поиском на сервере.
+ * Для карточки объекта ({@link useRequests}) — без пагинации.
+ */
+export function useRequestsInfinite(f: RequestListFilters, enabled = true) {
+  return useInfiniteQuery({
+    queryKey: [...requestsKey, "page", f],
+    enabled,
+    initialPageParam: null as RequestCursor | null,
+    queryFn: ({ pageParam }) => fetchRequestsPage(f, pageParam),
+    getNextPageParam: (last) => last.nextCursor,
+  });
+}
+
+/**
+ * Все заявки объекта (до 500) — для меток вызова / шапки / быстрого вызова.
+ * Глобальный реестр — через {@link useRequestsInfinite}.
+ */
 export function useRequests(objectId?: string) {
   return useQuery({
-    queryKey: [...requestsKey, objectId ?? "all"],
+    queryKey: [...requestsKey, "object", objectId ?? ""],
+    enabled: !!objectId,
     queryFn: async () => {
-      let q = supabase.from("v_requests").select("*").order("call_date", { ascending: false }).limit(2000);
-      if (objectId) q = q.eq("object_id", objectId);
-      const { data, error } = await q;
+      const { data, error } = await supabase
+        .from("v_requests")
+        .select("*")
+        .eq("object_id", objectId!)
+        .order("call_date", { ascending: false })
+        .limit(500);
       if (error) throw error;
-      return sortRequests(
-        (data ?? []).map((r) => ({ ...(r as unknown as RequestRow), is_new: !!r.is_new, is_overdue: !!r.is_overdue })),
-      );
+      return sortRequests((data ?? []).map((r) => mapRequestRow(r as Record<string, unknown>)));
     },
   });
 }

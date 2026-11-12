@@ -4,7 +4,7 @@ import { AlertTriangle, ClipboardList, Layers } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useShowOverdueGate } from "@/lib/ui-settings";
-import { formatDay, useOverdueItems, type OverdueItem } from "./data";
+import { formatDay, useOverdueCounts, useOverduePreview, type OverdueItem } from "./data";
 
 /** Показ fullscreen «Просрочено» один раз за сессию входа (ТЗ 7.8). */
 const SESSION_KEY = "lider.overdue-gate-ack";
@@ -38,10 +38,15 @@ function ack() {
  * «Понятно» скрывает до следующего входа (sessionStorage).
  */
 export function OverdueGate() {
-  const { items, isReady } = useOverdueItems();
+  const preview = useOverduePreview(80);
+  const counts = useOverdueCounts();
   const gatePref = useShowOverdueGate();
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
+
+  const items = preview.data ?? [];
+  const total = counts.data?.total ?? items.length;
+  const isReady = !!preview.data && !!counts.data;
 
   const stages = useMemo(
     () => items.filter((i) => i.kind === "stage").sort((a, b) => b.days - a.days),
@@ -56,11 +61,11 @@ export function OverdueGate() {
   const showOnLogin = gatePref.isError || gatePref.data !== false;
 
   useEffect(() => {
-    if (!isReady || !prefReady || wasAcked() || items.length === 0 || !showOnLogin) return;
+    if (!isReady || !prefReady || wasAcked() || total === 0 || !showOnLogin) return;
     setOpen(true);
-  }, [isReady, prefReady, items.length, showOnLogin]);
+  }, [isReady, prefReady, total, showOnLogin]);
 
-  if (!open || items.length === 0) return null;
+  if (!open || total === 0) return null;
 
   const dismiss = () => {
     ack();
@@ -80,9 +85,11 @@ export function OverdueGate() {
     }
   };
 
+  const stagesTotal = counts.data?.stages ?? stages.length;
+  const requestsTotal = counts.data?.requests ?? requests.length;
   const summaryParts = [
-    stages.length > 0 ? `${stages.length} ${stagesWord(stages.length)}` : null,
-    requests.length > 0 ? `${requests.length} ${requestsWord(requests.length)}` : null,
+    stagesTotal > 0 ? `${stagesTotal} ${stagesWord(stagesTotal)}` : null,
+    requestsTotal > 0 ? `${requestsTotal} ${requestsWord(requestsTotal)}` : null,
   ].filter(Boolean);
 
   return (
@@ -99,7 +106,7 @@ export function OverdueGate() {
           </span>
           <div className="min-w-0">
             <h1 id="overdue-gate-title" className="text-2xl font-semibold tracking-tight">
-              Просрочено · {items.length}
+              Просрочено · {total}
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
               {summaryParts.join(" · ")}. Закройте или перенесите — иначе список будет гореть при
@@ -113,7 +120,7 @@ export function OverdueGate() {
             <OverdueSection
               icon={Layers}
               title="Этапы"
-              count={stages.length}
+              count={stagesTotal}
               items={stages}
               onOpen={openItem}
             />
@@ -122,10 +129,15 @@ export function OverdueGate() {
             <OverdueSection
               icon={ClipboardList}
               title="Заявки"
-              count={requests.length}
+              count={requestsTotal}
               items={requests}
               onOpen={openItem}
             />
+          )}
+          {items.length < total && (
+            <p className="px-2 pb-1 text-center text-xs text-muted-foreground">
+              Показаны самые просроченные · остальное — в разделе «Просрочено»
+            </p>
           )}
         </div>
 

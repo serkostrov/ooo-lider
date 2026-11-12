@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "@tanstack/react-router";
 import { FileSpreadsheet, ListFilter, Plus, Printer, X } from "lucide-react";
@@ -6,16 +6,17 @@ import { formatDate } from "@/lib/format";
 import { mskToday } from "@/lib/dates";
 import { exportXlsx, printTable, type Column } from "@/lib/export";
 import { sortRows, useTableSort } from "@/lib/table-sort";
+import { useDebouncedValue } from "@/lib/useDebouncedValue";
 import { fieldLabelClass, fieldStackClass } from "@/lib/ui";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { DateField } from "@/components/ui/DateField";
-import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Toolbar } from "@/components/directories/common";
+import { InfiniteScrollSentinel } from "@/components/InfiniteScrollSentinel";
 import { SortableTh } from "@/components/SortableTh";
 import { useRequestTypes } from "@/components/directories/request-types/data";
 import { useObjects } from "@/components/objects/data";
@@ -31,7 +32,9 @@ import {
   statusInfo,
   useFieldValues,
   useRequests,
+  useRequestsInfinite,
   type FieldValue,
+  type RequestListFilters,
   type RequestRow,
 } from "./data";
 
@@ -94,24 +97,14 @@ export function RequestsList({
   chromeHost?: HTMLElement | null;
 }) {
   const navigate = useNavigate();
-  const { data: rows = [], isLoading } = useRequests(objectId);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const { data: types = [] } = useRequestTypes();
   const statuses = useRequestStatuses();
   const { data: objects = [] } = useObjects();
   const { data: stages = [] } = useObjectStages(objectId ?? "");
-  const ids = rows.map((r) => r.id);
-  const { data: values = [] } = useFieldValues(ids, objectId ?? "all");
-
-  const stageNumberById = useMemo(() => {
-    const m: Record<string, number> = {};
-    for (const s of stages) m[s.id] = s.number;
-    return m;
-  }, [stages]);
-
-  const callLabel = (r: RequestRow) =>
-    objectId ? stageCallLabel(r, rows, stageNumberById) : null;
 
   const [search, setSearch] = useState("");
+  const debouncedSearch = useDebouncedValue(search, 300);
   const [createOpenLocal, setCreateOpenLocal] = useState(false);
   const createControlled = onCreateOpenChange != null;
   const createOpen = createControlled ? (createOpenProp ?? false) : createOpenLocal;
@@ -138,6 +131,48 @@ export function RequestsList({
   };
 
   const showObject = !objectId;
+  /** На карточке объекта грузим все заявки — нужны для «15.2». Глобальный список — курсор. */
+  const scoped = !!objectId;
+
+  const serverFilters: RequestListFilters = useMemo(
+    () => ({
+      ...(objectId
+        ? { objectId }
+        : f.object !== ALL
+          ? { objectId: f.object }
+          : {}),
+      ...(effectiveType ? { requestTypeId: effectiveType } : {}),
+      ...(f.status !== ALL ? { status: f.status } : {}),
+      ...(f.from ? { from: f.from } : {}),
+      ...(f.to ? { to: f.to } : {}),
+      onlyOpen: f.onlyOpen,
+      onlyOverdue: f.onlyOverdue,
+      archive: f.archive,
+      search: debouncedSearch,
+    }),
+    [objectId, f, effectiveType, debouncedSearch],
+  );
+
+  const scopedQuery = useRequests(objectId);
+  const pageQuery = useRequestsInfinite(serverFilters, !scoped);
+
+  const rows: RequestRow[] = scoped
+    ? (scopedQuery.data ?? [])
+    : (pageQuery.data?.pages.flatMap((p) => p.rows) ?? []);
+  const isLoading = scoped ? scopedQuery.isLoading : pageQuery.isLoading;
+
+  const ids = rows.map((r) => r.id);
+  const { data: values = [] } = useFieldValues(ids, objectId ?? "all");
+
+  const stageNumberById = useMemo(() => {
+    const m: Record<string, number> = {};
+    for (const s of stages) m[s.id] = s.number;
+    return m;
+  }, [stages]);
+
+  const callLabel = (r: RequestRow) =>
+    objectId ? stageCallLabel(r, rows, stageNumberById) : null;
+
   const activeFilterCount = useMemo(() => {
     let n = 0;
     if (showObject && f.object !== ALL) n++;
@@ -164,10 +199,11 @@ export function RequestsList({
     return m;
   }, [values]);
 
+  /** На объекте — клиентский фильтр (все строки уже загружены). Глобально — уже на сервере. */
   const visible = useMemo(() => {
-    const q = search.trim().toLowerCase().replace(/^№/, "");
+    if (!scoped) return rows;
+    const q = debouncedSearch.trim().toLowerCase().replace(/^№/, "");
     return rows.filter((r) => {
-      if (f.object !== ALL && r.object_id !== f.object) return false;
       if (effectiveType && r.request_type_id !== effectiveType) return false;
       if (f.status !== ALL && r.status !== f.status) return false;
       if (f.from && r.call_date < f.from) return false;
@@ -179,7 +215,7 @@ export function RequestsList({
       }
       if (f.onlyOverdue && !r.is_overdue) return false;
       if (q) {
-        const stageLabel = objectId ? stageCallLabel(r, rows, stageNumberById) : null;
+        const stageLabel = stageCallLabel(r, rows, stageNumberById);
         const hay = [
           String(r.number),
           stageLabel,
@@ -196,7 +232,7 @@ export function RequestsList({
       }
       return true;
     });
-  }, [rows, f, effectiveType, search, valuesByRequest, objectId, stageNumberById]);
+  }, [scoped, rows, f, effectiveType, debouncedSearch, valuesByRequest, stageNumberById]);
 
   const { sort, toggle } = useTableSort<ReqSort>();
   const getters = useMemo(
@@ -216,9 +252,9 @@ export function RequestsList({
     [valuesByRequest, statuses],
   );
   const sorted = useMemo(() => {
-    if (!sort) return sortRequests(visible);
+    if (!sort) return scoped ? sortRequests(visible) : visible;
     return sortRows(visible, sort, getters);
-  }, [visible, sort, getters]);
+  }, [visible, sort, getters, scoped]);
 
   const columns: Column<RequestRow>[] = [
     {
@@ -443,15 +479,30 @@ export function RequestsList({
 
       {/* Один overflow: иначе sticky thead не работает во вложенном overflow-x-auto */}
       <div
+        ref={scrollRef}
         className={cn(
           "overflow-auto rounded-md border border-border bg-card",
           fillHeight && "min-h-0 flex-1",
         )}
       >
-        <table className="w-full min-w-[1000px] text-sm">
+        {/* Фиксированная ширина (не w-full): иначе table-fixed сжимает колонки и пропадает гориз. скролл */}
+        <table
+          className={cn("table-fixed text-sm", showObject ? "w-[1280px]" : "w-[1120px]")}
+        >
+          <colgroup>
+            <col style={{ width: "7.5rem" }} />
+            <col style={{ width: "7.5rem" }} />
+            <col style={{ width: "8rem" }} />
+            <col style={{ width: "11rem" }} />
+            {showObject && <col style={{ width: "14rem" }} />}
+            <col style={{ width: showObject ? "16rem" : "20rem" }} />
+            <col style={{ width: "9.5rem" }} />
+            <col style={{ width: "9rem" }} />
+            <col style={{ width: "9rem" }} />
+          </colgroup>
           <thead className="sticky top-0 z-10 border-b border-border bg-card shadow-[0_1px_0_0_var(--border)]">
             <tr>
-              <SortableTh column="number" sort={sort} onToggle={toggle} className="w-28">№</SortableTh>
+              <SortableTh column="number" sort={sort} onToggle={toggle}>№</SortableTh>
               <SortableTh column="created" sort={sort} onToggle={toggle}>Сформирована</SortableTh>
               <SortableTh column="call" sort={sort} onToggle={toggle}>Вызов на</SortableTh>
               <SortableTh column="type" sort={sort} onToggle={toggle}>Вид</SortableTh>
@@ -472,13 +523,11 @@ export function RequestsList({
                 <td colSpan={showObject ? 9 : 8} className="px-5 py-12 text-center">
                   <div className="mx-auto flex max-w-sm flex-col items-center gap-3">
                     <p className="text-sm text-muted-foreground">
-                      {rows.length === 0
+                      {rows.length === 0 && !activeFilterCount && !search.trim()
                         ? "Заявок пока нет"
-                        : activeFilterCount > 0 || search.trim()
-                          ? "По выбранным фильтрам ничего не найдено"
-                          : "Ничего не найдено"}
+                        : "По выбранным фильтрам ничего не найдено"}
                     </p>
-                    {(activeFilterCount > 0 || search.trim()) && rows.length > 0 && (
+                    {(activeFilterCount > 0 || search.trim()) && (
                       <Button
                         type="button"
                         variant="outline"
@@ -519,10 +568,10 @@ export function RequestsList({
                     className={`h-12 cursor-pointer border-t transition-colors hover:bg-elevated/50 ${tone}`}
                     title={[r.type_name, r.object_name, dataLine].filter(Boolean).join("\n")}
                   >
-                    <td className="max-w-[7rem] px-5 py-2.5 align-middle">
-                      <div className="flex min-w-0 items-center gap-2">
+                    <td className="px-5 py-2.5 align-middle">
+                      <div className="flex min-w-0 items-center gap-1.5 overflow-hidden">
                         <span
-                          className="shrink-0 font-semibold tabular-nums"
+                          className="min-w-0 truncate font-semibold tabular-nums"
                           title={callLabel(r) ? `Сквозной №${r.number}` : undefined}
                         >
                           {callLabel(r) ?? r.number}
@@ -534,15 +583,15 @@ export function RequestsList({
                         )}
                       </div>
                     </td>
-                    <td className="whitespace-nowrap px-5 py-2.5 align-middle tabular-nums">
+                    <td className="truncate px-5 py-2.5 align-middle tabular-nums">
                       {formatDate(r.created_at)}
                     </td>
-                    <td className="whitespace-nowrap px-5 py-2.5 align-middle">
-                      <div className={`inline-flex items-center gap-1.5 tabular-nums ${r.is_overdue ? "text-danger" : ""}`}>
-                        <span className="font-medium">{formatDate(r.call_date)}</span>
+                    <td className="px-5 py-2.5 align-middle">
+                      <div className={`flex min-w-0 items-center gap-1 overflow-hidden tabular-nums ${r.is_overdue ? "text-danger" : ""}`}>
+                        <span className="min-w-0 truncate font-medium">{formatDate(r.call_date)}</span>
                         {r.is_overdue && (
                           <span
-                            className="rounded-md bg-danger-soft px-1 py-0.5 text-[11px] font-semibold leading-none text-danger"
+                            className="shrink-0 rounded-md bg-danger-soft px-1 py-0.5 text-[11px] font-semibold leading-none text-danger"
                             title={`Просрочено ${overdueDays(r)} дн.`}
                           >
                             −{overdueDays(r)}д
@@ -550,24 +599,26 @@ export function RequestsList({
                         )}
                       </div>
                     </td>
-                    <td className="max-w-[10rem] px-5 py-2.5 align-middle">
+                    <td className="px-5 py-2.5 align-middle">
                       <div className="truncate" title={typeLine}>{typeLine}</div>
                     </td>
                     {showObject && (
-                      <td className="max-w-[14rem] px-5 py-2.5 align-middle">
+                      <td className="px-5 py-2.5 align-middle">
                         <div className="truncate" title={r.object_name ?? undefined}>{r.object_name}</div>
                       </td>
                     )}
-                    <td className="max-w-[18rem] px-5 py-2.5 align-middle text-xs text-muted-foreground">
+                    <td className="px-5 py-2.5 align-middle text-xs text-muted-foreground">
                       <div className="truncate" title={dataLine || undefined}>{dataLine || "—"}</div>
                     </td>
-                    <td className="whitespace-nowrap px-5 py-2.5 align-middle">
-                      <RequestStatusBadge status={r.status} />
+                    <td className="px-5 py-2.5 align-middle">
+                      <div className="truncate">
+                        <RequestStatusBadge status={r.status} />
+                      </div>
                     </td>
-                    <td className="max-w-[9rem] px-5 py-2.5 align-middle">
+                    <td className="px-5 py-2.5 align-middle">
                       <div className="truncate" title={r.initiator_name ?? undefined}>{r.initiator_name}</div>
                     </td>
-                    <td className="max-w-[9rem] px-5 py-2.5 align-middle">
+                    <td className="px-5 py-2.5 align-middle">
                       <div className="truncate" title={r.office_name ?? undefined}>{r.office_name}</div>
                     </td>
                   </tr>
@@ -576,6 +627,14 @@ export function RequestsList({
             )}
           </tbody>
         </table>
+        {!scoped && (
+          <InfiniteScrollSentinel
+            rootRef={scrollRef}
+            hasMore={!!pageQuery.hasNextPage}
+            loading={pageQuery.isFetchingNextPage}
+            onLoadMore={() => void pageQuery.fetchNextPage()}
+          />
+        )}
       </div>
     </div>
   );

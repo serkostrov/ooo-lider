@@ -11,10 +11,10 @@
 export const CONTROL_H = "h-9";
 
 /** Стек «подпись → поле»: единый отступ во всех формах. */
-export const fieldStackClass = "flex flex-col gap-1.5";
+export const fieldStackClass = "flex flex-col gap-2";
 
 /** Подпись поля (Label / dt). */
-export const fieldLabelClass = "block text-sm font-medium leading-none text-muted-foreground";
+export const fieldLabelClass = "block text-sm font-medium leading-snug text-muted-foreground";
 
 export const tabsListClass =
   "mb-4 inline-flex h-9 max-w-full flex-wrap items-center justify-start gap-0.5 rounded-md bg-muted p-0.5";

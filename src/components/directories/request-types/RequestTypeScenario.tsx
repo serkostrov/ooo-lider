@@ -5,12 +5,12 @@ import { Plus, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { showError } from "@/lib/format";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useRoles } from "@/components/directories/stages/data";
 import { Field } from "../common";
 import { useRequestFields } from "./data";
-import { cn } from "@/lib/utils";
 
 const STATUSES = [
   { v: "ready", label: "Готова к отправке" },
@@ -258,36 +258,42 @@ function StepCard({
         </Field>
       </div>
       {fields.length > 0 && (
-        <div className="mt-5">
-          <Field label="Обязательные поля к этому шагу">
-            <div className="flex flex-wrap gap-2">
-              {fields.map((f) => {
-                const on = fieldIds.includes(f.id);
-                return (
-                  <button
-                    key={f.id}
-                    type="button"
-                    disabled={readOnly || persist.isPending}
-                    onClick={() =>
-                      save({
-                        role_code: role,
-                        to_status: status,
-                        field_ids: on ? fieldIds.filter((x) => x !== f.id) : [...fieldIds, f.id],
-                      })
-                    }
-                    className={cn(
-                      "rounded-md border px-2.5 py-1 text-xs",
-                      on
-                        ? "border-signal bg-accent font-medium"
-                        : "border-border bg-background text-muted-foreground",
-                    )}
+        <div className="mt-5 space-y-2.5">
+          <div>
+            <div className="text-sm font-medium text-muted-foreground">Обязательные поля к этому шагу</div>
+            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+              Отмеченные поля нужно заполнить, прежде чем роль сможет перевести заявку в статус этого шага.
+              Без них кнопка перехода будет недоступна.
+            </p>
+          </div>
+          <ul className="grid gap-2 sm:grid-cols-2">
+            {fields.map((f) => {
+              const on = fieldIds.includes(f.id);
+              const id = `scenario-field-${step.id}-${f.id}`;
+              return (
+                <li key={f.id}>
+                  <label
+                    htmlFor={id}
+                    className="flex h-full cursor-pointer items-center justify-between gap-3 rounded-md border border-border px-3 py-2.5 text-sm hover:bg-muted/40"
                   >
-                    {f.label}
-                  </button>
-                );
-              })}
-            </div>
-          </Field>
+                    <span className="min-w-0 flex-1 leading-snug">{f.label}</span>
+                    <Switch
+                      id={id}
+                      checked={on}
+                      disabled={readOnly || persist.isPending}
+                      onCheckedChange={(v) =>
+                        save({
+                          role_code: role,
+                          to_status: status,
+                          field_ids: v ? [...fieldIds, f.id] : fieldIds.filter((x) => x !== f.id),
+                        })
+                      }
+                    />
+                  </label>
+                </li>
+              );
+            })}
+          </ul>
         </div>
       )}
     </li>

@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Plus, Search, Trash2 } from "lucide-react";
+import { Plus, Search, Trash2, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -47,13 +47,24 @@ export function Toolbar({
   return (
     <div className={cn("mb-4 flex w-full flex-wrap items-center gap-2 sm:gap-3", className)}>
       <div className="relative min-w-0 flex-1 basis-48">
-        <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+        <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           value={search}
           onChange={(e) => onSearch(e.target.value)}
           placeholder="Поиск"
-          className="h-9 w-full pl-11 text-sm"
+          className={cn("h-9 w-full pl-11 text-sm", search ? "pr-9" : undefined)}
         />
+        {search ? (
+          <button
+            type="button"
+            className="absolute right-2 top-1/2 inline-flex size-6 -translate-y-1/2 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:text-foreground"
+            onClick={() => onSearch("")}
+            aria-label="Очистить поиск"
+            title="Очистить"
+          >
+            <X className="size-3.5" />
+          </button>
+        ) : null}
       </div>
       {children}
       {onAdd && (

@@ -1,22 +1,14 @@
 import { useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Pencil, Plus } from "lucide-react";
+import { useNavigate } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useProfile } from "@/lib/profile";
 import { useSortedRows, useTableSort } from "@/lib/table-sort";
-import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
 import { SortableTh } from "@/components/SortableTh";
-import { fieldLabelClass, fieldStackClass } from "@/lib/ui";
-import { DeleteButton, EditSheet, EmptyRow, Toolbar, matches } from "./common";
+import { EmptyRow, Toolbar, matches } from "./common";
 import { DirectoryTableSkeleton } from "./DirectorySkeleton";
-import { CustomerForm, CUSTOMERS_KEY, type Customer } from "./CustomerForm";
-import {
-  CustomerContactForm,
-  customerContactsKey,
-  objectContactsKey,
-  type CustomerContact,
-} from "./CustomerContactForm";
+import { CUSTOMERS_KEY, type Customer } from "./CustomerForm";
 
 type CustSort = "name" | "inn" | "address" | "comment";
 const CUST_GETTERS: Record<CustSort, (c: Customer) => unknown> = {
@@ -28,9 +20,8 @@ const CUST_GETTERS: Record<CustSort, (c: Customer) => unknown> = {
 
 export function CustomersDirectory() {
   const { is_admin } = useProfile();
+  const navigate = useNavigate();
   const [search, setSearch] = useState("");
-  const [creating, setCreating] = useState(false);
-  const [openId, setOpenId] = useState<string | null>(null);
   const { data = [], isLoading } = useQuery({
     queryKey: CUSTOMERS_KEY,
     queryFn: async () => {
@@ -46,18 +37,27 @@ export function CustomersDirectory() {
   const filtered = data.filter((c) => matches(search, c.name, c.inn, c.legal_address, c.comment));
   const { sort, toggle } = useTableSort<CustSort>();
   const rows = useSortedRows(filtered, sort, CUST_GETTERS);
-  const current = data.find((c) => c.id === openId) ?? null;
+  const open = (id: string) => navigate({ to: "/directories/customers/$id", params: { id } });
+
   return (
     <div>
-      <Toolbar search={search} onSearch={setSearch} onAdd={is_admin ? () => setCreating(true) : undefined} />
+      <Toolbar search={search} onSearch={setSearch} onAdd={is_admin ? () => open("new") : undefined} />
       <div className="overflow-hidden rounded-md border border-border bg-card">
         <Table className="text-sm">
           <TableHeader>
             <TableRow>
-              <SortableTh as="table" column="name" sort={sort} onToggle={toggle}>Название</SortableTh>
-              <SortableTh as="table" column="inn" sort={sort} onToggle={toggle}>ИНН</SortableTh>
-              <SortableTh as="table" column="address" sort={sort} onToggle={toggle}>Адрес</SortableTh>
-              <SortableTh as="table" column="comment" sort={sort} onToggle={toggle}>Комментарий</SortableTh>
+              <SortableTh as="table" column="name" sort={sort} onToggle={toggle}>
+                Название
+              </SortableTh>
+              <SortableTh as="table" column="inn" sort={sort} onToggle={toggle}>
+                ИНН
+              </SortableTh>
+              <SortableTh as="table" column="address" sort={sort} onToggle={toggle}>
+                Адрес
+              </SortableTh>
+              <SortableTh as="table" column="comment" sort={sort} onToggle={toggle}>
+                Комментарий
+              </SortableTh>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -67,7 +67,7 @@ export function CustomersDirectory() {
               <EmptyRow cols={4} />
             ) : (
               rows.map((c) => (
-                <TableRow key={c.id} className="cursor-pointer" onClick={() => setOpenId(c.id)}>
+                <TableRow key={c.id} className="cursor-pointer" onClick={() => open(c.id)}>
                   <TableCell className="font-medium">{c.name}</TableCell>
                   <TableCell>{c.inn}</TableCell>
                   <TableCell>{c.legal_address}</TableCell>
@@ -78,175 +78,6 @@ export function CustomersDirectory() {
           </TableBody>
         </Table>
       </div>
-      <EditSheet open={creating} onOpenChange={setCreating} title="Новый заказчик" className="sm:max-w-3xl">
-        {creating && (
-          <CustomerForm
-            onSaved={(c) => {
-              setCreating(false);
-              setOpenId(c.id);
-            }}
-            onCancel={() => setCreating(false)}
-          />
-        )}
-      </EditSheet>
-      <EditSheet open={!!current} onOpenChange={(o) => !o && setOpenId(null)} title="Заказчик" className="sm:max-w-3xl">
-        {current && <CustomerCard key={current.id} customer={current} onClose={() => setOpenId(null)} />}
-      </EditSheet>
-    </div>
-  );
-}
-
-function CustomerCard({ customer, onClose }: { customer: Customer; onClose: () => void }) {
-  const { is_admin } = useProfile();
-  const [edit, setEdit] = useState(false);
-  const codes: [string, string | null][] = [
-    ["ИНН", customer.inn],
-    ["КПП", customer.kpp],
-    ["ОГРН", customer.ogrn],
-  ];
-  return (
-    <div className="w-full space-y-5">
-      {edit ? (
-        <CustomerForm
-          customer={customer}
-          onSaved={() => setEdit(false)}
-          onCancel={() => setEdit(false)}
-          onDeleted={onClose}
-        />
-      ) : (
-        <div className="space-y-5">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="text-lg font-semibold tracking-tight">{customer.name}</div>
-            {is_admin && (
-              <div className="flex flex-wrap gap-2">
-                <Button variant="outline" size="icon" onClick={() => setEdit(true)} title="Изменить" aria-label="Изменить">
-                  <Pencil className="size-4" />
-                </Button>
-                <DeleteButton table="customers" id={customer.id} name={customer.name} invalidate={CUSTOMERS_KEY} onDone={onClose} />
-              </div>
-            )}
-          </div>
-          <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-3">
-            {codes.map(([k, val]) => (
-              <div key={k} className={fieldStackClass}>
-                <dt className={fieldLabelClass}>{k}</dt>
-                <dd className="text-sm">{val || "—"}</dd>
-              </div>
-            ))}
-            <div className={`${fieldStackClass} sm:col-span-3`}>
-              <dt className={fieldLabelClass}>Адрес</dt>
-              <dd className="text-sm">{customer.legal_address || "—"}</dd>
-            </div>
-            <div className={`${fieldStackClass} sm:col-span-3`}>
-              <dt className={fieldLabelClass}>Комментарий</dt>
-              <dd className="whitespace-pre-line text-sm text-muted-foreground">{customer.comment || "—"}</dd>
-            </div>
-          </dl>
-        </div>
-      )}
-      <Contacts customerId={customer.id} />
-    </div>
-  );
-}
-
-function Contacts({ customerId }: { customerId: string }) {
-  const { is_admin } = useProfile();
-  const qc = useQueryClient();
-  const key = customerContactsKey(customerId);
-  const [editing, setEditing] = useState<CustomerContact | "new" | null>(null);
-  const { data = [] } = useQuery({
-    queryKey: key,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("customer_contacts")
-        .select("id, full_name, position, phone, email, comment")
-        .eq("customer_id", customerId)
-        .is("deleted_at", null)
-        .order("sort");
-      if (error) throw error;
-      return data as CustomerContact[];
-    },
-  });
-  return (
-    <div className="space-y-3 border-t pt-5">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h3 className="text-base font-semibold">Специалисты заказчика</h3>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Технадзор, куратор, ГИП и другие. На объекте выбираются из этого списка.
-          </p>
-        </div>
-        {is_admin && editing === null && (
-          <Button
-            type="button"
-            onClick={() => setEditing("new")}
-            className="h-8 shrink-0 gap-1.5 px-2.5 text-sm"
-          >
-            <Plus className="size-4" />
-            Добавить
-          </Button>
-        )}
-      </div>
-      {editing === "new" && (
-        <div className="rounded-md border border-border bg-muted/40 p-4">
-          <CustomerContactForm customerId={customerId} contact={null} onClose={() => setEditing(null)} />
-        </div>
-      )}
-      {data.length === 0 && editing !== "new" && (
-        <p className="text-sm text-muted-foreground">Пока никого нет — добавьте технадзора или другого специалиста</p>
-      )}
-      {data.length > 0 && (
-        <ul className="divide-y divide-border overflow-hidden rounded-md border border-border">
-          {data.map((c, i) =>
-            editing !== null && editing !== "new" && editing.id === c.id ? (
-              <li key={c.id} className="bg-muted/40 p-4">
-                <CustomerContactForm customerId={customerId} contact={c} onClose={() => setEditing(null)} />
-              </li>
-            ) : (
-              <li key={c.id} className="flex items-start gap-3 px-4 py-2.5 text-sm">
-                <span className="w-6 shrink-0 pt-0.5 text-xs font-medium tabular-nums text-muted-foreground">
-                  {i + 1}.
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                    <span className="font-medium">{c.full_name}</span>
-                    {c.position && <span className="text-muted-foreground">{c.position}</span>}
-                  </div>
-                  {(c.phone || c.email || c.comment) && (
-                    <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-muted-foreground">
-                      {c.phone && <span>{c.phone}</span>}
-                      {c.email && <span className="truncate">{c.email}</span>}
-                      {c.comment && <span className="truncate">{c.comment}</span>}
-                    </div>
-                  )}
-                </div>
-                {is_admin && (
-                  <div className="flex shrink-0 items-center gap-1.5">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      className="size-8"
-                      onClick={() => setEditing(c)}
-                      title="Изменить"
-                      aria-label="Изменить"
-                    >
-                      <Pencil className="size-3.5" />
-                    </Button>
-                    <DeleteButton
-                      table="customer_contacts"
-                      id={c.id}
-                      name={c.full_name}
-                      invalidate={[...key]}
-                      onDone={() => qc.invalidateQueries({ queryKey: objectContactsKey(customerId) })}
-                    />
-                  </div>
-                )}
-              </li>
-            ),
-          )}
-        </ul>
-      )}
     </div>
   );
 }

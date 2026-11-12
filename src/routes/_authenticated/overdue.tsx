@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { AlertTriangle, CheckCircle2 } from "lucide-react";
 import { tabsListClass, tabTriggerClass, tableWrapClass, thClass } from "@/lib/ui";
@@ -14,10 +14,18 @@ import {
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ToneBadge } from "@/components/ToneBadge";
+import { InfiniteScrollSentinel } from "@/components/InfiniteScrollSentinel";
 import { PageFrame } from "@/components/PageFrame";
 import { PageHeader } from "@/components/PageHeader";
 import { SortableTh } from "@/components/SortableTh";
-import { formatDay, useOverdueItems, type OverdueItem } from "@/components/overdue/data";
+import {
+  formatDay,
+  useOverdueCounts,
+  useOverdueInfinite,
+  useOverdueObjectOptions,
+  type OverdueItem,
+  type OverdueListFilters,
+} from "@/components/overdue/data";
 
 type OverdueSort = "what" | "object" | "status" | "responsible" | "due" | "days";
 
@@ -45,24 +53,32 @@ type Kind = "all" | "stage" | "request";
 
 function OverduePage() {
   const navigate = useNavigate();
-  const { items, isLoading } = useOverdueItems();
+  const scrollRef = useRef<HTMLDivElement>(null);
   const [kind, setKind] = useState<Kind>("all");
   const [objectId, setObjectId] = useState(ALL);
 
-  const objects = [...new Map(items.map((i) => [i.objectId, i.objectName])).entries()].sort(
-    (a, b) => a[1].localeCompare(b[1], "ru"),
+  const filters: OverdueListFilters = useMemo(
+    () => ({
+      kind,
+      ...(objectId !== ALL ? { objectId } : {}),
+    }),
+    [kind, objectId],
   );
-  const filtered = useMemo(
-    () =>
-      items.filter(
-        (i) => (kind === "all" || i.kind === kind) && (objectId === ALL || i.objectId === objectId),
-      ),
-    [items, kind, objectId],
+
+  const pageQuery = useOverdueInfinite(filters);
+  const { data: counts, isLoading: countsLoading } = useOverdueCounts(
+    objectId !== ALL ? objectId : undefined,
   );
+  const { data: objectOptions = [] } = useOverdueObjectOptions();
+
+  const items = pageQuery.data?.pages.flatMap((p) => p.rows) ?? [];
+  const isLoading = pageQuery.isLoading;
+  const total = counts?.total ?? 0;
+  const stagesCount = counts?.stages ?? 0;
+  const requestsCount = counts?.requests ?? 0;
+
   const { sort, toggle } = useTableSort<OverdueSort>({ key: "days", dir: "desc" });
-  const rows = useSortedRows(filtered, sort, OVERDUE_GETTERS);
-  const stagesCount = items.filter((i) => i.kind === "stage").length;
-  const requestsCount = items.length - stagesCount;
+  const rows = useSortedRows(items, sort, OVERDUE_GETTERS);
 
   const open = (it: OverdueItem) =>
     it.kind === "request"
@@ -72,6 +88,9 @@ function OverduePage() {
           params: { id: it.objectId, stageId: it.id },
         });
 
+  const tabTotal =
+    kind === "all" ? total : kind === "stage" ? stagesCount : requestsCount;
+
   return (
     <PageFrame
       header={
@@ -80,9 +99,9 @@ function OverduePage() {
             title={
               <span className="inline-flex items-center gap-3">
                 Просрочено
-                {items.length > 0 && (
+                {!countsLoading && total > 0 && (
                   <span className="rounded-full bg-danger px-2.5 text-sm font-semibold leading-6 text-danger-foreground">
-                    {items.length}
+                    {total}
                   </span>
                 )}
               </span>
@@ -94,13 +113,13 @@ function OverduePage() {
             <Tabs value={kind} onValueChange={(v) => setKind(v as Kind)}>
               <TabsList className={`${tabsListClass} mb-0`}>
                 <TabsTrigger value="all" className={tabTriggerClass}>
-                  Всё ({items.length})
+                  Всё ({countsLoading ? "…" : total})
                 </TabsTrigger>
                 <TabsTrigger value="stage" className={tabTriggerClass}>
-                  Этапы ({stagesCount})
+                  Этапы ({countsLoading ? "…" : stagesCount})
                 </TabsTrigger>
                 <TabsTrigger value="request" className={tabTriggerClass}>
-                  Заявки ({requestsCount})
+                  Заявки ({countsLoading ? "…" : requestsCount})
                 </TabsTrigger>
               </TabsList>
             </Tabs>
@@ -112,9 +131,9 @@ function OverduePage() {
                 <SelectItem value={ALL} className="text-sm">
                   Все объекты
                 </SelectItem>
-                {objects.map(([id, name]) => (
-                  <SelectItem key={id} value={id} className="text-sm">
-                    {name}
+                {objectOptions.map((o) => (
+                  <SelectItem key={o.id} value={o.id} className="text-sm">
+                    {o.name}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -154,14 +173,20 @@ function OverduePage() {
             </tbody>
           </table>
         </div>
-      ) : items.length === 0 ? (
+      ) : tabTotal === 0 ? (
         <div className="flex h-full flex-col items-center justify-center gap-2 rounded-md border border-border bg-card py-12 text-center">
           <CheckCircle2 className="size-8 text-success" />
-          <p className="text-sm font-semibold">Просроченного нет</p>
-          <p className="text-sm text-muted-foreground">Все этапы и заявки в срок</p>
+          <p className="text-sm font-semibold">
+            {objectId !== ALL || kind !== "all" ? "Ничего не найдено" : "Просроченного нет"}
+          </p>
+          <p className="text-sm text-muted-foreground">
+            {objectId !== ALL || kind !== "all"
+              ? "Сбросьте фильтр или выберите другой объект"
+              : "Все этапы и заявки в срок"}
+          </p>
         </div>
       ) : (
-        <div className={tableWrapClass}>
+        <div ref={scrollRef} className={tableWrapClass}>
           <table className="w-full min-w-[760px] text-sm">
             <thead className="sticky top-0 z-10 bg-card">
               <tr className="text-left">
@@ -237,6 +262,12 @@ function OverduePage() {
               )}
             </tbody>
           </table>
+          <InfiniteScrollSentinel
+            rootRef={scrollRef}
+            hasMore={!!pageQuery.hasNextPage}
+            loading={pageQuery.isFetchingNextPage}
+            onLoadMore={() => void pageQuery.fetchNextPage()}
+          />
         </div>
       )}
     </PageFrame>

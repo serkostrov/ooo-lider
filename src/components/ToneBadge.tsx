@@ -5,7 +5,8 @@ const FALLBACK = "oklch(0.62 0.02 250)";
 
 /**
  * Статус-бейдж: цвет из справочника.
- * Насыщенная заливка — читается на тёмной таблице.
+ * Фон — мягкий tint к --card; текст мешается с --foreground,
+ * чтобы в светлой теме не было белого на пастели.
  */
 export function ToneBadge({
   color,
@@ -21,9 +22,9 @@ export function ToneBadge({
 }) {
   const c = color || FALLBACK;
   const style: CSSProperties = {
-    backgroundColor: `color-mix(in oklab, ${c} 32%, var(--card))`,
-    color: `color-mix(in oklab, ${c} 82%, white)`,
-    boxShadow: `inset 0 0 0 1px color-mix(in oklab, ${c} 50%, transparent)`,
+    backgroundColor: `color-mix(in oklab, ${c} 28%, var(--card))`,
+    color: `color-mix(in oklab, ${c} 42%, var(--foreground))`,
+    boxShadow: `inset 0 0 0 1px color-mix(in oklab, ${c} 40%, transparent)`,
   };
   return (
     <span

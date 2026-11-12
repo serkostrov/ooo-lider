@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, ArrowLeft, Flag, Pencil } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Flag, ListChecks, Pencil } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { tabsListClass, tabTriggerClass } from "@/lib/ui";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -10,7 +10,11 @@ import { HistoryFeed } from "@/components/history/HistoryFeed";
 import { useProfile, type CurrentProfile } from "@/lib/profile";
 import { useRefreshStages, useStage, type ObjectStage } from "@/components/stages/data";
 import { StageMainTab, type StageMainHandle } from "@/components/stages/page/StageMainTab";
-import { StageConditionsTab, useStageConditions } from "@/components/stages/page/StageConditionsTab";
+import {
+  StageConditionsTab,
+  useStageConditions,
+  type StageConditionsHandle,
+} from "@/components/stages/page/StageConditionsTab";
 import { StageDocumentsTab } from "@/components/stages/page/StageDocumentsTab";
 import { StageStepsTab, useStageSteps } from "@/components/stages/page/StageStepsTab";
 import { StageStatusBar } from "@/components/stages/page/StageStatusBar";
@@ -30,11 +34,16 @@ function StagePage() {
   const { data: steps = [] } = useStageSteps(stageId);
   const [tab, setTab] = useState("main");
   const [editing, setEditing] = useState(false);
+  const [marking, setMarking] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [conditionsDirty, setConditionsDirty] = useState(false);
   const mainRef = useRef<StageMainHandle>(null);
+  const conditionsRef = useRef<StageConditionsHandle>(null);
 
   useEffect(() => {
     setEditing(false);
+    setMarking(false);
+    setConditionsDirty(false);
   }, [stageId]);
 
   const refresh = () => {
@@ -90,14 +99,31 @@ function StagePage() {
   }
 
   const access = stageAccess(me, stage);
-  const workLocked = !editing || !access.work;
+  const workReadOnly = !access.work;
+  const canMarkConditions =
+    access.work && !stage.is_excluded && !stage.is_closed && conditions.length > 0;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-y-contain pb-6">
         {back}
 
-        <Tabs key={stageId} value={tab} onValueChange={setTab}>
+        <Tabs
+          key={stageId}
+          value={tab}
+          onValueChange={(next) => {
+            if (editing && next !== "main") {
+              mainRef.current?.reset();
+              setEditing(false);
+            }
+            if (marking && next !== "conditions") {
+              conditionsRef.current?.reset();
+              setMarking(false);
+              setConditionsDirty(false);
+            }
+            setTab(next);
+          }}
+        >
           <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between lg:gap-6">
             <div className="flex min-w-0 flex-1 flex-col gap-4">
               <header>
@@ -157,16 +183,23 @@ function StagePage() {
             />
           </TabsContent>
           <TabsContent value="conditions" className="mt-0">
-            <StageConditionsTab stage={stage} readOnly={workLocked} onChanged={refresh} />
+            <StageConditionsTab
+              ref={conditionsRef}
+              stage={stage}
+              readOnly={workReadOnly}
+              marking={marking}
+              onChanged={refresh}
+              onDirtyChange={setConditionsDirty}
+            />
           </TabsContent>
           <TabsContent value="documents" className="mt-0">
-            <StageDocumentsTab stage={stage} readOnly={workLocked} />
+            <StageDocumentsTab stage={stage} readOnly={workReadOnly} />
           </TabsContent>
           {steps.length > 0 && (
             <TabsContent value="steps" className="mt-0">
               <StageStepsTab
                 steps={steps}
-                canAct={(role) => editing && access.canCompleteStep(role)}
+                canAct={(role) => access.canCompleteStep(role)}
                 onChanged={refresh}
               />
             </TabsContent>
@@ -177,7 +210,7 @@ function StagePage() {
         </Tabs>
       </div>
 
-      {access.any && (
+      {access.any && tab === "main" && (
         <div className="shrink-0 border-t border-border bg-background py-3">
           <div className="flex flex-wrap items-center justify-end gap-2">
             {!editing ? (
@@ -198,7 +231,7 @@ function StagePage() {
                 >
                   Отмена
                 </Button>
-                {tab === "main" && (access.work || access.assign) && (
+                {(access.work || access.assign) && (
                   <Button
                     className="h-10 px-6 text-sm"
                     disabled={saving}
@@ -219,6 +252,54 @@ function StagePage() {
                     {saving ? "Сохранение…" : "Сохранить"}
                   </Button>
                 )}
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {canMarkConditions && tab === "conditions" && (
+        <div className="shrink-0 border-t border-border bg-background py-3">
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {!marking ? (
+              <Button className="h-10 gap-1.5 px-6 text-sm" onClick={() => setMarking(true)}>
+                <ListChecks className="size-3.5" />
+                Отметить условия
+              </Button>
+            ) : (
+              <>
+                <Button
+                  variant="outline"
+                  className="h-10 px-6 text-sm"
+                  disabled={saving}
+                  onClick={() => {
+                    conditionsRef.current?.reset();
+                    setMarking(false);
+                    setConditionsDirty(false);
+                  }}
+                >
+                  Отмена
+                </Button>
+                <Button
+                  className="h-10 px-6 text-sm"
+                  disabled={saving || !conditionsDirty}
+                  onClick={() => {
+                    void (async () => {
+                      setSaving(true);
+                      try {
+                        await conditionsRef.current?.save();
+                        setMarking(false);
+                        setConditionsDirty(false);
+                      } catch {
+                        // ошибка уже показана в форме
+                      } finally {
+                        setSaving(false);
+                      }
+                    })();
+                  }}
+                >
+                  {saving ? "Сохранение…" : "Сохранить"}
+                </Button>
               </>
             )}
           </div>

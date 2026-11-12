@@ -98,9 +98,9 @@ function StageCardPage() {
         key={id}
         value={isNew ? "main" : tab}
         onValueChange={(v) => setTab(v as StageTab)}
-        className="space-y-5"
+        className="flex flex-col gap-6"
       >
-        <TabsList className={cn(tabsListClass, "mb-0")}>
+        <TabsList className={cn(tabsListClass, "mb-0 w-fit self-start")}>
           <TabsTrigger value="main" className={tabTriggerClass}>
             Основное
           </TabsTrigger>
@@ -115,25 +115,27 @@ function StageCardPage() {
           </TabsTrigger>
         </TabsList>
         {isNew && (
-          <p className="text-sm text-muted-foreground">
+          <p className="w-full text-sm text-muted-foreground">
             Сначала сохраните основные данные — после этого откроются условия, предшествующие этапы и сценарий.
           </p>
         )}
         {/* Только активная вкладка в DOM — иначе неактивные панели раздувают скролл */}
-        {tab === "main" || isNew ? (
-          <StageMainForm
-            key={stage?.id ?? "new"}
-            stage={stage}
-            allStages={stages}
-            readOnly={readOnly}
-            onCreated={(newId) => navigate({ to: "/directories/stages/$id", params: { id: newId }, replace: true })}
-          />
-        ) : null}
-        {stage && tab === "conditions" ? <StageConditions templateId={stage.id} readOnly={readOnly} /> : null}
-        {stage && tab === "predecessors" ? (
-          <StagePredecessors templateId={stage.id} allStages={stages} readOnly={readOnly} />
-        ) : null}
-        {stage && tab === "steps" ? <StageSteps templateId={stage.id} readOnly={readOnly} /> : null}
+        <div className="w-full min-w-0">
+          {tab === "main" || isNew ? (
+            <StageMainForm
+              key={stage?.id ?? "new"}
+              stage={stage}
+              allStages={stages}
+              readOnly={readOnly}
+              onCreated={(newId) => navigate({ to: "/directories/stages/$id", params: { id: newId }, replace: true })}
+            />
+          ) : null}
+          {stage && tab === "conditions" ? <StageConditions templateId={stage.id} readOnly={readOnly} /> : null}
+          {stage && tab === "predecessors" ? (
+            <StagePredecessors templateId={stage.id} allStages={stages} readOnly={readOnly} />
+          ) : null}
+          {stage && tab === "steps" ? <StageSteps templateId={stage.id} readOnly={readOnly} /> : null}
+        </div>
       </Tabs>
     </div>
   );

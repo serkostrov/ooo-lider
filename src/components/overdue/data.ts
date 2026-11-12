@@ -1,9 +1,7 @@
 import { useCallback, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { daysBetween, mskToday } from "@/lib/dates";
-import { useObjects } from "@/components/objects/data";
-import { statusInfo, useRequestStatuses } from "@/components/requests/data";
+import { PAGE_SIZE, takePage, type CursorPage } from "@/lib/cursor";
 
 export const OVERDUE_KEY = ["overdue"] as const;
 
@@ -31,111 +29,238 @@ export function clearOverdueNotificationAck() {
   localStorage.removeItem(ACK_STORAGE);
 }
 
+export type OverdueKind = "request" | "stage";
+
 export type OverdueItem = {
   key: string;
-  kind: "request" | "stage";
+  kind: OverdueKind;
   id: string;
   objectId: string;
   objectName: string;
-  /** «Заявка №12 «Технадзор»» / «Этап 18 «Раскопка траншеи»» */
   title: string;
   status: string;
   statusColor: string | null;
-  /** Кто отвечает: исполнитель этапа / офис по заявке (если не назначен — инициатор). */
   responsible: string | null;
-  /** Срок: дата этапа или дата созвона по заявке, YYYY-MM-DD. */
   dueDate: string;
   days: number;
   note: string | null;
 };
 
-/**
- * Просроченные заявки и этапы по видимым пользователю незавершённым объектам.
- * Один источник для колокольчика уведомлений, бейджа в меню и раздела «Просрочено».
- * Видимость ограничивает RLS.
- */
-export function useOverdueItems() {
-  const { data: objects = [], isLoading: objectsLoading } = useObjects();
-  const statuses = useRequestStatuses();
-  const q = useQuery({
-    queryKey: OVERDUE_KEY,
+export type OverdueListFilters = {
+  kind?: "all" | OverdueKind;
+  objectId?: string;
+  pageSize?: number;
+};
+
+export type OverdueCursor = { days: number; id: string };
+
+type OverdueRow = {
+  kind: string;
+  id: string;
+  object_id: string;
+  object_name: string;
+  title: string;
+  status: string;
+  status_color: string | null;
+  responsible: string | null;
+  due_date: string;
+  days: number;
+  note: string | null;
+};
+
+function mapRow(r: OverdueRow): OverdueItem {
+  const kind = r.kind === "stage" ? "stage" : "request";
+  return {
+    key: `${kind[0]}-${r.id}`,
+    kind,
+    id: r.id,
+    objectId: r.object_id,
+    objectName: r.object_name,
+    title: r.title,
+    status: r.status,
+    statusColor: r.status_color,
+    responsible: r.responsible,
+    dueDate: r.due_date,
+    days: Number(r.days) || 0,
+    note: r.note,
+  };
+}
+
+/** View ещё может отсутствовать в сгенерированных типах. */
+function overdueTable() {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (supabase as any).from("v_overdue");
+}
+
+function applyOverdueFilters(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  q: any,
+  f: OverdueListFilters,
+) {
+  if (f.kind && f.kind !== "all") q = q.eq("kind", f.kind);
+  if (f.objectId) q = q.eq("object_id", f.objectId);
+  return q;
+}
+
+async function fetchOverduePage(
+  f: OverdueListFilters,
+  cursor: OverdueCursor | null,
+): Promise<CursorPage<OverdueItem, OverdueCursor>> {
+  const pageSize = f.pageSize ?? PAGE_SIZE;
+  let q = overdueTable()
+    .select(
+      "kind, id, object_id, object_name, title, status, status_color, responsible, due_date, days, note",
+    )
+    .order("days", { ascending: false })
+    .order("id", { ascending: false })
+    .limit(pageSize + 1);
+  q = applyOverdueFilters(q, f);
+  if (cursor) {
+    q = q.or(
+      [`days.lt.${cursor.days}`, `and(days.eq.${cursor.days},id.lt.${cursor.id})`].join(","),
+    );
+  }
+  const { data, error } = await q;
+  if (error) throw error;
+  const mapped = ((data ?? []) as unknown as OverdueRow[]).map(mapRow);
+  const { rows, hasMore } = takePage(mapped, pageSize);
+  const last = rows[rows.length - 1];
+  return {
+    rows,
+    nextCursor: hasMore && last ? { days: last.days, id: last.id } : null,
+  };
+}
+
+/** Курсорный список просроченных (фильтры на сервере). */
+export function useOverdueInfinite(f: OverdueListFilters = {}) {
+  return useInfiniteQuery({
+    queryKey: [...OVERDUE_KEY, "page", f],
+    initialPageParam: null as OverdueCursor | null,
+    queryFn: ({ pageParam }) => fetchOverduePage(f, pageParam),
+    getNextPageParam: (last) => last.nextCursor,
+    refetchInterval: 60_000,
+  });
+}
+
+/** Счётчики для бейджа меню и табов — без выгрузки строк. */
+export function useOverdueCounts(objectId?: string) {
+  return useQuery({
+    queryKey: [...OVERDUE_KEY, "counts", objectId ?? ""],
     refetchInterval: 60_000,
     queryFn: async () => {
-      const [req, st] = await Promise.all([
-        supabase
-          .from("v_requests")
-          .select("id, number, type_name, object_id, call_date, status, office_name, initiator_name")
-          .eq("is_overdue", true),
-        supabase
-          .from("v_object_stages")
-          .select("id, number, name, object_id, due_date, status_name, status_color, executor_name, note")
-          .eq("is_overdue", true)
-          .eq("is_excluded", false),
+      const base = (kind?: OverdueKind) => {
+        let q = overdueTable().select("id", { count: "exact", head: true });
+        if (objectId) q = q.eq("object_id", objectId);
+        if (kind) q = q.eq("kind", kind);
+        return q;
+      };
+      const [all, stages, requests] = await Promise.all([
+        base(),
+        base("stage"),
+        base("request"),
       ]);
-      if (req.error) throw req.error;
-      if (st.error) throw st.error;
-      return { requests: req.data ?? [], stages: st.data ?? [] };
+      if (all.error) throw all.error;
+      if (stages.error) throw stages.error;
+      if (requests.error) throw requests.error;
+      return {
+        total: all.count ?? 0,
+        stages: stages.count ?? 0,
+        requests: requests.count ?? 0,
+      };
     },
   });
+}
 
-  const active = new Map(objects.filter((o) => o.status !== "completed").map((o) => [o.id, o.name]));
-  const today = mskToday();
-  const items: OverdueItem[] = q.data
-    ? [
-        ...q.data.requests
-          .filter((r) => r.id && r.object_id && r.call_date && active.has(r.object_id))
-          .map((r) => {
-            const s = statusInfo(r.status ?? "new", statuses);
-            return {
-              key: `r-${r.id}`,
-              kind: "request" as const,
-              id: r.id!,
-              objectId: r.object_id!,
-              objectName: active.get(r.object_id!) ?? "",
-              title: `Заявка №${r.number} «${r.type_name}»`,
-              status: s.label,
-              statusColor: s.color,
-              responsible: r.office_name ?? r.initiator_name ?? null,
-              dueDate: r.call_date!,
-              days: daysBetween(r.call_date!, today),
-              note: null,
-            };
-          }),
-        ...q.data.stages
-          .filter((s) => s.id && s.object_id && s.due_date && active.has(s.object_id))
-          .map((s) => ({
-            key: `s-${s.id}`,
-            kind: "stage" as const,
-            id: s.id!,
-            objectId: s.object_id!,
-            objectName: active.get(s.object_id!) ?? "",
-            title: `Этап ${s.number} «${s.name}»`,
-            status: s.status_name ?? "",
-            statusColor: s.status_color ?? null,
-            responsible: s.executor_name ?? null,
-            dueDate: s.due_date!,
-            days: daysBetween(s.due_date!, today),
-            note: s.note ?? null,
-          })),
-      ].sort((a, b) => b.days - a.days)
-    : [];
-
-  return { items, isLoading: q.isLoading || objectsLoading, isReady: !!q.data && !objectsLoading };
+/** Объекты, у которых есть просрочка — для селекта фильтра. */
+export function useOverdueObjectOptions() {
+  return useQuery({
+    queryKey: [...OVERDUE_KEY, "objects"],
+    staleTime: 60_000,
+    queryFn: async () => {
+      const { data, error } = await overdueTable()
+        .select("object_id, object_name")
+        .order("object_name")
+        .limit(2000);
+      if (error) throw error;
+      const map = new Map<string, string>();
+      for (const r of (data ?? []) as unknown as { object_id: string; object_name: string }[]) {
+        if (r.object_id) map.set(r.object_id, r.object_name);
+      }
+      return [...map.entries()]
+        .map(([id, name]) => ({ id, name }))
+        .sort((a, b) => a.name.localeCompare(b.name, "ru"));
+    },
+  });
 }
 
 /**
- * Непросмотренные просроченные для колокольчика.
- * «Просмотреть все» помечает текущий набор как прочитанный — бейдж пропадает,
- * пока не появятся новые ключи.
+ * Лёгкий превью-набор (гейт при входе / колокольчик): топ по дням + ключи для ack.
+ * Не тянет полные карточки сверх limit.
+ */
+export function useOverduePreview(limit = 40) {
+  return useQuery({
+    queryKey: [...OVERDUE_KEY, "preview", limit],
+    refetchInterval: 60_000,
+    queryFn: async () => {
+      const { data, error } = await overdueTable()
+        .select(
+          "kind, id, object_id, object_name, title, status, status_color, responsible, due_date, days, note",
+        )
+        .order("days", { ascending: false })
+        .order("id", { ascending: false })
+        .limit(limit);
+      if (error) throw error;
+      return ((data ?? []) as unknown as OverdueRow[]).map(mapRow);
+    },
+  });
+}
+
+/** Все ключи просрочки (kind+id) — для «просмотреть все» в колокольчике. */
+async function fetchAllOverdueKeys(): Promise<string[]> {
+  const keys: string[] = [];
+  const page = 1000;
+  let from = 0;
+  for (;;) {
+    const { data, error } = await overdueTable()
+      .select("kind, id")
+      .order("id")
+      .range(from, from + page - 1);
+    if (error) throw error;
+    const rows = (data ?? []) as unknown as { kind: string; id: string }[];
+    for (const r of rows) {
+      const kind = r.kind === "stage" ? "stage" : "request";
+      keys.push(`${kind[0]}-${r.id}`);
+    }
+    if (rows.length < page) break;
+    from += page;
+  }
+  return keys;
+}
+
+/**
+ * Непросмотренные для колокольчика: превью + сверка ключей с localStorage.
+ * Бейдж — число непросмотренных ключей (лёгкий select kind,id), не полный список строк.
  */
 export function useOverdueNotifications() {
-  const { items, isLoading, isReady } = useOverdueItems();
+  const preview = useOverduePreview(30);
+  const keysQ = useQuery({
+    queryKey: [...OVERDUE_KEY, "keys"],
+    refetchInterval: 60_000,
+    queryFn: fetchAllOverdueKeys,
+  });
   const [tick, setTick] = useState(0);
   const acked = useMemo(() => {
     void tick;
     return readAckKeys();
   }, [tick]);
-  const unseen = useMemo(() => items.filter((it) => !acked.has(it.key)), [items, acked]);
+
+  const allKeys = keysQ.data ?? [];
+  const unseenKeys = useMemo(() => allKeys.filter((k) => !acked.has(k)), [allKeys, acked]);
+  const unseenSet = useMemo(() => new Set(unseenKeys), [unseenKeys]);
+  const items = useMemo(
+    () => (preview.data ?? []).filter((it) => unseenSet.has(it.key)),
+    [preview.data, unseenSet],
+  );
 
   const markSeen = useCallback((keys: string[]) => {
     if (keys.length === 0) {
@@ -149,10 +274,39 @@ export function useOverdueNotifications() {
   }, []);
 
   const markAllSeen = useCallback(() => {
-    markSeen(items.map((it) => it.key));
-  }, [items, markSeen]);
+    void (async () => {
+      const keys = keysQ.data ?? (await fetchAllOverdueKeys());
+      markSeen(keys);
+    })();
+  }, [keysQ.data, markSeen]);
 
-  return { items: unseen, allCount: items.length, isLoading, isReady, markAllSeen, markSeen };
+  return {
+    items,
+    /** Непросмотренных всего (для бейджа колокольчика). */
+    unseenCount: unseenKeys.length,
+    allCount: allKeys.length,
+    isLoading: preview.isLoading || keysQ.isLoading,
+    isReady: !!preview.data && !!keysQ.data,
+    markAllSeen,
+    markSeen,
+  };
+}
+
+/**
+ * @deprecated Для совместимости гейта/старого кода — превью + counts.
+ * Страница /overdue использует {@link useOverdueInfinite}.
+ */
+export function useOverdueItems() {
+  const preview = useOverduePreview(100);
+  const counts = useOverdueCounts();
+  return {
+    items: preview.data ?? [],
+    isLoading: preview.isLoading || counts.isLoading,
+    isReady: !!preview.data && !!counts.data,
+    total: counts.data?.total ?? preview.data?.length ?? 0,
+    stagesCount: counts.data?.stages ?? 0,
+    requestsCount: counts.data?.requests ?? 0,
+  };
 }
 
 /** 2026-10-23 → 23.10.2026 */

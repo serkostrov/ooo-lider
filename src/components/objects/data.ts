@@ -1,7 +1,37 @@
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { PAGE_SIZE, likeContains, takePage, type CursorPage } from "@/lib/cursor";
 
 export const OBJECTS_KEY = ["objects"] as const;
+
+export type ObjectProblemFilter =
+  | "all"
+  | "stages_overdue"
+  | "stages_no_response"
+  | "stages_on_review"
+  | "stages_no_executor"
+  | "requests_new"
+  | "requests_overdue";
+
+export type ObjectListFilters = {
+  search?: string;
+  status?: string;
+  objectType?: string;
+  archive?: boolean;
+  problem?: ObjectProblemFilter;
+  pageSize?: number;
+};
+
+export type ObjectCursor = {
+  name: string;
+  id: string;
+  /** При фильтре проблем — значение счётчика для keyset. */
+  problemCount?: number;
+};
+
+function quoteFilter(v: string) {
+  return `"${v.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+}
 
 export type ObjectRow = {
   id: string;
@@ -34,6 +64,15 @@ export type ObjectRow = {
   current_stage_name: string | null;
   requests_new: number;
   requests_overdue: number;
+};
+
+const PROBLEM_COL: Record<Exclude<ObjectProblemFilter, "all">, keyof ObjectRow> = {
+  stages_overdue: "stages_overdue",
+  stages_no_response: "stages_no_response",
+  stages_on_review: "stages_on_review",
+  stages_no_executor: "stages_no_executor",
+  requests_new: "requests_new",
+  requests_overdue: "requests_overdue",
 };
 
 /** Справочник «Типы объектов» (правка 2.5, db/07). Удалённые тоже грузим — для подписей у старых объектов. */
@@ -93,7 +132,7 @@ function normalize(r: Record<string, unknown>): ObjectRow {
   };
 }
 
-/** Все видимые объекты (RLS и can_see_object — в представлении v_objects). */
+/** Все видимые объекты (селекты, просрочено, справочники). Список /objects — через {@link useObjectsInfinite}. */
 export function useObjects() {
   return useQuery({
     queryKey: OBJECTS_KEY,
@@ -101,6 +140,122 @@ export function useObjects() {
       const { data, error } = await supabase.from("v_objects").select("*").order("name");
       if (error) throw error;
       return (data ?? []).map((r) => normalize(r as Record<string, unknown>));
+    },
+  });
+}
+
+function applyObjectFilters(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  q: any,
+  f: ObjectListFilters,
+) {
+  if (f.archive) q = q.eq("status", "completed");
+  else q = q.neq("status", "completed");
+  if (f.status && f.status !== "all") q = q.eq("status", f.status);
+  if (f.objectType && f.objectType !== "all") q = q.eq("object_type", f.objectType);
+  if (f.problem && f.problem !== "all") q = q.gt(PROBLEM_COL[f.problem], 0);
+  const like = likeContains(f.search ?? "");
+  if (like) q = q.or(`name.ilike.${like},address.ilike.${like}`);
+  return q;
+}
+
+async function fetchObjectsPage(
+  f: ObjectListFilters,
+  cursor: ObjectCursor | null,
+): Promise<CursorPage<ObjectRow, ObjectCursor>> {
+  const pageSize = f.pageSize ?? PAGE_SIZE;
+  const problem = f.problem && f.problem !== "all" ? f.problem : null;
+  const problemCol = problem ? PROBLEM_COL[problem] : null;
+
+  let q = supabase.from("v_objects").select("*");
+  q = applyObjectFilters(q, f);
+
+  if (problemCol) {
+    q = q
+      .order(problemCol, { ascending: false })
+      .order("name", { ascending: true })
+      .order("id", { ascending: true })
+      .limit(pageSize + 1);
+    if (cursor && cursor.problemCount != null) {
+      const n = quoteFilter(cursor.name);
+      const id = quoteFilter(cursor.id);
+      q = q.or(
+        [
+          `${problemCol}.lt.${cursor.problemCount}`,
+          `and(${problemCol}.eq.${cursor.problemCount},name.gt.${n})`,
+          `and(${problemCol}.eq.${cursor.problemCount},name.eq.${n},id.gt.${id})`,
+        ].join(","),
+      );
+    }
+  } else {
+    q = q.order("name", { ascending: true }).order("id", { ascending: true }).limit(pageSize + 1);
+    if (cursor) {
+      const n = quoteFilter(cursor.name);
+      const id = quoteFilter(cursor.id);
+      q = q.or(`name.gt.${n},and(name.eq.${n},id.gt.${id})`);
+    }
+  }
+
+  const { data, error } = await q;
+  if (error) throw error;
+  const mapped = (data ?? []).map((r) => normalize(r as Record<string, unknown>));
+  const { rows, hasMore } = takePage(mapped, pageSize);
+  const last = rows[rows.length - 1];
+  return {
+    rows,
+    nextCursor:
+      hasMore && last
+        ? {
+            name: last.name,
+            id: last.id,
+            ...(problemCol ? { problemCount: Number(last[problemCol]) } : {}),
+          }
+        : null,
+  };
+}
+
+/** Курсорный список объектов с поиском/фильтрами на сервере. */
+export function useObjectsInfinite(f: ObjectListFilters) {
+  return useInfiniteQuery({
+    queryKey: [...OBJECTS_KEY, "page", f],
+    initialPageParam: null as ObjectCursor | null,
+    queryFn: ({ pageParam }) => fetchObjectsPage(f, pageParam),
+    getNextPageParam: (last) => last.nextCursor,
+  });
+}
+
+/** Сводка проблем для чипов (тонкие колонки, без полного списка в UI). */
+export function useObjectProblemSummary(archive: boolean) {
+  return useQuery({
+    queryKey: [...OBJECTS_KEY, "problem-summary", archive],
+    queryFn: async () => {
+      let q = supabase
+        .from("v_objects")
+        .select(
+          "stages_overdue, stages_no_response, stages_on_review, stages_no_executor, requests_new, requests_overdue",
+        );
+      q = archive ? q.eq("status", "completed") : q.neq("status", "completed");
+      const { data, error } = await q;
+      if (error) throw error;
+      const sum = {
+        stages_overdue: 0,
+        stages_no_response: 0,
+        stages_on_review: 0,
+        stages_no_executor: 0,
+        requests_new: 0,
+        requests_overdue: 0,
+        count: 0,
+      };
+      for (const r of data ?? []) {
+        sum.count += 1;
+        sum.stages_overdue += num(r.stages_overdue);
+        sum.stages_no_response += num(r.stages_no_response);
+        sum.stages_on_review += num(r.stages_on_review);
+        sum.stages_no_executor += num(r.stages_no_executor);
+        sum.requests_new += num(r.requests_new);
+        sum.requests_overdue += num(r.requests_overdue);
+      }
+      return sum;
     },
   });
 }

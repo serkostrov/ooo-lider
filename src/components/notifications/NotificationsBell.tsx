@@ -20,8 +20,8 @@ export function NotificationsBell({
 }) {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
-  const { items, isLoading, markAllSeen, markSeen } = useOverdueNotifications();
-  const count = items.length;
+  const { items, unseenCount, isLoading, markAllSeen, markSeen } = useOverdueNotifications();
+  const count = unseenCount;
   const tip = count > 0 ? `Уведомления · ${count}` : "Уведомления";
   const badge = count > 9 ? "9+" : String(count);
 
