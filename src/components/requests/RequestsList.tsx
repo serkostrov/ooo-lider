@@ -485,20 +485,38 @@ export function RequestsList({
           fillHeight && "min-h-0 flex-1",
         )}
       >
-        {/* Фиксированная ширина (не w-full): иначе table-fixed сжимает колонки и пропадает гориз. скролл */}
+        {/* w-full на широких, min-w — пол не даёт сжимать колонки (гориз. скролл) */}
         <table
-          className={cn("table-fixed text-sm", showObject ? "w-[1280px]" : "w-[1120px]")}
+          className={cn(
+            "w-full table-fixed text-sm",
+            showObject ? "min-w-[1280px]" : "min-w-[1120px]",
+          )}
         >
           <colgroup>
-            <col style={{ width: "7.5rem" }} />
-            <col style={{ width: "7.5rem" }} />
-            <col style={{ width: "8rem" }} />
-            <col style={{ width: "11rem" }} />
-            {showObject && <col style={{ width: "14rem" }} />}
-            <col style={{ width: showObject ? "16rem" : "20rem" }} />
-            <col style={{ width: "9.5rem" }} />
-            <col style={{ width: "9rem" }} />
-            <col style={{ width: "9rem" }} />
+            {showObject ? (
+              <>
+                <col style={{ width: "7%" }} />
+                <col style={{ width: "8%" }} />
+                <col style={{ width: "8%" }} />
+                <col style={{ width: "11%" }} />
+                <col style={{ width: "14%" }} />
+                <col style={{ width: "18%" }} />
+                <col style={{ width: "12%" }} />
+                <col style={{ width: "11%" }} />
+                <col style={{ width: "11%" }} />
+              </>
+            ) : (
+              <>
+                <col style={{ width: "8%" }} />
+                <col style={{ width: "9%" }} />
+                <col style={{ width: "9%" }} />
+                <col style={{ width: "14%" }} />
+                <col style={{ width: "24%" }} />
+                <col style={{ width: "12%" }} />
+                <col style={{ width: "12%" }} />
+                <col style={{ width: "12%" }} />
+              </>
+            )}
           </colgroup>
           <thead className="sticky top-0 z-10 border-b border-border bg-card shadow-[0_1px_0_0_var(--border)]">
             <tr>
