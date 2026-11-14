@@ -1,33 +1,73 @@
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Check, Undo2 } from "lucide-react";
+import { Check, RotateCcw, Undo2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { showError } from "@/lib/format";
 import { formatDateTime } from "@/lib/dates";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useProfile } from "@/lib/profile";
-import { useRequestStatuses, type RequestRow } from "../data";
+import {
+  scenarioRoleForTransition,
+  useRequestTypeScenario,
+} from "@/components/directories/request-types/data";
+import {
+  RequestStatusBadge,
+  useRequestFlowStatuses,
+  useRequestStatuses,
+  type RequestRow,
+  type RequestStatusDef,
+} from "../data";
 
-/** Кто по умолчанию жмёт переход на статус (как в сценарии вида). Админ — все. */
-function canAdvanceStatus(roleCode: string, isAdmin: boolean, toStatus: string) {
+/** Кто жмёт переход: роль из сценария вида, иначе запасной дефолт. Админ — все. */
+function canAdvanceStatus(
+  roleCode: string,
+  isAdmin: boolean,
+  toStatus: string,
+  scenarioRole: string | null,
+) {
   if (isAdmin) return true;
+  if (scenarioRole) return roleCode === scenarioRole;
   if (toStatus === "ready") return roleCode === "foreman" || roleCode === "pto";
   return roleCode === "office";
 }
 
 function useStatusFlow(r: RequestRow) {
-  const statuses = useRequestStatuses();
-  const idx = statuses.findIndex((s) => s.v === r.status);
+  const flow = useRequestFlowStatuses();
+  const all = useRequestStatuses();
+  const onRework = r.status === "rework";
+  // В rework степпер показывает ход до «Готова» (ещё не пройдена заново).
+  const effective = onRework ? "ready" : r.status;
+  const idx = flow.findIndex((s) => s.v === effective);
+  const nextFromFlow = idx >= 0 ? flow[idx + 1] : undefined;
+  const prevFromFlow = idx > 0 ? flow[idx - 1] : undefined;
+  const reworkDef = all.find((s) => s.v === "rework");
+  const readyDef = all.find((s) => s.v === "ready") ?? flow.find((s) => s.v === "ready");
+
+  let next: RequestStatusDef | undefined;
+  let prev: RequestStatusDef | undefined;
+  if (onRework) {
+    next = readyDef
+      ? { ...readyDef, next: readyDef.next || "Готова к отправке" }
+      : undefined;
+    prev = undefined;
+  } else {
+    next = nextFromFlow;
+    // С ready нельзя назад в new — только «На доработку»
+    prev = prevFromFlow && prevFromFlow.v !== "new" ? prevFromFlow : undefined;
+  }
+
   return {
-    statuses,
-    idx,
-    next: statuses[idx + 1],
-    prev: idx > 0 ? statuses[idx - 1] : undefined,
+    flow,
+    idx: onRework ? -1 : idx,
+    next,
+    prev,
+    onRework,
+    reworkDef,
+    canSendToRework: r.status === "ready" || r.status === "sent" || r.status === "accepted",
   };
 }
 
@@ -51,59 +91,64 @@ export function RequestStatusStepper({
   doneByName: string | null;
   className?: string;
 }) {
-  const { statuses, idx } = useStatusFlow(r);
+  const { flow, idx, onRework } = useStatusFlow(r);
   return (
-    <ol
-      className={cn(
-        "flex min-w-0 flex-wrap gap-0.5 rounded-md border border-border bg-muted/40 p-0.5 sm:flex-nowrap",
-        className,
+    <div className={cn("flex min-w-0 flex-col gap-2", className)}>
+      {onRework && (
+        <div className="flex flex-wrap items-center gap-2">
+          <RequestStatusBadge status="rework" />
+          <span className="text-xs text-muted-foreground">Ожидает правок прораба</span>
+        </div>
       )}
-    >
-      {statuses.map((s, i) => {
-        const done = i <= idx;
-        const current = i === idx;
-        // Финал «Исполнена» — зелёный, не «сигнальный» жёлтый текущего шага.
-        const finished = current && r.status === "done";
-        const active = current && !finished;
-        const meta = whenLines(r, s.v, doneByName);
-        return (
-          <li key={s.v} className="min-w-0 flex-1">
-            <div
-              className={cn(
-                "flex h-8 w-full items-center justify-center gap-1 rounded-lg px-1.5 text-[11px] font-medium transition-colors sm:px-2 sm:text-xs",
-                (active || finished) && "bg-card text-foreground",
-                done && !current && "text-foreground/80",
-                !done && !current && "text-muted-foreground",
-              )}
-              title={meta.join(" · ") || undefined}
-            >
-              <span
+      <ol className="flex min-w-0 flex-wrap gap-0.5 rounded-md border border-border bg-muted/40 p-0.5 sm:flex-nowrap">
+        {flow.map((s, i) => {
+          const done = !onRework && i <= idx;
+          const current = !onRework && i === idx;
+          // Финал «Исполнена» — зелёный, не «сигнальный» жёлтый текущего шага.
+          const finished = current && r.status === "done";
+          const active = current && !finished;
+          const meta = whenLines(r, s.v, doneByName);
+          return (
+            <li key={s.v} className="min-w-0 flex-1">
+              <div
                 className={cn(
-                  "inline-flex size-3.5 shrink-0 items-center justify-center rounded-full text-[8px] font-semibold tabular-nums",
-                  active
-                    ? "bg-signal text-[oklch(0.18_0.02_240)]"
-                    : done || finished
-                      ? "bg-success text-success-foreground"
-                      : "bg-muted-foreground/20 text-muted-foreground",
+                  "flex h-8 w-full items-center justify-center gap-1 rounded-lg px-1.5 text-[11px] font-medium transition-colors sm:px-2 sm:text-xs",
+                  (active || finished) && "bg-card text-foreground",
+                  done && !current && "text-foreground/80",
+                  !done && !current && "text-muted-foreground",
+                  onRework && "opacity-70",
                 )}
+                title={meta.join(" · ") || undefined}
               >
-                {done ? <Check className="size-2" strokeWidth={3} /> : i + 1}
-              </span>
-              <span className="truncate">{s.label}</span>
-            </div>
-          </li>
-        );
-      })}
-    </ol>
+                <span
+                  className={cn(
+                    "inline-flex size-3.5 shrink-0 items-center justify-center rounded-full text-[8px] font-semibold tabular-nums",
+                    active
+                      ? "bg-signal text-[oklch(0.18_0.02_240)]"
+                      : done || finished
+                        ? "bg-success text-success-foreground"
+                        : "bg-muted-foreground/20 text-muted-foreground",
+                  )}
+                >
+                  {done ? <Check className="size-2" strokeWidth={3} /> : i + 1}
+                </span>
+                <span className="truncate">{s.label}</span>
+              </div>
+            </li>
+          );
+        })}
+      </ol>
+    </div>
   );
 }
 
-/** Действия смены статуса для sticky-бара. */
+/** Действия смены статуса для sticky-бара. Результат/протокол — в форме, не здесь. */
 export function RequestStatusActions({
   r,
   missingRequired,
   onChanged,
   beforeChange,
+  resultText,
   className,
 }: {
   r: RequestRow;
@@ -111,18 +156,25 @@ export function RequestStatusActions({
   onChanged: () => void;
   /** Сохранить черновик полей до смены статуса (иначе «Отправить» теряет несохранённое). */
   beforeChange?: () => Promise<void>;
+  /** Черновик результата с формы (пишется в result_text при «Исполнено»). */
+  resultText?: string;
   className?: string;
 }) {
   const me = useProfile();
-  const { next, prev } = useStatusFlow(r);
-  const [result, setResult] = useState(r.result_text ?? "");
+  const { next, prev, onRework, canSendToRework, reworkDef } = useStatusFlow(r);
+  const { data: scenario = [] } = useRequestTypeScenario(r.request_type_id);
+  const scenarioRole = next ? scenarioRoleForTransition(scenario, next.v) : null;
   const [back, setBack] = useState(false);
+  const [reworkOpen, setReworkOpen] = useState(false);
   const [reason, setReason] = useState("");
-  // Обязательные поля — до «Готова» и до «Отправлена».
-  const blockedByFields =
-    missingRequired.length > 0 && (next?.v === "ready" || next?.v === "sent");
-  const canNext = !!next && canAdvanceStatus(me.role_code, me.is_admin, next.v);
-  const canBack = !!prev && (me.is_admin || me.role_code === "office" || me.role_code === "foreman" || me.role_code === "pto");
+  // Обязательные поля шага (сценарий) — блокируют следующий переход.
+  const blockedByFields = missingRequired.length > 0 && !!next;
+  const canNext = !!next && canAdvanceStatus(me.role_code, me.is_admin, next.v, scenarioRole);
+  const canBack =
+    !!prev &&
+    !onRework &&
+    (me.is_admin || me.role_code === "office" || me.role_code === "foreman" || me.role_code === "pto");
+  const canRework = canSendToRework && (me.is_admin || me.role_code === "office");
 
   const m = useMutation({
     mutationFn: async ({ to, comment }: { to: string; comment?: string }) => {
@@ -137,8 +189,11 @@ export function RequestStatusActions({
       return to;
     },
     onSuccess: (to) => {
-      toast.success(to === "done" ? "Заявка исполнена" : "Статус изменён");
+      toast.success(
+        to === "done" ? "Заявка исполнена" : to === "rework" ? "Отправлена на доработку" : "Статус изменён",
+      );
       setBack(false);
+      setReworkOpen(false);
       setReason("");
       onChanged();
     },
@@ -151,12 +206,11 @@ export function RequestStatusActions({
         <span className="inline-flex items-center gap-1.5 font-medium text-success">
           <Check className="size-4" /> Исполнена
         </span>
-        {r.result_text && <span className="text-muted-foreground">Результат: {r.result_text}</span>}
       </div>
     );
   }
 
-  if (!canNext && !canBack) {
+  if (!canNext && !canBack && !canRework) {
     return (
       <p className={cn("text-sm text-muted-foreground", className)}>
         Смену статуса выполняют роли сценария этого вида заявки.
@@ -164,38 +218,48 @@ export function RequestStatusActions({
     );
   }
 
+  const doneComment = (resultText ?? r.result_text ?? "").trim();
+
   return (
     <div className={cn("flex flex-nowrap items-center gap-2", className)}>
+      {canRework && (
+        <Button
+          variant="outline"
+          onClick={() => {
+            setReason("");
+            setReworkOpen(true);
+          }}
+          className="h-9 shrink-0 gap-1.5 text-sm text-warning hover:text-warning"
+        >
+          <RotateCcw className="size-3.5" />
+          {reworkDef?.next || "На доработку"}
+        </Button>
+      )}
       {canBack && prev && (
         <Button
           variant="ghost"
-          onClick={() => setBack(true)}
+          onClick={() => {
+            setReason("");
+            setBack(true);
+          }}
           className="h-9 shrink-0 text-sm text-muted-foreground"
         >
           <Undo2 className="size-4" /> Назад («{prev.label}»)
         </Button>
-      )}
-      {canNext && next?.v === "done" && (
-        <Input
-          value={result}
-          onChange={(e) => setResult(e.target.value)}
-          placeholder="Результат / номер протокола"
-          className="h-9 w-52 shrink-0 text-sm sm:w-64"
-        />
       )}
       {canNext && next && (
         <Button
           onClick={() =>
             m.mutate({
               to: next.v,
-              ...(next.v === "done" && result.trim() ? { comment: result.trim() } : {}),
+              ...(next.v === "done" && doneComment ? { comment: doneComment } : {}),
             })
           }
           disabled={m.isPending || blockedByFields}
           title={blockedByFields ? `Сначала заполните: ${missingRequired.join(", ")}` : undefined}
           className="h-9 shrink-0 bg-success px-4 text-sm text-success-foreground shadow-none hover:bg-success/90"
         >
-          {next.next}
+          {onRework ? "Готова к отправке" : next.next || next.label}
         </Button>
       )}
 
@@ -228,6 +292,50 @@ export function RequestStatusActions({
                 Вернуть
               </Button>
               <Button type="button" variant="outline" onClick={() => setBack(false)} className="h-9 flex-1 text-sm">
+                Отмена
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={reworkOpen} onOpenChange={setReworkOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="text-base">Отправить на доработку</DialogTitle>
+          </DialogHeader>
+          <form
+            className="space-y-4"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (!reason.trim()) {
+                toast.error("Укажите, что нужно доработать");
+                return;
+              }
+              m.mutate({ to: "rework", comment: reason.trim() });
+            }}
+          >
+            <p className="text-sm text-muted-foreground">
+              Прораб увидит замечание, внесёт правки и снова отправит заявку.
+            </p>
+            <Textarea
+              autoFocus
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="Что исправить — обязательно"
+              rows={3}
+              className="text-sm"
+            />
+            <div className="flex gap-3">
+              <Button type="submit" disabled={m.isPending} className="h-9 flex-1 text-sm">
+                На доработку
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setReworkOpen(false)}
+                className="h-9 flex-1 text-sm"
+              >
                 Отмена
               </Button>
             </div>

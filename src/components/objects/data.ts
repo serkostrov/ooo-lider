@@ -104,14 +104,44 @@ export const OBJECT_STATUSES = [
   { v: "completed", label: "Завершён (архив)" },
 ] as const;
 
-/** Роли участников объекта (ТЗ 7.3, шаг 2). */
+/** Роли участников объекта (ТЗ 7.3, шаг 2) — порядок групп в UI. */
 export const MEMBER_ROLES = [
   { code: "director", label: "Руководитель" },
   { code: "pto", label: "Инженер ПТО" },
   { code: "foreman", label: "Прораб" },
   { code: "supply", label: "Снабжение" },
   { code: "office", label: "Офис-менеджер" },
+  { code: "estimator", label: "Сметчик" },
+  { code: "brigadier", label: "Бригадир" },
 ] as const;
+
+export type RoleForMembers = {
+  code: string;
+  name: string;
+  is_admin: boolean;
+  required_on_object_create: boolean;
+  sort: number;
+};
+
+/** Роли из справочника: обязательность при создании объекта. */
+export function useRolesForMembers() {
+  return useQuery({
+    queryKey: ["roles-for-members"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("roles")
+        .select("code, name, is_admin, required_on_object_create, sort")
+        .order("sort");
+      if (error) throw error;
+      return (data ?? []) as RoleForMembers[];
+    },
+  });
+}
+
+/** Коды ролей с флагом «обязательна при создании объекта». */
+export function requiredRoleCodes(roles: RoleForMembers[]): string[] {
+  return roles.filter((r) => r.required_on_object_create).map((r) => r.code);
+}
 
 export const statusLabel = (v: string | null | undefined) => OBJECT_STATUSES.find((t) => t.v === v)?.label ?? "";
 

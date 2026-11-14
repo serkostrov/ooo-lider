@@ -30,6 +30,8 @@ import { InfiniteScrollSentinel } from "@/components/InfiniteScrollSentinel";
 import { PageFrame } from "@/components/PageFrame";
 import { PageHeader } from "@/components/PageHeader";
 import { SortableTh } from "@/components/SortableTh";
+import { TableColgroup } from "@/components/TableColgroup";
+import { useTableColumnWidths, type ColumnWidthDef } from "@/lib/table-column-widths";
 import {
   OBJECT_STATUSES,
   contractTone,
@@ -45,6 +47,17 @@ import {
 
 type ViewMode = "table" | "cards";
 const VIEW_KEY = "lider.objects.view";
+
+const OBJECT_COLUMNS: ColumnWidthDef[] = [
+  { id: "name", defaultWidth: 260, minWidth: 120 },
+  { id: "address", defaultWidth: 200, minWidth: 100 },
+  { id: "customer", defaultWidth: 180, minWidth: 100 },
+  { id: "type", defaultWidth: 88, minWidth: 64, maxWidth: 140 },
+  { id: "responsible", defaultWidth: 160, minWidth: 100 },
+  { id: "stage", defaultWidth: 180, minWidth: 100 },
+  { id: "progress", defaultWidth: 120, minWidth: 90, maxWidth: 180 },
+  { id: "contract", defaultWidth: 120, minWidth: 90, maxWidth: 180 },
+];
 
 function useObjectsView(): [ViewMode, (v: ViewMode) => void] {
   const [view, setView] = useState<ViewMode>(() => {
@@ -126,6 +139,10 @@ function ObjectsPage() {
   const [archive, setArchive] = useState(false);
   const [problem, setProblem] = useState<ObjectProblemFilter>("all");
   const [view, setView] = useObjectsView();
+  const { widths: colWidths, totalWidth: colsTotal, resizeProps } = useTableColumnWidths(
+    "objects",
+    OBJECT_COLUMNS,
+  );
 
   const listFilters: ObjectListFilters = useMemo(
     () => ({
@@ -364,31 +381,42 @@ function ObjectsPage() {
           ref={scrollRef}
           className="max-h-full min-h-0 overflow-auto rounded-xl border border-border/70 bg-card shadow-[var(--surface-glow)] backdrop-blur-[2px]"
         >
-          <Table className="w-full table-fixed text-sm" containerClassName="max-h-none overflow-visible">
+          <Table
+            className="w-full table-fixed text-sm"
+            style={{ minWidth: colsTotal }}
+            containerClassName="max-h-none overflow-visible"
+          >
+            <TableColgroup columns={OBJECT_COLUMNS} widths={colWidths} />
             <TableHeader>
               <TableRow>
-                <SortableTh as="table" column="name" sort={sort} onToggle={toggle} className="w-[24%]">
+                <SortableTh as="table" column="name" sort={sort} onToggle={toggle} resize={resizeProps("name")}>
                   Наименование
                 </SortableTh>
-                <SortableTh as="table" column="address" sort={sort} onToggle={toggle} className="w-[16%]">
+                <SortableTh as="table" column="address" sort={sort} onToggle={toggle} resize={resizeProps("address")}>
                   Адрес
                 </SortableTh>
-                <SortableTh as="table" column="customer" sort={sort} onToggle={toggle} className="w-[14%]">
+                <SortableTh as="table" column="customer" sort={sort} onToggle={toggle} resize={resizeProps("customer")}>
                   Заказчик
                 </SortableTh>
-                <SortableTh as="table" column="type" sort={sort} onToggle={toggle} className="w-[8%]">
+                <SortableTh as="table" column="type" sort={sort} onToggle={toggle} resize={resizeProps("type")}>
                   Тип
                 </SortableTh>
-                <SortableTh as="table" column="responsible" sort={sort} onToggle={toggle} className="w-[12%]">
+                <SortableTh
+                  as="table"
+                  column="responsible"
+                  sort={sort}
+                  onToggle={toggle}
+                  resize={resizeProps("responsible")}
+                >
                   Ответственный
                 </SortableTh>
-                <SortableTh as="table" column="stage" sort={sort} onToggle={toggle} className="w-[14%]">
+                <SortableTh as="table" column="stage" sort={sort} onToggle={toggle} resize={resizeProps("stage")}>
                   Текущий этап
                 </SortableTh>
-                <SortableTh as="table" column="progress" sort={sort} onToggle={toggle} className="w-[10%]">
+                <SortableTh as="table" column="progress" sort={sort} onToggle={toggle} resize={resizeProps("progress")}>
                   Готовность
                 </SortableTh>
-                <SortableTh as="table" column="contract" sort={sort} onToggle={toggle} className="w-[10%]">
+                <SortableTh as="table" column="contract" sort={sort} onToggle={toggle} resize={resizeProps("contract")}>
                   Окончание
                 </SortableTh>
               </TableRow>

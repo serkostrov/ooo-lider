@@ -15,7 +15,15 @@ import { ReorderModeButton } from "./ReorderModeButton";
 import { nextSort, slugCode, uniqueCode, validateRole } from "./rules";
 
 const KEY = ["dir-roles"] as const;
-type Role = { code: string; name: string; is_admin: boolean; sort: number };
+const ROLES_FOR_MEMBERS_KEY = ["roles-for-members"] as const;
+
+type Role = {
+  code: string;
+  name: string;
+  is_admin: boolean;
+  required_on_object_create: boolean;
+  sort: number;
+};
 
 /** Справочник ролей (§3.15): можно добавить роль без доработки кода. */
 export function RolesDirectory() {
@@ -27,7 +35,10 @@ export function RolesDirectory() {
   const { data = [], isLoading } = useQuery({
     queryKey: KEY,
     queryFn: async () => {
-      const { data, error } = await supabase.from("roles").select("code, name, is_admin, sort").order("sort");
+      const { data, error } = await supabase
+        .from("roles")
+        .select("code, name, is_admin, required_on_object_create, sort")
+        .order("sort");
       if (error) throw error;
       return data as Role[];
     },
@@ -60,7 +71,7 @@ export function RolesDirectory() {
   return (
     <div className="w-full">
       <p className="mb-3 text-sm text-muted-foreground">
-        Можно править название и признак полного доступа. Системные роли удалить нельзя.
+        Можно править название, полный доступ и обязательность при создании объекта. Системные роли удалить нельзя.
         {is_admin && search.trim() ? " Сбросьте поиск, чтобы менять порядок." : null}
       </p>
       <Toolbar search={search} onSearch={setSearch} onAdd={is_admin ? () => setEditing("new") : undefined}>
@@ -78,6 +89,7 @@ export function RolesDirectory() {
             <TableRow>
               <TableHead>Название</TableHead>
               <TableHead>Полный доступ</TableHead>
+              <TableHead>Обязательна при создании объекта</TableHead>
               {handles && <TableHead className={REORDER_ACTIONS_W} />}
             </TableRow>
           </TableHeader>
@@ -87,9 +99,9 @@ export function RolesDirectory() {
             onReorder={applyOrder}
           >
             {isLoading ? (
-              <DirectoryTableSkeleton cols={2} withActions={handles} />
+              <DirectoryTableSkeleton cols={3} withActions={handles} />
             ) : filtered.length === 0 ? (
-              <EmptyRow cols={handles ? 3 : 2} />
+              <EmptyRow cols={handles ? 4 : 3} />
             ) : (
               filtered.map((r) => (
                 <SortableTableRow
@@ -99,8 +111,16 @@ export function RolesDirectory() {
                   className={is_admin ? "cursor-pointer" : ""}
                   onClick={() => is_admin && setEditing(r)}
                 >
-                  <TableCell className="font-medium">{r.name}</TableCell>
+                  <TableCell className="font-medium">
+                    {r.name}
+                    {r.required_on_object_create ? (
+                      <span className="ml-1 text-destructive" title="Обязательна при создании объекта">
+                        *
+                      </span>
+                    ) : null}
+                  </TableCell>
                   <TableCell>{r.is_admin ? "Да" : "Нет"}</TableCell>
+                  <TableCell>{r.required_on_object_create ? "Да" : "Нет"}</TableCell>
                 </SortableTableRow>
               ))
             )}
@@ -137,6 +157,7 @@ function RoleForm({
   const qc = useQueryClient();
   const [name, setName] = useState(role?.name ?? "");
   const [isAdmin, setIsAdmin] = useState(role?.is_admin ?? false);
+  const [requiredOnCreate, setRequiredOnCreate] = useState(role?.required_on_object_create ?? false);
 
   const m = useMutation({
     mutationFn: async () => {
@@ -146,7 +167,11 @@ function RoleForm({
       if (role) {
         const { error } = await supabase
           .from("roles")
-          .update({ name: n, is_admin: isAdmin })
+          .update({
+            name: n,
+            is_admin: isAdmin,
+            required_on_object_create: requiredOnCreate,
+          })
           .eq("code", role.code);
         if (error) throw error;
       } else {
@@ -154,15 +179,20 @@ function RoleForm({
           slugCode(n, "role"),
           existing.map((r) => r.code),
         );
-        const { error } = await supabase
-          .from("roles")
-          .insert({ code: c, name: n, is_admin: isAdmin, sort: nextSort(existing) });
+        const { error } = await supabase.from("roles").insert({
+          code: c,
+          name: n,
+          is_admin: isAdmin,
+          required_on_object_create: requiredOnCreate,
+          sort: nextSort(existing),
+        });
         if (error) throw error;
       }
     },
     onSuccess: () => {
       toast.success("Сохранено");
       qc.invalidateQueries({ queryKey: KEY });
+      qc.invalidateQueries({ queryKey: ROLES_FOR_MEMBERS_KEY });
       onClose();
     },
     onError: showError,
@@ -182,6 +212,19 @@ function RoleForm({
       <label className="flex items-center gap-3 text-sm">
         <Switch checked={isAdmin} onCheckedChange={setIsAdmin} />
         Полный доступ (как администратор / руководитель)
+      </label>
+      <label className="flex items-start gap-3 text-sm">
+        <Switch
+          checked={requiredOnCreate}
+          onCheckedChange={setRequiredOnCreate}
+          className="mt-0.5"
+        />
+        <span>
+          Обязательна при создании объекта
+          <span className="mt-0.5 block text-xs text-muted-foreground">
+            На шаге «Участники» будет звёздочка; без участника с этой ролью объект не создать
+          </span>
+        </span>
       </label>
       <FormActions onCancel={onClose} pending={m.isPending} />
     </form>

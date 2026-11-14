@@ -7,6 +7,10 @@ export type ObjectStage = {
   id: string;
   object_id: string;
   template_id: string | null;
+  parent_id: string | null;
+  code: string;
+  parent_code: string | null;
+  parent_name: string | null;
   number: number;
   name: string;
   work_type_id: string | null;
@@ -69,6 +73,10 @@ const n = (v: unknown) => (v === null || v === undefined ? 0 : Number(v));
 const normalize = (r: Record<string, unknown>) =>
   ({
     ...(r as unknown as ObjectStage),
+    parent_id: (r["parent_id"] as string | null | undefined) ?? null,
+    code: String(r["code"] ?? r["number"] ?? ""),
+    parent_code: (r["parent_code"] as string | null | undefined) ?? null,
+    parent_name: (r["parent_name"] as string | null | undefined) ?? null,
     conditions_total: n(r["conditions_total"]),
     conditions_done: n(r["conditions_done"]),
     is_overdue: !!r["is_overdue"],
@@ -106,6 +114,23 @@ export function useStage(stageId: string) {
       const { data, error } = await supabase.from("v_object_stages").select("*").eq("id", stageId).maybeSingle();
       if (error) throw error;
       return data ? normalize(data as Record<string, unknown>) : null;
+    },
+  });
+}
+
+/** Короткие данные этапов по id (для списка заявок без objectId). */
+export function useStagesByIds(ids: string[]) {
+  const key = [...ids].sort().join(",");
+  return useQuery({
+    queryKey: ["stages-by-ids", key],
+    enabled: ids.length > 0,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("v_object_stages")
+        .select("id, object_id, code, number, name, parent_id, parent_code, parent_name")
+        .in("id", ids);
+      if (error) throw error;
+      return (data ?? []).map((r) => normalize(r as Record<string, unknown>));
     },
   });
 }

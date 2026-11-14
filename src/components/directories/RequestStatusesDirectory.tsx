@@ -8,7 +8,12 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { TableCell } from "@/components/ui/table";
 import { ToneBadge } from "@/components/ToneBadge";
-import { REQUEST_STATUSES_KEY, useRequestStatuses, type RequestStatusDef } from "@/components/requests/data";
+import {
+  REQUEST_FLOW_STATUSES,
+  REQUEST_STATUSES_KEY,
+  useRequestStatuses,
+  type RequestStatusDef,
+} from "@/components/requests/data";
 import { ColorField, ColorSwatch, EditSheet, Field, FormActions, isHexColor } from "./common";
 import { StatusDirectoryShell } from "./status-directory-shared";
 import { SortableTableRow } from "./SortableTableRows";
@@ -21,15 +26,17 @@ import { validateRequestStatus } from "./rules";
 export function RequestStatusesDirectory() {
   const { is_admin } = useProfile();
   const statuses = useRequestStatuses();
-  const [editing, setEditing] = useState<{ s: RequestStatusDef; i: number } | null>(null);
+  const flow = statuses.filter((s) => REQUEST_FLOW_STATUSES.includes(s.v));
+  const side = statuses.filter((s) => !REQUEST_FLOW_STATUSES.includes(s.v));
+  const [editing, setEditing] = useState<{ s: RequestStatusDef; i: number; side?: boolean } | null>(null);
 
   return (
     <>
       <StatusDirectoryShell
         title="Статусы заявок"
-        hint="Шаги «Хода заявки» идут в фиксированном порядке: Новая → Готова к отправке → Отправлена → Принята заказчиком → Исполнена. Можно поменять название, текст кнопки и цвет. Порядок менять нельзя — от него зависит создание заявки и переходы."
+        hint="Ход: Новая → Готова к отправке → Отправлена → Принята → Исполнена. «Требует доработки» — боковая ветка: офис возвращает прорабу, тот снова отдаёт в «Готова». Можно поменять название, текст кнопки и цвет."
       >
-        {statuses.map((s, i) => (
+        {flow.map((s, i) => (
           <SortableTableRow
             key={s.v}
             id={String(s.v)}
@@ -49,15 +56,46 @@ export function RequestStatusesDirectory() {
             </TableCell>
           </SortableTableRow>
         ))}
+        {side.map((s) => (
+          <SortableTableRow
+            key={s.v}
+            id={String(s.v)}
+            disabled
+            className={is_admin ? "cursor-pointer" : ""}
+            onClick={() => is_admin && setEditing({ s, i: 0, side: true })}
+          >
+            <TableCell className="text-muted-foreground">—</TableCell>
+            <TableCell>
+              <ToneBadge color={s.color}>{s.label}</ToneBadge>
+            </TableCell>
+            <TableCell className="max-w-[18rem] truncate text-muted-foreground">
+              боковая ветка · кнопка «{s.next}»
+            </TableCell>
+            <TableCell>
+              <ColorSwatch color={s.color} />
+            </TableCell>
+          </SortableTableRow>
+        ))}
       </StatusDirectoryShell>
 
       <EditSheet
         open={!!editing}
         onOpenChange={(o) => !o && setEditing(null)}
-        title={editing ? `Статус заявки · шаг ${editing.i + 1}` : "Статус заявки"}
+        title={
+          editing
+            ? editing.side
+              ? `Статус заявки · ${editing.s.label}`
+              : `Статус заявки · шаг ${editing.i + 1}`
+            : "Статус заявки"
+        }
       >
         {editing && (
-          <StatusForm key={editing.s.v} s={editing.s} first={editing.i === 0} onClose={() => setEditing(null)} />
+          <StatusForm
+            key={editing.s.v}
+            s={editing.s}
+            first={!editing.side && editing.i === 0}
+            onClose={() => setEditing(null)}
+          />
         )}
       </EditSheet>
     </>

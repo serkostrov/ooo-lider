@@ -544,6 +544,7 @@ export type Database = {
         Row: {
           closed_at: string | null
           closed_by: string | null
+          code: string
           coexecutor_id: string | null
           confirmer_id: string | null
           confirmer_role: string | null
@@ -564,6 +565,7 @@ export type Database = {
           object_id: string
           out_of_order: boolean
           outgoing_doc: string | null
+          parent_id: string | null
           remind_days: number | null
           response_days: number | null
           response_due: string | null
@@ -579,6 +581,7 @@ export type Database = {
         Insert: {
           closed_at?: string | null
           closed_by?: string | null
+          code?: string
           coexecutor_id?: string | null
           confirmer_id?: string | null
           confirmer_role?: string | null
@@ -599,6 +602,7 @@ export type Database = {
           object_id: string
           out_of_order?: boolean
           outgoing_doc?: string | null
+          parent_id?: string | null
           remind_days?: number | null
           response_days?: number | null
           response_due?: string | null
@@ -614,6 +618,7 @@ export type Database = {
         Update: {
           closed_at?: string | null
           closed_by?: string | null
+          code?: string
           coexecutor_id?: string | null
           confirmer_id?: string | null
           confirmer_role?: string | null
@@ -634,6 +639,7 @@ export type Database = {
           object_id?: string
           out_of_order?: boolean
           outgoing_doc?: string | null
+          parent_id?: string | null
           remind_days?: number | null
           response_days?: number | null
           response_due?: string | null
@@ -1360,18 +1366,21 @@ export type Database = {
           code: string
           is_admin: boolean
           name: string
+          required_on_object_create: boolean
           sort: number
         }
         Insert: {
           code: string
           is_admin?: boolean
           name: string
+          required_on_object_create?: boolean
           sort?: number
         }
         Update: {
           code?: string
           is_admin?: boolean
           name?: string
+          required_on_object_create?: boolean
           sort?: number
         }
         Relationships: []
@@ -1695,6 +1704,7 @@ export type Database = {
         Row: {
           closed_at: string | null
           closed_by: string | null
+          code: string | null
           coexecutor_id: string | null
           coexecutor_name: string | null
           conditions_done: number | null
@@ -1729,6 +1739,9 @@ export type Database = {
           object_id: string | null
           out_of_order: boolean | null
           outgoing_doc: string | null
+          parent_code: string | null
+          parent_id: string | null
+          parent_name: string | null
           remind_days: number | null
           response_days: number | null
           response_due: string | null
@@ -1981,6 +1994,18 @@ export type Database = {
         Args: { p_object_id: string; p_template_ids: string[] }
         Returns: number
       }
+      add_object_substage: {
+        Args: {
+          p_parent_id: string
+          p_name: string
+          p_description?: string
+          p_executor_id?: string
+          p_duration_days?: number
+          p_confirmer_role?: string
+          p_work_type_id?: string
+        }
+        Returns: string
+      }
       can_see_object: { Args: { p_object_id: string }; Returns: boolean }
       create_object: {
         Args: {
@@ -1991,6 +2016,7 @@ export type Database = {
         Returns: string
       }
       current_profile_id: { Args: never; Returns: string }
+      delete_object_stage: { Args: { p_stage_id: string }; Returns: undefined }
       is_admin: { Args: never; Returns: boolean }
       log_history: {
         Args: {
@@ -2004,6 +2030,10 @@ export type Database = {
         Returns: undefined
       }
       msk_today: { Args: never; Returns: string }
+      reorder_object_stages: {
+        Args: { p_object_id: string; p_ordered_ids: string[] }
+        Returns: undefined
+      }
       request_create: {
         Args: {
           p_call_date: string

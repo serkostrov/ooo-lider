@@ -24,8 +24,8 @@ export function RequestHeader({
 }) {
   const { data: objectRequests = [] } = useRequests(r.object_id);
   const { data: stages = [] } = useObjectStages(r.object_id);
-  const stageNumberById = Object.fromEntries(stages.map((s) => [s.id, s.number]));
-  const stageNo = stageCallLabel(r, objectRequests, stageNumberById);
+  const stageCodeById = Object.fromEntries(stages.map((s) => [s.id, s.code || String(s.number)]));
+  const stageNo = stageCallLabel(r, objectRequests, stageCodeById);
 
   return (
     <header className="flex flex-col gap-3 lg:flex-row lg:items-stretch lg:justify-between lg:gap-6">
@@ -37,7 +37,7 @@ export function RequestHeader({
             </span>{" "}
             {r.type_name}
           </h1>
-          {r.is_new ? (
+          {r.is_new && r.status === "new" ? (
             <span className="rounded-md bg-danger px-2 py-0.5 text-xs font-semibold text-danger-foreground">
               Новая
             </span>
@@ -105,8 +105,8 @@ function StageLink({ objectId, stageId }: { objectId: string; stageId: string })
     queryKey: ["stage-short", stageId],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("object_stages")
-        .select("number, name")
+        .from("v_object_stages")
+        .select("code, number, name, parent_code, parent_name, parent_id")
         .eq("id", stageId)
         .maybeSingle();
       if (error) throw error;
@@ -114,6 +114,11 @@ function StageLink({ objectId, stageId }: { objectId: string; stageId: string })
     },
   });
   if (!data) return null;
+  const code = data.code || String(data.number);
+  const parent =
+    data.parent_id && (data.parent_code || data.parent_name)
+      ? ` · этап ${[data.parent_code, data.parent_name].filter(Boolean).join(" ")}`
+      : "";
   return (
     <p className="text-muted-foreground">
       Этап:{" "}
@@ -122,8 +127,9 @@ function StageLink({ objectId, stageId }: { objectId: string; stageId: string })
         params={{ id: objectId, stageId }}
         className="text-foreground transition-colors hover:text-primary"
       >
-        {data.number}. {data.name}
+        {code}. {data.name}
       </Link>
+      {parent}
     </p>
   );
 }

@@ -7,7 +7,14 @@ import { supabase } from "@/integrations/supabase/client";
 import { showError } from "@/lib/format";
 import { listFiles } from "@/lib/files";
 import { Button } from "@/components/ui/button";
-import { useRequestFields } from "@/components/directories/request-types/data";
+import { Input } from "@/components/ui/input";
+import { Field } from "@/components/directories/common";
+import {
+  nextRequestStatus,
+  requiredFieldIdsForTransition,
+  useRequestFields,
+  useRequestTypeScenario,
+} from "@/components/directories/request-types/data";
 import { useActiveProfiles } from "@/components/objects/data";
 import { HistoryFeed } from "@/components/history/HistoryFeed";
 import { FileList, UploadButton } from "@/components/stages/page/FileButtons";
@@ -27,7 +34,7 @@ import { RequestStatusActions, RequestStatusStepper } from "@/components/request
 import { RequestComments, commentsQuery } from "@/components/requests/card/RequestComments";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
-import { tabsListClass, tabTriggerClass } from "@/lib/ui";
+import { fieldLabelClass, fieldStackClass, panelClass, tabsListClass, tabTriggerClass } from "@/lib/ui";
 import { useProfile } from "@/lib/profile";
 
 /** Основная работа + вторичные вкладки. Старые tab=initiator|office|files → work. */
@@ -87,6 +94,7 @@ function RequestCard() {
     },
   });
   const { data: fields = [] } = useRequestFields(r?.request_type_id);
+  const { data: scenario = [] } = useRequestTypeScenario(r?.request_type_id);
   const { data: profiles = [] } = useActiveProfiles();
 
   const initiatorRef = useRef<RequestFieldsHandle>(null);
@@ -96,6 +104,7 @@ function RequestCard() {
   const [dirtyOffice, setDirtyOffice] = useState(false);
   const [draftRev, setDraftRev] = useState(0);
   const [saving, setSaving] = useState(false);
+  const [resultText, setResultText] = useState("");
   const dirty = dirtyInitiator || dirtyOffice;
 
   useEffect(() => {
@@ -103,6 +112,10 @@ function RequestCard() {
     setDirtyInitiator(false);
     setDirtyOffice(false);
   }, [requestId]);
+
+  useEffect(() => {
+    setResultText(r?.result_text ?? "");
+  }, [r?.id, r?.result_text]);
 
   const onDirtyInitiator = useCallback((d: boolean) => setDirtyInitiator(d), []);
   const onDirtyOffice = useCallback((d: boolean) => setDirtyOffice(d), []);
@@ -190,25 +203,24 @@ function RequestCard() {
     if (looksLikeEmailField(f) && (typeof raw !== "string" || !isValidEmail(raw))) return true;
     return false;
   };
-  // До «Готова к отправке» обязательны поля прораба. До «Отправлена» — ещё и офиса.
-  const requiredNow =
-    r.status === "new"
-      ? active.filter((f) => f.is_required && f.filled_by === "initiator")
-      : r.status === "ready"
-        ? active.filter((f) => f.is_required)
-        : [];
+  // Обязательные для следующего перехода: сценарий шага + глобальный is_required (как в RPC).
+  const toStatus = nextRequestStatus(r.status);
+  const requiredIds = toStatus
+    ? requiredFieldIdsForTransition(scenario, active, toStatus)
+    : new Set<string>();
+  const requiredNow = active.filter((f) => requiredIds.has(f.id));
   const missingRequired = requiredNow.filter(isMissing).map((f) => f.label);
   const orphan = values.filter((v) => !activeIds.has(v.field_id) && v.field_type !== "file");
   const doneByName = r.done_by ? profiles.find((p) => p.id === r.done_by)?.full_name ?? null : null;
-  // Админ — всё в окне статуса; прораб/ПТО — поля initiator на «Новая»; офис — office до отправки.
+  // Прораб/ПТО (и админ) — initiator на «Новая»/доработке; офис (и админ) — office только на «Готова».
   const isInitiatorRole = me.role_code === "foreman" || me.role_code === "pto";
   const isOfficeRole = me.role_code === "office";
-  const statusAllowsInitiator = r.status === "new";
-  const statusAllowsOffice = r.status === "new" || r.status === "ready";
+  const statusAllowsInitiator = r.status === "new" || r.status === "rework";
+  const statusAllowsOffice = r.status === "ready";
   const canEditInitiator = (me.is_admin || isInitiatorRole) && statusAllowsInitiator;
   const canEditOffice = (me.is_admin || isOfficeRole) && statusAllowsOffice;
   const canEditFiles =
-    (me.is_admin && statusAllowsOffice) ||
+    (me.is_admin && (statusAllowsInitiator || statusAllowsOffice)) ||
     (isInitiatorRole && statusAllowsInitiator) ||
     (isOfficeRole && statusAllowsOffice);
   const canEditAnything = canEditInitiator || canEditOffice || canEditFiles;
@@ -230,12 +242,20 @@ function RequestCard() {
     ? "Зафиксированы после «Готова к отправке»."
     : !canEditInitiator
       ? "Заполняет прораб или ПТО."
-      : "Заполните и переведите заявку дальше.";
-  const officeHint = !statusAllowsOffice
-    ? "Зафиксированы после отправки заявки."
-    : !canEditOffice
-      ? "Заполняет офис-менеджер перед отправкой."
-      : "Заполняются перед отправкой заявки.";
+      : r.status === "rework"
+        ? "Исправьте замечания и снова отправьте заявку."
+        : "Заполните и переведите заявку дальше.";
+  const officeHint = r.status === "rework"
+    ? "На доработке меняются только данные прораба."
+    : r.status === "new"
+      ? "Заполняет офис-менеджер после «Готова к отправке»."
+      : !statusAllowsOffice
+        ? "Зафиксированы после отправки заявки."
+        : !canEditOffice
+          ? "Заполняет офис-менеджер перед отправкой."
+          : "Заполняются перед отправкой заявки.";
+  /** Результат всегда в форме (как блок офиса); править — только на «Принята» перед «Исполнена». */
+  const resultEditable = r.status === "accepted";
   const count = (n: number) =>
     n > 0 ? (
       <span
@@ -303,6 +323,7 @@ function RequestCard() {
                 values={values}
                 orphanValues={orphan}
                 readOnly={initiatorReadOnly}
+                requiredFieldIds={requiredIds}
                 onDirtyChange={onDirtyInitiator}
                 onDraftChange={onDraftChange}
               />
@@ -318,15 +339,53 @@ function RequestCard() {
                 values={values}
                 orphanValues={[]}
                 readOnly={officeReadOnly}
+                requiredFieldIds={requiredIds}
                 onDirtyChange={onDirtyOffice}
                 onDraftChange={onDraftChange}
               />
             )}
 
+            <section className={cn(panelClass, "p-5 sm:p-6")}>
+              <header className="mb-5">
+                <h2 className="text-base font-semibold tracking-tight">Результат</h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {resultEditable
+                    ? "Укажите результат или номер протокола перед нажатием «Исполнено»."
+                    : r.status === "done"
+                      ? "Зафиксирован при исполнении заявки."
+                      : "Заполняется офисом на шаге «Принята заказчиком» перед «Исполнена»."}
+                </p>
+              </header>
+              {resultEditable ? (
+                <Field label="Результат / номер протокола">
+                  <Input
+                    value={resultText}
+                    onChange={(e) => setResultText(e.target.value)}
+                    placeholder="Например, № протокола"
+                    className="h-9 max-w-md text-sm"
+                  />
+                </Field>
+              ) : (
+                <div className={fieldStackClass}>
+                  <dt className={fieldLabelClass}>Результат / номер протокола</dt>
+                  <dd className="text-sm">
+                    {r.result_text?.trim() ? (
+                      r.result_text
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </dd>
+                </div>
+              )}
+            </section>
+
             <section className="space-y-3 border-t border-border pt-6">
               <div className="flex flex-wrap items-center gap-3">
                 <h2 className="text-base font-semibold tracking-tight">
                   Файлы
+                  {active.some((f) => f.field_type === "file" && requiredIds.has(f.id)) && (
+                    <span className="text-destructive"> *</span>
+                  )}
                   {files.length > 0 && (
                     <span className="ml-1.5 font-normal tabular-nums text-muted-foreground">{files.length}</span>
                   )}
@@ -392,6 +451,7 @@ function RequestCard() {
             <RequestStatusActions
               r={r}
               missingRequired={missingRequired}
+              resultText={resultText}
               beforeChange={() =>
                 editing ? saveAll({ silent: true, keepEditing: true }) : Promise.resolve()
               }

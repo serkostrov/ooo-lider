@@ -1,20 +1,33 @@
 import { useState } from "react";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Archive, ArchiveRestore, ArrowLeft, Plus } from "lucide-react";
+import { Archive, ArchiveRestore, ArrowLeft, Plus, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useProfile } from "@/lib/profile";
 import { showError } from "@/lib/format";
 import { Button } from "@/components/ui/button";
-import { tabsListClass, tabTriggerClass } from "@/lib/ui";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { tabsListClass, tabTriggerClass, thLabelClass } from "@/lib/ui";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { OBJECTS_KEY } from "@/components/objects/data";
+import { OBJECTS_KEY, useActiveProfiles, type ProfileShort } from "@/components/objects/data";
 import { ObjectCardFields, draftToPayload, validateDraft, type ObjectDraft } from "@/components/objects/ObjectCardFields";
 import { MembersPicker } from "@/components/objects/MembersPicker";
 import { StagesPicker, useAvailableTemplates } from "@/components/objects/StagesPicker";
-import { StatusBadge, useObjectStages } from "@/components/stages/data";
+import { ReorderModeButton } from "@/components/directories/ReorderModeButton";
+import { Reorderable } from "@/components/directories/stages/Reorderable";
+import { StatusBadge, useObjectStages, type ObjectStage } from "@/components/stages/data";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/objects_/$id_/edit")({
   component: EditObjectPage,
@@ -83,7 +96,7 @@ function EditObjectPage() {
           <TabsTrigger value="stages" className={tabTriggerClass}>Этапы</TabsTrigger>
         </TabsList>
         <TabsContent value="card">
-          <CardTab id={id} initial={draft} />
+          <CardTab id={id} name={obj.name} initial={draft} />
         </TabsContent>
         <TabsContent value="members">
           <MembersTab id={id} />
@@ -106,7 +119,7 @@ function useInvalidateObject(id: string) {
   };
 }
 
-function CardTab({ id, initial }: { id: string; initial: ObjectDraft }) {
+function CardTab({ id, name, initial }: { id: string; name: string; initial: ObjectDraft }) {
   const [draft, setDraft] = useState(initial);
   const invalidate = useInvalidateObject(id);
 
@@ -139,35 +152,102 @@ function CardTab({ id, initial }: { id: string; initial: ObjectDraft }) {
   return (
     <div className="space-y-5">
       <ObjectCardFields value={draft} onChange={setDraft} showStatus />
-      <div className="flex flex-wrap gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <Button onClick={() => save.mutate(undefined)} disabled={save.isPending} className="h-9 px-5 text-sm">
           {save.isPending ? "Сохранение…" : "Сохранить"}
         </Button>
         {archived ? (
           <Button
             variant="outline"
-            size="icon"
             onClick={() => save.mutate({ status: "in_work" })}
             disabled={save.isPending}
-            title="Вернуть из архива"
-            aria-label="Вернуть из архива"
+            className="h-9 gap-1.5 px-3 text-sm"
           >
             <ArchiveRestore className="size-4" />
+            Вернуть из архива
           </Button>
         ) : (
           <Button
             variant="outline"
-            size="icon"
             onClick={() => save.mutate({ status: "completed" })}
             disabled={save.isPending}
-            title="Завершить и перенести в архив"
-            aria-label="Завершить и перенести в архив"
+            className="h-9 gap-1.5 px-3 text-sm"
           >
             <Archive className="size-4" />
+            В архив
           </Button>
         )}
+        <div className="ml-auto">
+          <DeleteObjectButton id={id} name={name} disabled={save.isPending} />
+        </div>
       </div>
     </div>
+  );
+}
+
+/** Мягкое удаление объекта только после подтверждения в диалоге. */
+function DeleteObjectButton({ id, name, disabled }: { id: string; name: string; disabled?: boolean }) {
+  const qc = useQueryClient();
+  const navigate = useNavigate();
+  const [open, setOpen] = useState(false);
+  const m = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase
+        .from("objects")
+        .update({ deleted_at: new Date().toISOString() })
+        .eq("id", id)
+        .is("deleted_at", null)
+        .select("id")
+        .maybeSingle();
+      if (error) throw error;
+      if (!data) throw new Error("Не удалось удалить объект");
+    },
+    onSuccess: () => {
+      toast.success("Объект удалён");
+      qc.invalidateQueries({ queryKey: OBJECTS_KEY });
+      qc.invalidateQueries({ queryKey: ["object-raw", id] });
+      setOpen(false);
+      void navigate({ to: "/objects" });
+    },
+    onError: showError,
+  });
+
+  return (
+    <>
+      <Button
+        type="button"
+        variant="outline"
+        onClick={() => setOpen(true)}
+        disabled={disabled || m.isPending}
+        className="h-9 gap-1.5 px-3 text-sm text-destructive hover:bg-destructive/10 hover:text-destructive"
+      >
+        <Trash2 className="size-4" />
+        Удалить
+      </Button>
+      <AlertDialog open={open} onOpenChange={setOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-base">Удалить объект?</AlertDialogTitle>
+            <AlertDialogDescription className="text-sm">
+              «{name}» исчезнет из списка и станет недоступен. Для завершения работ лучше перенести объект в архив.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="h-9 text-sm">Отмена</AlertDialogCancel>
+            <AlertDialogAction
+              className="h-9 bg-destructive text-sm text-destructive-foreground hover:bg-destructive/90"
+              onClick={(e) => {
+                e.preventDefault();
+                m.mutate();
+              }}
+              disabled={m.isPending}
+            >
+              {m.isPending ? "Удаление…" : "Удалить"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
 
@@ -210,8 +290,22 @@ function StagesTab({ id }: { id: string }) {
   const invalidate = useInvalidateObject(id);
   const [adding, setAdding] = useState(false);
   const [picked, setPicked] = useState<string[]>([]);
+  const [reordering, setReordering] = useState(false);
   const { data: stages = [], isLoading } = useObjectStages(id);
-  const { templates } = useAvailableTemplates(stages.map((s) => s.template_id).filter((x): x is string => !!x));
+  const { templates } = useAvailableTemplates();
+  const { data: memberIds = [] } = useQuery({
+    queryKey: ["object-members", id],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("object_members").select("profile_id").eq("object_id", id);
+      if (error) throw error;
+      return (data ?? []).map((r) => r.profile_id as string);
+    },
+  });
+  const { data: profiles = [] } = useActiveProfiles();
+  const memberProfiles: ProfileShort[] = profiles.filter((p) => memberIds.includes(p.id));
+
+  const tops = stages.filter((s) => !s.parent_id);
+  const childrenOf = (parentId: string) => stages.filter((s) => s.parent_id === parentId);
 
   const exclude = useMutation({
     mutationFn: async ({ stageId, excluded }: { stageId: string; excluded: boolean }) => {
@@ -223,6 +317,18 @@ function StagesTab({ id }: { id: string }) {
       toast.success(excluded ? "Этап исключён из работы" : "Этап возвращён в работу");
       invalidate();
     },
+    onError: showError,
+  });
+
+  const reorder = useMutation({
+    mutationFn: async (orderedIds: string[]) => {
+      const { error } = await supabase.rpc("reorder_object_stages", {
+        p_object_id: id,
+        p_ordered_ids: orderedIds,
+      });
+      if (error) throw error;
+    },
+    onSuccess: invalidate,
     onError: showError,
   });
 
@@ -245,47 +351,70 @@ function StagesTab({ id }: { id: string }) {
   if (isLoading) return null;
 
   return (
-    <div className="max-w-5xl space-y-4">
+    <div className="w-full space-y-4">
       <div className="flex flex-wrap items-center gap-3">
-        <p className="flex-1 text-sm text-muted-foreground">
-          Исключённый этап не учитывается в готовности и не подсвечивается. Его можно вернуть в любой момент.
+        <p className="min-w-0 flex-1 text-sm text-muted-foreground">
+          {reordering
+            ? "Перетащите этапы за ручку. Номера пересчитаются сами. Один шаблон можно добавить несколько раз."
+            : "Один шаблон можно добавить несколько раз. Исключённый этап не учитывается в готовности."}
         </p>
-        <Button
-          onClick={() => setAdding(true)}
-          size="icon"
-          title="Добавить этапы из справочника"
-          aria-label="Добавить этапы из справочника"
-        >
-          <Plus className="size-4" />
-        </Button>
+        <div className="flex shrink-0 items-center gap-2">
+          {tops.length > 1 && (
+            <ReorderModeButton
+              active={reordering}
+              onChange={setReordering}
+              disabled={reorder.isPending}
+            />
+          )}
+          <Button
+            onClick={() => setAdding(true)}
+            size="icon"
+            title="Добавить этапы из справочника"
+            aria-label="Добавить этапы из справочника"
+          >
+            <Plus className="size-4" />
+          </Button>
+        </div>
       </div>
-      <div className="divide-y overflow-hidden rounded-md border border-border bg-card">
-        {stages.length === 0 && <p className="p-4 text-sm text-muted-foreground">Этапов нет</p>}
-        {stages.map((s) => (
-          <div key={s.id} className={`flex flex-wrap items-center gap-4 px-4 py-2 text-sm ${s.is_excluded ? "bg-muted/50" : ""}`}>
-            <span className="w-8 font-semibold">{s.number}</span>
-            <span className={`flex-1 ${s.is_excluded ? "text-muted-foreground line-through" : ""}`}>{s.name}</span>
-            {!s.is_excluded && (
-              <StatusBadge name={s.status_name} color={s.status_color} />
-            )}
-            <Button
-              variant="outline"
-              className="h-8 text-sm"
-              disabled={exclude.isPending}
-              onClick={() => exclude.mutate({ stageId: s.id, excluded: !s.is_excluded })}
-            >
-              {s.is_excluded ? "Вернуть" : "Исключить"}
-            </Button>
-          </div>
-        ))}
-      </div>
+
+      {tops.length === 0 ? (
+        <p className="rounded-md border border-border bg-card p-4 text-sm text-muted-foreground">Этапов нет</p>
+      ) : (
+        <Reorderable
+          items={tops}
+          disabled={!reordering || reorder.isPending}
+          onMove={(ids) => reorder.mutate(ids)}
+          header={
+            <>
+              <span className={cn(thLabelClass, "w-10 shrink-0")}>N</span>
+              <span className={cn(thLabelClass, "min-w-0 flex-1")}>Этап</span>
+              <span className={cn(thLabelClass, "hidden w-40 shrink-0 sm:block")}>Исполнитель</span>
+              <span className={cn(thLabelClass, "hidden w-40 shrink-0 md:block")}>Адресат</span>
+              <span className={cn(thLabelClass, "w-[7.5rem] shrink-0")}>Статус</span>
+              <span className="w-[5.5rem] shrink-0" aria-hidden />
+            </>
+          }
+          render={(s) => (
+            <StageEditRow
+              s={s}
+              substages={childrenOf(s.id)}
+              excludePending={exclude.isPending}
+              onExclude={(excluded) => exclude.mutate({ stageId: s.id, excluded })}
+              onReorderChildren={(ids) => reorder.mutate(ids)}
+              reordering={reordering}
+              reorderPending={reorder.isPending}
+              onExcludeChild={(stageId, excluded) => exclude.mutate({ stageId, excluded })}
+            />
+          )}
+        />
+      )}
 
       <Dialog open={adding} onOpenChange={setAdding}>
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-4xl">
           <DialogHeader>
             <DialogTitle className="text-lg">Добавить этапы из справочника</DialogTitle>
           </DialogHeader>
-          <StagesPicker templates={templates} selected={picked} onChange={setPicked} />
+          <StagesPicker templates={templates} selected={picked} onChange={setPicked} members={memberProfiles} />
           <div className="flex gap-3 pt-2">
             <Button onClick={() => add.mutate()} disabled={add.isPending || picked.length === 0} className="h-9 px-4 text-sm">
               {add.isPending ? "Добавление…" : `Добавить (${picked.length})`}
@@ -296,6 +425,119 @@ function StagesTab({ id }: { id: string }) {
           </div>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+function stagePerson(s: ObjectStage, kind: "executor" | "confirmer") {
+  if (kind === "executor") {
+    return s.executor_name?.trim() || null;
+  }
+  return s.confirmer_name?.trim() || s.confirmer_role_name?.trim() || null;
+}
+
+function StagePeopleCells({ s }: { s: ObjectStage }) {
+  const executor = stagePerson(s, "executor");
+  const confirmer = stagePerson(s, "confirmer");
+  return (
+    <>
+      <span
+        className="hidden w-40 shrink-0 truncate text-muted-foreground sm:block"
+        title={executor ?? undefined}
+      >
+        {executor ?? "—"}
+      </span>
+      <span
+        className="hidden w-40 shrink-0 truncate text-muted-foreground md:block"
+        title={confirmer ?? undefined}
+      >
+        {confirmer ?? "—"}
+      </span>
+    </>
+  );
+}
+
+function StageEditRow({
+  s,
+  substages,
+  excludePending,
+  onExclude,
+  onReorderChildren,
+  reordering,
+  reorderPending,
+  onExcludeChild,
+}: {
+  s: ObjectStage;
+  substages: ObjectStage[];
+  excludePending: boolean;
+  onExclude: (excluded: boolean) => void;
+  onReorderChildren: (ids: string[]) => void;
+  reordering: boolean;
+  reorderPending: boolean;
+  onExcludeChild: (stageId: string, excluded: boolean) => void;
+}) {
+  return (
+    <div className="min-w-0 flex-1 space-y-2 py-1">
+      <div className={`flex min-w-0 items-center gap-3 text-sm ${s.is_excluded ? "opacity-70" : ""}`}>
+        <span className="w-10 shrink-0 font-semibold tabular-nums">{s.code}</span>
+        <span className={`min-w-0 flex-1 truncate ${s.is_excluded ? "text-muted-foreground line-through" : ""}`} title={s.name}>
+          {s.name}
+        </span>
+        <StagePeopleCells s={s} />
+        <span className="flex w-[7.5rem] shrink-0 items-center">
+          {!s.is_excluded ? <StatusBadge name={s.status_name} color={s.status_color} /> : null}
+        </span>
+        <Button
+          variant="outline"
+          className="h-8 w-[5.5rem] shrink-0 text-sm"
+          disabled={excludePending || reordering}
+          onClick={(e) => {
+            e.stopPropagation();
+            onExclude(!s.is_excluded);
+          }}
+        >
+          {s.is_excluded ? "Вернуть" : "Исключить"}
+        </Button>
+      </div>
+      {substages.length > 0 && (
+        <div className="ml-6 border-l border-border/70 pl-3">
+          <Reorderable
+            items={substages}
+            disabled={!reordering || reorderPending}
+            onMove={onReorderChildren}
+            render={(child) => (
+              <div
+                className={`flex min-w-0 flex-1 items-center gap-3 py-1 text-sm ${child.is_excluded ? "opacity-70" : ""}`}
+              >
+                <span className="w-12 shrink-0 font-semibold tabular-nums text-muted-foreground">{child.code}</span>
+                <span
+                  className={`min-w-0 flex-1 truncate ${child.is_excluded ? "text-muted-foreground line-through" : ""}`}
+                  title={child.name}
+                >
+                  {child.name}
+                </span>
+                <StagePeopleCells s={child} />
+                <span className="flex w-[7.5rem] shrink-0 items-center">
+                  {!child.is_excluded ? (
+                    <StatusBadge name={child.status_name} color={child.status_color} />
+                  ) : null}
+                </span>
+                <Button
+                  variant="outline"
+                  className="h-8 w-[5.5rem] shrink-0 text-sm"
+                  disabled={excludePending || reordering}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onExcludeChild(child.id, !child.is_excluded);
+                  }}
+                >
+                  {child.is_excluded ? "Вернуть" : "Исключить"}
+                </Button>
+              </div>
+            )}
+          />
+        </div>
+      )}
     </div>
   );
 }

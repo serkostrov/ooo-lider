@@ -297,16 +297,18 @@ export function ObjectCardFields({
             </SelectContent>
           </Select>
         </Field>
-        <Field label="Дата начала по договору" required>
-          <DateField value={value.contract_start} onChange={(ymd) => set("contract_start", ymd)} />
-        </Field>
-        <Field label="Дата окончания по договору" required>
-          <DateField
-            value={value.contract_end}
-            {...(value.contract_start ? { min: value.contract_start } : {})}
-            onChange={(ymd) => set("contract_end", ymd)}
-          />
-        </Field>
+        <div className="flex flex-wrap gap-5 sm:col-span-2">
+          <Field label="Дата начала по договору" required>
+            <DateField value={value.contract_start} onChange={(ymd) => set("contract_start", ymd)} />
+          </Field>
+          <Field label="Дата окончания по договору" required>
+            <DateField
+              value={value.contract_end}
+              {...(value.contract_start ? { min: value.contract_start } : {})}
+              onChange={(ymd) => set("contract_end", ymd)}
+            />
+          </Field>
+        </div>
         {showStatus && (
           <Field label="Статус объекта">
             <Select value={value.status} onValueChange={(v) => set("status", v as ObjectDraft["status"])}>

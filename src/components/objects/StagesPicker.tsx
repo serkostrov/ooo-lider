@@ -1,13 +1,26 @@
 import { Flag } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
-import { useStageTemplatesFull, useWorkTypes, type StageTemplate } from "@/components/directories/stages/data";
+import { useRoles, useStageTemplatesFull, useWorkTypes, type StageTemplate } from "@/components/directories/stages/data";
+import type { ProfileShort } from "./data";
 
-/** Активные этапы справочника, которые можно добавить (без уже добавленных). */
-export function useAvailableTemplates(excludeIds: string[] = []) {
+/** Активные этапы справочника. Повторы шаблона разрешены — не исключаем уже добавленные. */
+export function useAvailableTemplates() {
   const { data: all = [], isLoading } = useStageTemplatesFull();
-  const ex = new Set(excludeIds);
-  return { templates: all.filter((t) => t.is_active && !ex.has(t.id)), isLoading };
+  return { templates: all.filter((t) => t.is_active), isLoading };
+}
+
+function executorHint(
+  template: StageTemplate,
+  members: ProfileShort[] | undefined,
+  roleName: (code: string | null) => string,
+): string {
+  if (!template.executor_role) return "Роль исполнителя не задана";
+  const role = roleName(template.executor_role);
+  if (!members) return role;
+  const people = members.filter((m) => m.role_code === template.executor_role);
+  if (people.length === 0) return `Исполнитель не назначен · ${role}`;
+  return `${people.map((p) => p.full_name).join(", ")} · ${role}`;
 }
 
 /** Выбор этапов галочками, сгруппированных по группам (ТЗ 7.3, шаг 3). */
@@ -15,12 +28,17 @@ export function StagesPicker({
   templates,
   selected,
   onChange,
+  members,
 }: {
   templates: StageTemplate[];
   selected: string[];
   onChange: (ids: string[]) => void;
+  /** Участники объекта — для подсказки исполнителей по роли шаблона. */
+  members?: ProfileShort[];
 }) {
   const { data: workTypes = [] } = useWorkTypes();
+  const { data: roles = [] } = useRoles();
+  const roleName = (code: string | null) => (code ? roles.find((r) => r.code === code)?.name ?? code : "");
   const sel = new Set(selected);
   const groups = [
     ...workTypes.map((w) => ({ id: w.id, name: w.name, items: templates.filter((t) => t.work_type_id === w.id) })),
@@ -43,7 +61,8 @@ export function StagesPicker({
   return (
     <div className="w-full space-y-4">
       <p className="text-xs text-muted-foreground">
-        Номера слева — из справочника. На объекте выбранные этапы получат свою нумерацию 1, 2, 3… по порядку.
+        Номера слева — из справочника. На объекте выбранные этапы получат свою нумерацию. Один шаблон можно добавлять
+        повторно.
       </p>
       <div className="sticky top-0 z-10 flex flex-wrap items-center gap-3 bg-background/95 py-2 backdrop-blur-sm">
         <span className="flex-1 text-sm font-semibold">
@@ -57,7 +76,7 @@ export function StagesPicker({
         </Button>
       </div>
       {templates.length === 0 && (
-        <p className="py-4 text-center text-sm text-muted-foreground">Все этапы справочника уже добавлены</p>
+        <p className="py-4 text-center text-sm text-muted-foreground">В справочнике нет активных этапов</p>
       )}
       {groups.map((g) => {
         const ids = g.items.map((t) => t.id);
@@ -68,7 +87,9 @@ export function StagesPicker({
             <div className="flex flex-wrap items-center gap-3 border-b bg-muted/60 px-4 py-2">
               <span className="flex-1 text-sm font-semibold">
                 {g.name}
-                <span className="ml-2 font-normal text-muted-foreground">{count} из {ids.length}</span>
+                <span className="ml-2 font-normal text-muted-foreground">
+                  {count} из {ids.length}
+                </span>
               </span>
               <Button type="button" variant="ghost" className="h-9 text-sm" onClick={() => setMany(ids, !all)}>
                 {all ? "Снять группу" : "Отметить группу"}
@@ -79,7 +100,12 @@ export function StagesPicker({
                 <label key={t.id} className="flex cursor-pointer items-center gap-4 px-4 py-2 text-sm hover:bg-muted/40">
                   <Checkbox className="size-4" checked={sel.has(t.id)} onCheckedChange={(c) => setMany([t.id], c === true)} />
                   <span className="w-8 shrink-0 font-semibold">{t.number}</span>
-                  <span className="flex-1">{t.name}</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block">{t.name}</span>
+                    <span className="mt-0.5 block text-xs text-muted-foreground">
+                      {executorHint(t, members, roleName)}
+                    </span>
+                  </span>
                   {t.is_critical && <Flag className="size-3.5 shrink-0 fill-destructive text-destructive" aria-label="Критичный" />}
                 </label>
               ))}

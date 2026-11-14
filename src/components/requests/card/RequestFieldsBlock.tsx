@@ -38,12 +38,25 @@ export const RequestFieldsBlock = forwardRef<
     values: FieldValue[];
     orphanValues: FieldValue[];
     readOnly: boolean;
+    /** Обязательные для текущего перехода (сценарий шага ∪ is_required). */
+    requiredFieldIds?: Set<string>;
     onDirtyChange?: (dirty: boolean) => void;
     /** Любое изменение черновика — чтобы страница пересчитала обязательные поля. */
     onDraftChange?: () => void;
   }
 >(function RequestFieldsBlock(
-  { title, hint, requestId, fields, values, orphanValues, readOnly, onDirtyChange, onDraftChange },
+  {
+    title,
+    hint,
+    requestId,
+    fields,
+    values,
+    orphanValues,
+    readOnly,
+    requiredFieldIds,
+    onDirtyChange,
+    onDraftChange,
+  },
   ref,
 ) {
   const editable = fields.filter((f) => f.field_type !== "file");
@@ -112,6 +125,8 @@ export const RequestFieldsBlock = forwardRef<
   if (editable.length === 0 && orphanValues.length === 0) return null;
 
   const labelOf = (f: RequestField) => values.find((v) => v.field_id === f.id)?.label ?? f.label;
+  const isReq = (f: RequestField) =>
+    requiredFieldIds ? requiredFieldIds.has(f.id) : f.is_required;
 
   return (
     <section className={cn(panelClass, "p-5 sm:p-6")}>
@@ -124,7 +139,7 @@ export const RequestFieldsBlock = forwardRef<
         <div className="grid gap-x-5 gap-y-5 sm:grid-cols-2 xl:grid-cols-3">
           {editable.map((f) => (
             <div key={f.id} className={colSpan(f.field_type)}>
-              <Field label={labelOf(f)} required={f.is_required}>
+              <Field label={labelOf(f)} required={isReq(f)}>
                 <FieldInput
                   field={f}
                   value={draft[f.id]}
@@ -144,16 +159,17 @@ export const RequestFieldsBlock = forwardRef<
           {editable.map((f) => {
             const v = initial[f.id];
             const empty = isEmptyValue(v);
+            const req = isReq(f);
             return (
               <div key={f.id} className={cn(fieldStackClass, colSpan(f.field_type))}>
                 <dt className={fieldLabelClass}>
                   {labelOf(f)}
-                  {f.is_required && <span className="text-destructive"> *</span>}
+                  {req && <span className="text-destructive"> *</span>}
                 </dt>
                 <dd className="whitespace-pre-line text-sm">
                   {empty ? (
-                    <span className={f.is_required ? "text-warning" : "text-muted-foreground"}>
-                      {f.is_required ? "Не заполнено" : "—"}
+                    <span className={req ? "text-warning" : "text-muted-foreground"}>
+                      {req ? "Не заполнено" : "—"}
                     </span>
                   ) : (
                     formatValue(f.field_type, v)

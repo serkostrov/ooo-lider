@@ -199,7 +199,7 @@ function NewRequestForm({
               </SelectItem>
               {openStages.map((s) => (
                 <SelectItem key={s.id} value={s.id} className="text-sm">
-                  {s.number}. {s.name}
+                  {s.code || s.number}. {s.name}
                 </SelectItem>
               ))}
             </SelectContent>

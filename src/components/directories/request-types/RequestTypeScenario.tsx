@@ -10,7 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useRoles } from "@/components/directories/stages/data";
 import { Field } from "../common";
-import { useRequestFields } from "./data";
+import { useRequestFields, type RequestField } from "./data";
 
 const STATUSES = [
   { v: "ready", label: "Готова к отправке" },
@@ -18,6 +18,22 @@ const STATUSES = [
   { v: "accepted", label: "Принята заказчиком" },
   { v: "done", label: "Исполнена" },
 ] as const;
+
+/** На этих статусах обычно только подтверждают переход — поля уже заполнены на ready/sent. */
+const STATUSES_WITH_REQUIRED_FIELDS = new Set(["ready", "sent"]);
+
+/** Чьи поля показывать в обязательных для шага — по роли перехода. */
+function filledByForRole(roleCode: string): RequestField["filled_by"] | "all" {
+  if (roleCode === "office") return "office";
+  if (roleCode === "foreman" || roleCode === "pto") return "initiator";
+  return "all";
+}
+
+function fieldsForStepRole(fields: RequestField[], roleCode: string): RequestField[] {
+  const who = filledByForRole(roleCode);
+  if (who === "all") return fields;
+  return fields.filter((f) => f.filled_by === who);
+}
 
 type Step = {
   id: string;
@@ -94,7 +110,9 @@ export function RequestTypeScenario({ typeId, readOnly }: { typeId: string; read
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">
-        Цепочка статусов фиксирована. Здесь задаётся, какая роль переводит заявку на статус и какие поля должны быть заполнены к этому шагу.
+        Цепочка статусов фиксирована. На шаге: кто переводит заявку дальше и какие{" "}
+        <span className="text-foreground/80">свои</span> поля этой роли обязательны перед переходом (не чужие —
+        прорабские поля на шаге офиса не показываются).
       </p>
       {isLoading ? (
         <ol className="space-y-3">
@@ -152,7 +170,7 @@ function StepCard({
 }: {
   step: Step;
   roles: { code: string; name: string }[];
-  fields: { id: string; label: string }[];
+  fields: RequestField[];
   readOnly?: boolean;
   onSaved: () => void;
 }) {
@@ -160,6 +178,8 @@ function StepCard({
   const [status, setStatus] = useState(step.to_status);
   const [fieldIds, setFieldIds] = useState<string[]>(step.field_ids);
   const fieldsKey = step.field_ids.join(",");
+  const roleFields = useMemo(() => fieldsForStepRole(fields, role), [fields, role]);
+  const roleFieldIdSet = useMemo(() => new Set(roleFields.map((f) => f.id)), [roleFields]);
 
   useEffect(() => {
     setRole(step.role_code);
@@ -167,18 +187,23 @@ function StepCard({
     setFieldIds(step.field_ids);
   }, [step.id, step.role_code, step.to_status, fieldsKey]);
 
+  const showRequiredFields = STATUSES_WITH_REQUIRED_FIELDS.has(status);
+
   const persist = useMutation({
     mutationFn: async (next: { role_code: string; to_status: string; field_ids: string[] }) => {
+      const allowFields = STATUSES_WITH_REQUIRED_FIELDS.has(next.to_status);
+      const allowed = new Set(fieldsForStepRole(fields, next.role_code).map((f) => f.id));
+      const cleaned = allowFields ? next.field_ids.filter((id) => allowed.has(id)) : [];
       const { error } = await supabase
         .from("request_type_scenario_steps")
         .update({ role_code: next.role_code, to_status: next.to_status })
         .eq("id", step.id);
       if (error) throw error;
       await supabase.from("request_type_scenario_step_fields").delete().eq("step_id", step.id);
-      if (next.field_ids.length) {
+      if (cleaned.length) {
         const { error: e2 } = await supabase
           .from("request_type_scenario_step_fields")
-          .insert(next.field_ids.map((field_id) => ({ step_id: step.id, field_id })));
+          .insert(cleaned.map((field_id) => ({ step_id: step.id, field_id })));
         if (e2) throw e2;
       }
     },
@@ -202,11 +227,21 @@ function StepCard({
   });
 
   const save = (next: { role_code: string; to_status: string; field_ids: string[] }) => {
+    const allowFields = STATUSES_WITH_REQUIRED_FIELDS.has(next.to_status);
+    const allowed = new Set(fieldsForStepRole(fields, next.role_code).map((f) => f.id));
+    const cleaned = allowFields ? next.field_ids.filter((id) => allowed.has(id)) : [];
     setRole(next.role_code);
     setStatus(next.to_status);
-    setFieldIds(next.field_ids);
-    persist.mutate(next);
+    setFieldIds(cleaned);
+    persist.mutate({ ...next, field_ids: cleaned });
   };
+
+  const whoLabel =
+    filledByForRole(role) === "office"
+      ? "офис-менеджера"
+      : filledByForRole(role) === "initiator"
+        ? "прораба / ПТО"
+        : "заявки";
 
   return (
     <li className="rounded-md border border-border bg-card p-4">
@@ -257,45 +292,60 @@ function StepCard({
           </Select>
         </Field>
       </div>
-      {fields.length > 0 && (
-        <div className="mt-5 space-y-2.5">
-          <div>
-            <div className="text-sm font-medium text-muted-foreground">Обязательные поля к этому шагу</div>
-            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-              Отмеченные поля нужно заполнить, прежде чем роль сможет перевести заявку в статус этого шага.
-              Без них кнопка перехода будет недоступна.
-            </p>
-          </div>
-          <ul className="grid gap-2 sm:grid-cols-2">
-            {fields.map((f) => {
-              const on = fieldIds.includes(f.id);
-              const id = `scenario-field-${step.id}-${f.id}`;
-              return (
-                <li key={f.id}>
-                  <label
-                    htmlFor={id}
-                    className="flex h-full cursor-pointer items-center justify-between gap-3 rounded-md border border-border px-3 py-2.5 text-sm hover:bg-muted/40"
-                  >
-                    <span className="min-w-0 flex-1 leading-snug">{f.label}</span>
-                    <Switch
-                      id={id}
-                      checked={on}
-                      disabled={readOnly || persist.isPending}
-                      onCheckedChange={(v) =>
-                        save({
-                          role_code: role,
-                          to_status: status,
-                          field_ids: v ? [...fieldIds, f.id] : fieldIds.filter((x) => x !== f.id),
-                        })
-                      }
-                    />
-                  </label>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      )}
+      <div className="mt-5 space-y-2.5">
+        {showRequiredFields ? (
+          <>
+            <div>
+              <div className="text-sm font-medium text-muted-foreground">
+                Обязательные поля {whoLabel} к этому шагу
+              </div>
+              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                Только поля, которые заполняет эта роль (см. вкладку «Поля заявки» → «Кто заполняет»).
+                Отмеченные нужно заполнить, прежде чем роль сможет перевести заявку дальше.
+              </p>
+            </div>
+            {roleFields.length === 0 ? (
+              <p className="rounded-md border border-dashed border-border px-3 py-2.5 text-sm text-muted-foreground">
+                У этой роли нет своих полей в виде заявки — обязательные отмечать нечего.
+              </p>
+            ) : (
+              <ul className="grid gap-2 sm:grid-cols-2">
+                {roleFields.map((f) => {
+                  const on = fieldIds.includes(f.id) && roleFieldIdSet.has(f.id);
+                  const id = `scenario-field-${step.id}-${f.id}`;
+                  return (
+                    <li key={f.id}>
+                      <label
+                        htmlFor={id}
+                        className="flex h-full cursor-pointer items-center justify-between gap-3 rounded-md border border-border px-3 py-2.5 text-sm hover:bg-muted/40"
+                      >
+                        <span className="min-w-0 flex-1 leading-snug">{f.label}</span>
+                        <Switch
+                          id={id}
+                          checked={on}
+                          disabled={readOnly || persist.isPending}
+                          onCheckedChange={(v) =>
+                            save({
+                              role_code: role,
+                              to_status: status,
+                              field_ids: v ? [...fieldIds, f.id] : fieldIds.filter((x) => x !== f.id),
+                            })
+                          }
+                        />
+                      </label>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </>
+        ) : (
+          <p className="rounded-md border border-dashed border-border px-3 py-2.5 text-sm text-muted-foreground">
+            На этом шаге обычно ничего заполнять не нужно — только смена статуса (поля уже внесены на
+            «Готова к отправке» / «Отправлена»).
+          </p>
+        )}
+      </div>
     </li>
   );
 }

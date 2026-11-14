@@ -7,8 +7,15 @@ import type { ObjectStage } from "./data";
 
 /** Колонки — как в таблице этапов на экране (ТЗ 7.5, критерий «колонки как на экране»). */
 const COLUMNS: Column<ObjectStage>[] = [
-  { header: "N", value: (s) => s.number, width: 5 },
-  { header: "Название этапа", value: (s) => s.name + (s.is_critical ? " (критичный)" : ""), width: 45 },
+  { header: "N", value: (s) => s.code || s.number, width: 8 },
+  {
+    header: "Название этапа",
+    value: (s) =>
+      s.name +
+      (s.is_critical ? " (критичный)" : "") +
+      (s.parent_id && s.parent_code ? ` [подэтап ${s.parent_code}]` : ""),
+    width: 45,
+  },
   { header: "От нас", value: (s) => s.outgoing_doc, width: 18 },
   { header: "Ждём", value: (s) => s.expected_doc, width: 18 },
   { header: "Условия закрытия", value: (s) => (s.conditions_total ? `${s.conditions_done} из ${s.conditions_total}` : ""), width: 12 },

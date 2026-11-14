@@ -18,9 +18,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Toolbar } from "@/components/directories/common";
 import { InfiniteScrollSentinel } from "@/components/InfiniteScrollSentinel";
 import { SortableTh } from "@/components/SortableTh";
+import { TableColgroup } from "@/components/TableColgroup";
+import { useTableColumnWidths, type ColumnWidthDef } from "@/lib/table-column-widths";
 import { useRequestTypes } from "@/components/directories/request-types/data";
 import { useObjects } from "@/components/objects/data";
-import { useObjectStages } from "@/components/stages/data";
+import { useObjectStages, useStagesByIds } from "@/components/stages/data";
 import { NewRequestDialog } from "./NewRequestDialog";
 import {
   useRequestStatuses,
@@ -29,6 +31,7 @@ import {
   overdueDays,
   sortRequests,
   stageCallLabel,
+  stageDisplayLabel,
   statusInfo,
   useFieldValues,
   useRequests,
@@ -40,22 +43,51 @@ import {
 
 const ALL = "__all";
 
+const REQUEST_COLUMNS_CORE: ColumnWidthDef[] = [
+  /** № + плашка «Новая» должны быть видны одновременно. */
+  { id: "number", defaultWidth: 128, minWidth: 112, maxWidth: 180 },
+  /** Дата + padding; заголовок «Сформирована» не должен обрезаться. */
+  { id: "created", defaultWidth: 148, minWidth: 136, maxWidth: 220 },
+  { id: "call", defaultWidth: 140, minWidth: 128, maxWidth: 220 },
+  { id: "type", defaultWidth: 180, minWidth: 120 },
+  { id: "stage", defaultWidth: 180, minWidth: 120 },
+  { id: "status", defaultWidth: 140, minWidth: 110, maxWidth: 220 },
+  { id: "data", defaultWidth: 260, minWidth: 140 },
+  { id: "initiator", defaultWidth: 160, minWidth: 120 },
+  { id: "office", defaultWidth: 160, minWidth: 120 },
+];
+
+const REQUEST_OBJECT_COL: ColumnWidthDef = {
+  id: "object",
+  defaultWidth: 220,
+  minWidth: 120,
+};
+
+function requestColumns(showObject: boolean): ColumnWidthDef[] {
+  if (!showObject) return REQUEST_COLUMNS_CORE;
+  // Объект — после «Вид»
+  const out = [...REQUEST_COLUMNS_CORE];
+  out.splice(4, 0, REQUEST_OBJECT_COL);
+  return out;
+}
+
 type ReqSort =
   | "number"
   | "created"
   | "call"
   | "type"
   | "object"
+  | "stage"
   | "data"
   | "status"
   | "initiator"
   | "office";
 
-
 type Filters = {
   object: string;
   type: string;
   status: string;
+  stage: string;
   from: string;
   to: string;
   onlyOpen: boolean;
@@ -101,7 +133,6 @@ export function RequestsList({
   const { data: types = [] } = useRequestTypes();
   const statuses = useRequestStatuses();
   const { data: objects = [] } = useObjects();
-  const { data: stages = [] } = useObjectStages(objectId ?? "");
 
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebouncedValue(search, 300);
@@ -113,6 +144,7 @@ export function RequestsList({
     object: ALL,
     type: ALL,
     status: ALL,
+    stage: ALL,
     from: "",
     to: "",
     onlyOpen: true,
@@ -131,6 +163,11 @@ export function RequestsList({
   };
 
   const showObject = !objectId;
+  const tableCols = useMemo(() => requestColumns(showObject), [showObject]);
+  const { widths: colWidths, totalWidth: colsTotal, resizeProps } = useTableColumnWidths(
+    showObject ? "requests" : "requests-object",
+    tableCols,
+  );
   /** На карточке объекта грузим все заявки — нужны для «15.2». Глобальный список — курсор. */
   const scoped = !!objectId;
 
@@ -164,20 +201,37 @@ export function RequestsList({
   const ids = rows.map((r) => r.id);
   const { data: values = [] } = useFieldValues(ids, objectId ?? "all");
 
-  const stageNumberById = useMemo(() => {
-    const m: Record<string, number> = {};
-    for (const s of stages) m[s.id] = s.number;
+  const stagesObjectId = objectId ?? (f.object !== ALL ? f.object : "");
+  const { data: objectStages = [] } = useObjectStages(stagesObjectId);
+  const looseStageIds = useMemo(() => {
+    if (stagesObjectId) return [] as string[];
+    return [...new Set(rows.map((r) => r.stage_id).filter((x): x is string => !!x))];
+  }, [rows, stagesObjectId]);
+  const { data: looseStages = [] } = useStagesByIds(looseStageIds);
+  const stages = stagesObjectId ? objectStages : looseStages;
+
+  const stageById = useMemo(() => Object.fromEntries(stages.map((s) => [s.id, s])), [stages]);
+  const stageCodeById = useMemo(() => {
+    const m: Record<string, string> = {};
+    for (const s of stages) m[s.id] = s.code || String(s.number);
     return m;
   }, [stages]);
 
   const callLabel = (r: RequestRow) =>
-    objectId ? stageCallLabel(r, rows, stageNumberById) : null;
+    objectId ? stageCallLabel(r, rows, stageCodeById) : null;
+
+  const stageLabelOf = (r: RequestRow) => {
+    if (!r.stage_id) return "";
+    const s = stageById[r.stage_id];
+    return s ? stageDisplayLabel(s) : "";
+  };
 
   const activeFilterCount = useMemo(() => {
     let n = 0;
     if (showObject && f.object !== ALL) n++;
     if (!typeLocked && typeSelect !== ALL) n++;
     if (f.status !== ALL) n++;
+    if (f.stage !== ALL) n++;
     if (f.from) n++;
     if (f.to) n++;
     if (f.archive) n++;
@@ -199,40 +253,47 @@ export function RequestsList({
     return m;
   }, [values]);
 
-  /** На объекте — клиентский фильтр (все строки уже загружены). Глобально — уже на сервере. */
+  /** На объекте — клиентский фильтр (все строки уже загружены). Глобально — уже на сервере (+ этап клиентом). */
   const visible = useMemo(() => {
-    if (!scoped) return rows;
+    const applyStage = (list: RequestRow[]) =>
+      f.stage === ALL ? list : list.filter((r) => r.stage_id === f.stage);
+
+    if (!scoped) return applyStage(rows);
     const q = debouncedSearch.trim().toLowerCase().replace(/^№/, "");
-    return rows.filter((r) => {
-      if (effectiveType && r.request_type_id !== effectiveType) return false;
-      if (f.status !== ALL && r.status !== f.status) return false;
-      if (f.from && r.call_date < f.from) return false;
-      if (f.to && r.call_date > f.to) return false;
-      if (f.archive) {
-        if (r.status !== "done") return false;
-      } else if (f.onlyOpen && r.status === "done") {
-        return false;
-      }
-      if (f.onlyOverdue && !r.is_overdue) return false;
-      if (q) {
-        const stageLabel = stageCallLabel(r, rows, stageNumberById);
-        const hay = [
-          String(r.number),
-          stageLabel,
-          r.type_name,
-          r.object_name,
-          r.representative_name,
-          r.result_text,
-          ...(valuesByRequest[r.id] ?? []).map((v) => formatValue(v.field_type, v.value)),
-        ]
-          .filter(Boolean)
-          .join(" ")
-          .toLowerCase();
-        if (!hay.includes(q)) return false;
-      }
-      return true;
-    });
-  }, [scoped, rows, f, effectiveType, debouncedSearch, valuesByRequest, stageNumberById]);
+    return applyStage(
+      rows.filter((r) => {
+        if (effectiveType && r.request_type_id !== effectiveType) return false;
+        if (f.status !== ALL && r.status !== f.status) return false;
+        if (f.from && r.call_date < f.from) return false;
+        if (f.to && r.call_date > f.to) return false;
+        if (f.archive) {
+          if (r.status !== "done") return false;
+        } else if (f.onlyOpen && r.status === "done") {
+          return false;
+        }
+        if (f.onlyOverdue && !r.is_overdue) return false;
+        if (q) {
+          const call = stageCallLabel(r, rows, stageCodeById);
+          const stageTxt = stageLabelOf(r);
+          const hay = [
+            String(r.number),
+            call,
+            stageTxt,
+            r.type_name,
+            r.object_name,
+            r.representative_name,
+            r.result_text,
+            ...(valuesByRequest[r.id] ?? []).map((v) => formatValue(v.field_type, v.value)),
+          ]
+            .filter(Boolean)
+            .join(" ")
+            .toLowerCase();
+          if (!hay.includes(q)) return false;
+        }
+        return true;
+      }),
+    );
+  }, [scoped, rows, f, effectiveType, debouncedSearch, valuesByRequest, stageCodeById, stageById]);
 
   const { sort, toggle } = useTableSort<ReqSort>();
   const getters = useMemo(
@@ -243,13 +304,14 @@ export function RequestsList({
         call: (r: RequestRow) => r.call_date,
         type: (r: RequestRow) => r.type_name,
         object: (r: RequestRow) => r.object_name,
+        stage: (r: RequestRow) => stageLabelOf(r),
         data: (r: RequestRow) =>
           [...keyFields(valuesByRequest[r.id] ?? []), r.result_text ?? ""].join(" "),
         status: (r: RequestRow) => statusInfo(r.status, statuses).label,
         initiator: (r: RequestRow) => r.initiator_name,
         office: (r: RequestRow) => r.office_name,
       }) satisfies Record<ReqSort, (r: RequestRow) => unknown>,
-    [valuesByRequest, statuses],
+    [valuesByRequest, statuses, stageById],
   );
   const sorted = useMemo(() => {
     if (!sort) return scoped ? sortRequests(visible) : visible;
@@ -266,9 +328,16 @@ export function RequestsList({
     { header: "Дата вызова", value: (r) => formatDate(r.call_date), width: 12 },
     { header: "Вид", value: (r) => r.type_name, width: 18 },
     ...(showObject ? [{ header: "Объект", value: (r: RequestRow) => r.object_name, width: 35 }] : []),
+    { header: "Этап", value: (r) => stageLabelOf(r), width: 28 },
     { header: "Кого вызываем", value: (r) => r.representative_name, width: 18 },
+    {
+      header: "Статус",
+      value: (r) =>
+        statusInfo(r.status, statuses).label +
+        (r.is_overdue ? ` (не исполнена ${overdueDays(r)} дн.)` : ""),
+      width: 22,
+    },
     { header: "Поля", value: (r) => keyFields(valuesByRequest[r.id] ?? []).join("; "), width: 40 },
-    { header: "Статус", value: (r) => statusInfo(r.status, statuses).label + (r.is_overdue ? ` (не исполнена ${overdueDays(r)} дн.)` : ""), width: 22 },
     { header: "Результат", value: (r) => r.result_text, width: 20 },
     { header: "Инициатор", value: (r) => r.initiator_name, width: 20 },
     { header: "Офис-менеджер", value: (r) => r.office_name, width: 20 },
@@ -305,7 +374,13 @@ export function RequestsList({
               {showObject && (
                 <div className={fieldStackClass}>
                   <span className={fieldLabelClass}>Объект</span>
-                  <Select value={f.object} onValueChange={(v) => set("object", v)}>
+                  <Select
+                    value={f.object}
+                    onValueChange={(v) => {
+                      set("object", v);
+                      set("stage", ALL);
+                    }}
+                  >
                     <SelectTrigger className="h-9 w-full text-sm">
                       <SelectValue />
                     </SelectTrigger>
@@ -340,6 +415,26 @@ export function RequestsList({
                             {t.name}
                           </SelectItem>
                         ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              {(objectId || f.object !== ALL) && (
+                <div className={fieldStackClass}>
+                  <span className={fieldLabelClass}>Этап</span>
+                  <Select value={f.stage} onValueChange={(v) => set("stage", v)}>
+                    <SelectTrigger className="h-9 w-full text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={ALL} className="text-sm">
+                        Все этапы
+                      </SelectItem>
+                      {objectStages.map((s) => (
+                        <SelectItem key={s.id} value={s.id} className="text-sm">
+                          {s.code || s.number}. {s.name}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -485,52 +580,42 @@ export function RequestsList({
           fillHeight && "min-h-0 flex-1",
         )}
       >
-        {/* w-full на широких, min-w — пол не даёт сжимать колонки (гориз. скролл) */}
-        <table
-          className={cn(
-            "w-full table-fixed text-sm",
-            showObject ? "min-w-[1280px]" : "min-w-[1120px]",
-          )}
-        >
-          <colgroup>
-            {showObject ? (
-              <>
-                <col style={{ width: "7%" }} />
-                <col style={{ width: "8%" }} />
-                <col style={{ width: "8%" }} />
-                <col style={{ width: "11%" }} />
-                <col style={{ width: "14%" }} />
-                <col style={{ width: "18%" }} />
-                <col style={{ width: "12%" }} />
-                <col style={{ width: "11%" }} />
-                <col style={{ width: "11%" }} />
-              </>
-            ) : (
-              <>
-                <col style={{ width: "8%" }} />
-                <col style={{ width: "9%" }} />
-                <col style={{ width: "9%" }} />
-                <col style={{ width: "14%" }} />
-                <col style={{ width: "24%" }} />
-                <col style={{ width: "12%" }} />
-                <col style={{ width: "12%" }} />
-                <col style={{ width: "12%" }} />
-              </>
-            )}
-          </colgroup>
+        <table className="w-full table-fixed text-sm" style={{ minWidth: colsTotal }}>
+          <TableColgroup columns={tableCols} widths={colWidths} />
           <thead className="sticky top-0 z-10 border-b border-border bg-card shadow-[0_1px_0_0_var(--border)]">
             <tr>
-              <SortableTh column="number" sort={sort} onToggle={toggle}>№</SortableTh>
-              <SortableTh column="created" sort={sort} onToggle={toggle}>Сформирована</SortableTh>
-              <SortableTh column="call" sort={sort} onToggle={toggle}>Вызов на</SortableTh>
-              <SortableTh column="type" sort={sort} onToggle={toggle}>Вид</SortableTh>
+              <SortableTh column="number" sort={sort} onToggle={toggle} resize={resizeProps("number")}>
+                №
+              </SortableTh>
+              <SortableTh column="created" sort={sort} onToggle={toggle} resize={resizeProps("created")}>
+                Сформирована
+              </SortableTh>
+              <SortableTh column="call" sort={sort} onToggle={toggle} resize={resizeProps("call")}>
+                Вызов на
+              </SortableTh>
+              <SortableTh column="type" sort={sort} onToggle={toggle} resize={resizeProps("type")}>
+                Вид
+              </SortableTh>
               {showObject && (
-                <SortableTh column="object" sort={sort} onToggle={toggle}>Объект</SortableTh>
+                <SortableTh column="object" sort={sort} onToggle={toggle} resize={resizeProps("object")}>
+                  Объект
+                </SortableTh>
               )}
-              <SortableTh column="data" sort={sort} onToggle={toggle}>Данные</SortableTh>
-              <SortableTh column="status" sort={sort} onToggle={toggle}>Статус</SortableTh>
-              <SortableTh column="initiator" sort={sort} onToggle={toggle}>Инициатор</SortableTh>
-              <SortableTh column="office" sort={sort} onToggle={toggle}>Офис-менеджер</SortableTh>
+              <SortableTh column="stage" sort={sort} onToggle={toggle} resize={resizeProps("stage")}>
+                Этап
+              </SortableTh>
+              <SortableTh column="status" sort={sort} onToggle={toggle} resize={resizeProps("status")}>
+                Статус
+              </SortableTh>
+              <SortableTh column="data" sort={sort} onToggle={toggle} resize={resizeProps("data")}>
+                Данные
+              </SortableTh>
+              <SortableTh column="initiator" sort={sort} onToggle={toggle} resize={resizeProps("initiator")}>
+                Инициатор
+              </SortableTh>
+              <SortableTh column="office" sort={sort} onToggle={toggle} resize={resizeProps("office")}>
+                Офис-менеджер
+              </SortableTh>
             </tr>
           </thead>
           <tbody>
@@ -538,7 +623,7 @@ export function RequestsList({
               <RequestsTableSkeleton showObject={showObject} />
             ) : sorted.length === 0 ? (
               <tr>
-                <td colSpan={showObject ? 9 : 8} className="px-5 py-12 text-center">
+                <td colSpan={showObject ? 10 : 9} className="px-5 py-12 text-center">
                   <div className="mx-auto flex max-w-sm flex-col items-center gap-3">
                     <p className="text-sm text-muted-foreground">
                       {rows.length === 0 && !activeFilterCount && !search.trim()
@@ -587,25 +672,25 @@ export function RequestsList({
                     title={[r.type_name, r.object_name, dataLine].filter(Boolean).join("\n")}
                   >
                     <td className="px-5 py-2.5 align-middle">
-                      <div className="flex min-w-0 items-center gap-1.5 overflow-hidden">
+                      <div className="flex items-center gap-1.5 whitespace-nowrap">
                         <span
-                          className="min-w-0 truncate font-semibold tabular-nums"
+                          className="shrink-0 font-semibold tabular-nums"
                           title={callLabel(r) ? `Сквозной №${r.number}` : undefined}
                         >
                           {callLabel(r) ?? r.number}
                         </span>
                         {r.is_new && (
                           <span className="shrink-0 rounded bg-danger px-1.5 py-0.5 text-[11px] font-semibold leading-none text-danger-foreground">
-                            Новая
+                            {r.status === "rework" ? "Доработка" : "Новая"}
                           </span>
                         )}
                       </div>
                     </td>
-                    <td className="truncate px-5 py-2.5 align-middle tabular-nums">
+                    <td className="whitespace-nowrap px-5 py-2.5 align-middle tabular-nums">
                       {formatDate(r.created_at)}
                     </td>
                     <td className="px-5 py-2.5 align-middle">
-                      <div className={`flex min-w-0 items-center gap-1 overflow-hidden tabular-nums ${r.is_overdue ? "text-danger" : ""}`}>
+                      <div className={`flex min-w-0 items-center gap-1 overflow-hidden whitespace-nowrap tabular-nums ${r.is_overdue ? "text-danger" : ""}`}>
                         <span className="min-w-0 truncate font-medium">{formatDate(r.call_date)}</span>
                         {r.is_overdue && (
                           <span
@@ -625,13 +710,37 @@ export function RequestsList({
                         <div className="truncate" title={r.object_name ?? undefined}>{r.object_name}</div>
                       </td>
                     )}
-                    <td className="px-5 py-2.5 align-middle text-xs text-muted-foreground">
-                      <div className="truncate" title={dataLine || undefined}>{dataLine || "—"}</div>
+                    <td className="px-5 py-2.5 align-middle">
+                      {(() => {
+                        const label = stageLabelOf(r);
+                        if (!label || !r.stage_id) {
+                          return <span className="text-muted-foreground">—</span>;
+                        }
+                        return (
+                          <button
+                            type="button"
+                            className="block max-w-full truncate text-left text-sm text-foreground hover:text-primary hover:underline"
+                            title={label}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigate({
+                                to: "/objects/$id/stages/$stageId",
+                                params: { id: r.object_id, stageId: r.stage_id! },
+                              });
+                            }}
+                          >
+                            {label}
+                          </button>
+                        );
+                      })()}
                     </td>
                     <td className="px-5 py-2.5 align-middle">
                       <div className="truncate">
                         <RequestStatusBadge status={r.status} />
                       </div>
+                    </td>
+                    <td className="px-5 py-2.5 align-middle text-xs text-muted-foreground">
+                      <div className="truncate" title={dataLine || undefined}>{dataLine || "—"}</div>
                     </td>
                     <td className="px-5 py-2.5 align-middle">
                       <div className="truncate" title={r.initiator_name ?? undefined}>{r.initiator_name}</div>
@@ -682,10 +791,13 @@ function RequestsTableSkeleton({ showObject, rows = 8 }: { showObject: boolean; 
             </td>
           )}
           <td className={cell}>
-            <Skeleton height={14} width="90%" />
+            <Skeleton height={16} width="75%" />
           </td>
           <td className={cell}>
             <Skeleton height={22} width={96} borderRadius={6} />
+          </td>
+          <td className={cell}>
+            <Skeleton height={14} width="90%" />
           </td>
           <td className={cell}>
             <Skeleton height={16} width="75%" />

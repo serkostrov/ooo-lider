@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode } from "react";
+import type { ReactNode } from "react";
 import {
   DndContext,
   closestCenter,
@@ -9,12 +9,11 @@ import {
   useSortable,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
 import { TableBody, TableCell, TableRow } from "@/components/ui/table";
 import { REORDER_ACTIONS_W } from "@/lib/ui";
 import { cn } from "@/lib/utils";
 import { DragHandle } from "./DragHandle";
-import { orderedIdsAfterDrag, useDirectoryDndSensors } from "./dnd";
+import { orderedIdsAfterDrag, useDirectoryDndSensors, verticalSortableStyle } from "./dnd";
 
 /**
  * TableBody с DnD-строками. Каждый ребёнок — SortableTableRow с id.
@@ -98,11 +97,9 @@ function SortableTableRowInner({
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id,
   });
-  const style: CSSProperties = {
-    transform: CSS.Transform.toString(transform),
-    transition,
+  const style = verticalSortableStyle(transform, transition, {
     opacity: isDragging ? 0.85 : undefined,
-  };
+  });
 
   return (
     <TableRow

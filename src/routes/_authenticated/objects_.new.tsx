@@ -8,7 +8,12 @@ import { useProfile } from "@/lib/profile";
 import { showError } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { OBJECTS_KEY } from "@/components/objects/data";
+import {
+  OBJECTS_KEY,
+  requiredRoleCodes,
+  useActiveProfiles,
+  useRolesForMembers,
+} from "@/components/objects/data";
 import {
   EMPTY_DRAFT,
   ObjectCardFields,
@@ -35,11 +40,22 @@ function NewObjectPage() {
   const [members, setMembers] = useState<string[]>([]);
   const [stageIds, setStageIds] = useState<string[] | null>(null);
   const { templates, isLoading } = useAvailableTemplates();
+  const { data: profiles = [] } = useActiveProfiles();
+  const { data: roles = [] } = useRolesForMembers();
 
   // По умолчанию отмечены все активные этапы
   useEffect(() => {
     if (!isLoading && stageIds === null) setStageIds(templates.map((t) => t.id));
   }, [isLoading, templates, stageIds]);
+
+  const memberProfiles = profiles.filter((p) => members.includes(p.id));
+
+  const missingRequiredRoles = (memberIds: string[]) => {
+    const need = requiredRoleCodes(roles);
+    return need
+      .map((code) => roles.find((r) => r.code === code)!)
+      .filter((role) => !profiles.some((p) => memberIds.includes(p.id) && p.role_code === role.code));
+  };
 
   const create = useMutation({
     mutationFn: async () => {
@@ -47,6 +63,14 @@ function NewObjectPage() {
       if (err) throw new Error(err);
       const payload = draftToPayload(draft);
       const memberIds = [...new Set([...members, ...(payload.responsible_id ? [payload.responsible_id] : [])])];
+      const missing = missingRequiredRoles(memberIds);
+      if (missing.length) {
+        throw new Error(
+          missing.length === 1
+            ? `Назначьте хотя бы одного участника с ролью «${missing[0]!.name}»`
+            : `Назначьте участников с ролями: ${missing.map((r) => r.name).join(", ")}`,
+        );
+      }
       const { data, error } = await supabase.rpc("create_object", {
         p_object: payload,
         p_member_ids: memberIds,
@@ -85,6 +109,18 @@ function NewObjectPage() {
       const err = validateDraft(draft);
       if (err) {
         toast.error(err);
+        return;
+      }
+    }
+    if (step === 1) {
+      const memberIds = [...new Set([...members, ...(draft.responsible_id ? [draft.responsible_id] : [])])];
+      const missing = missingRequiredRoles(memberIds);
+      if (missing.length) {
+        toast.error(
+          missing.length === 1
+            ? `Назначьте хотя бы одного участника с ролью «${missing[0]!.name}»`
+            : `Назначьте участников с ролями: ${missing.map((r) => r.name).join(", ")}`,
+        );
         return;
       }
     }
@@ -138,7 +174,8 @@ function NewObjectPage() {
           {step === 1 && (
             <div className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                Участники видят объект и его заявки. Исполнители этапов подставятся автоматически по ролям из регламента.
+                Участники видят объект и его заявки. Роли со звёздочкой обязательны (настраивается в справочнике
+                ролей). Исполнители этапов подставятся автоматически по ролям из регламента.
               </p>
               <MembersPicker
                 value={members}
@@ -146,17 +183,27 @@ function NewObjectPage() {
               />
             </div>
           )}
-          {step === 2 && <StagesPicker templates={templates} selected={stageIds ?? []} onChange={setStageIds} />}
+          {step === 2 && (
+            <StagesPicker
+              templates={templates}
+              selected={stageIds ?? []}
+              onChange={setStageIds}
+              members={memberProfiles}
+            />
+          )}
         </div>
       </div>
 
       <div className="shrink-0 border-t border-border bg-background py-3">
-        <div className="flex min-w-0 flex-wrap items-center gap-3">
+        <div className="flex min-w-0 flex-wrap items-center justify-end gap-3">
           {step > 0 && (
             <Button variant="outline" onClick={() => setStep((s) => s - 1)} className="h-9 px-4 text-sm">
               Назад
             </Button>
           )}
+          <Button asChild variant="outline" className="h-9 px-4 text-sm">
+            <Link to="/objects">Отмена</Link>
+          </Button>
           {step < STEPS.length - 1 ? (
             <Button onClick={next} className="h-9 px-5 text-sm">
               Далее
@@ -166,9 +213,6 @@ function NewObjectPage() {
               {create.isPending ? "Создание…" : `Создать объект (${stageIds?.length ?? 0} этапов)`}
             </Button>
           )}
-          <Button asChild variant="outline" className="ml-auto h-9 px-4 text-sm">
-            <Link to="/objects">Отмена</Link>
-          </Button>
         </div>
       </div>
     </div>

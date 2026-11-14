@@ -18,6 +18,7 @@ import {
 import { StageDocumentsTab } from "@/components/stages/page/StageDocumentsTab";
 import { StageStepsTab, useStageSteps } from "@/components/stages/page/StageStepsTab";
 import { StageStatusBar } from "@/components/stages/page/StageStatusBar";
+import { StageSubstages } from "@/components/stages/page/StageSubstages";
 
 export const Route = createFileRoute("/_authenticated/objects_/$id_/stages/$stageId")({
   component: StagePage,
@@ -128,8 +129,13 @@ function StagePage() {
             <div className="flex min-w-0 flex-1 flex-col gap-4">
               <header>
                 <h1 className="text-xl font-semibold leading-snug tracking-tight">
-                  <span className="text-muted-foreground">{stage.number}.</span> {stage.name}
+                  <span className="text-muted-foreground">{stage.code || stage.number}.</span> {stage.name}
                 </h1>
+                {stage.parent_id && stage.parent_name && (
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Подэтап этапа {stage.parent_code}: {stage.parent_name}
+                  </p>
+                )}
                 {meta.length > 0 && (
                   <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
                     {meta.map((m, i) => (
@@ -171,7 +177,7 @@ function StagePage() {
             </div>
           </div>
 
-          <TabsContent value="main" className="mt-0">
+          <TabsContent value="main" className="mt-0 space-y-4">
             <StageMainTab
               ref={mainRef}
               key={stage.id + stage.updated_at}
@@ -181,6 +187,7 @@ function StagePage() {
               canWork={access.work}
               onSaved={refresh}
             />
+            {!stage.parent_id && <StageSubstages objectId={id} parent={stage} />}
           </TabsContent>
           <TabsContent value="conditions" className="mt-0">
             <StageConditionsTab

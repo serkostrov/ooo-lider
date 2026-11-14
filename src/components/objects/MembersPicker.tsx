@@ -1,9 +1,14 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { ChevronDown, Search, X } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { MEMBER_ROLES, useActiveProfiles, type ProfileShort } from "./data";
+import {
+  MEMBER_ROLES,
+  useActiveProfiles,
+  useRolesForMembers,
+  type ProfileShort,
+} from "./data";
 
 /**
  * Выбор участников объекта по ролям, несколько человек на роль (ТЗ 7.3, шаг 2).
@@ -19,19 +24,47 @@ export function MembersPicker({
   onToggle: (profileId: string, checked: boolean) => void;
   disabled?: boolean;
 }) {
-  const { data: profiles = [], isLoading } = useActiveProfiles();
-  if (isLoading) return null;
-  const known = new Set<string>(MEMBER_ROLES.map((r) => r.code));
-  const others = profiles.filter((p) => !known.has(p.role_code));
-  const groups = [
-    ...MEMBER_ROLES.map((r) => ({ title: r.label, people: profiles.filter((p) => p.role_code === r.code) })),
-    ...(others.length > 0 ? [{ title: "Другие", people: others }] : []),
-  ];
+  const { data: profiles = [], isLoading: loadingProfiles } = useActiveProfiles();
+  const { data: roles = [], isLoading: loadingRoles } = useRolesForMembers();
+  const groups = useMemo(() => {
+    const known = new Set<string>(MEMBER_ROLES.map((r) => r.code));
+    const byCode = new Map(roles.map((r) => [r.code, r]));
+    const primary = MEMBER_ROLES.map((r) => {
+      const meta = byCode.get(r.code);
+      return {
+        code: r.code,
+        title: meta?.name ?? r.label,
+        people: profiles.filter((p) => p.role_code === r.code),
+        required: !!meta?.required_on_object_create,
+      };
+    });
+    const extras = roles
+      .filter((r) => !known.has(r.code) && !r.is_admin)
+      .map((r) => ({
+        code: r.code,
+        title: r.name,
+        people: profiles.filter((p) => p.role_code === r.code),
+        required: r.required_on_object_create,
+      }))
+      .filter((g) => g.people.length > 0 || g.required);
+    return [...primary, ...extras];
+  }, [roles, profiles]);
+
+  if (loadingProfiles || loadingRoles) return null;
 
   return (
     <div className="grid w-full gap-4 md:grid-cols-2 xl:grid-cols-3">
       {groups.map((g) => (
-        <RoleSelect key={g.title} title={g.title} people={g.people} value={value} onToggle={onToggle} disabled={disabled ?? false} />
+        <RoleSelect
+          key={g.code}
+          title={g.title}
+          required={g.required}
+          people={g.people}
+          value={value}
+          onToggle={onToggle}
+          disabled={disabled ?? false}
+          {...(g.required ? { hint: "Обязательно хотя бы один при создании объекта" } : {})}
+        />
       ))}
     </div>
   );
@@ -42,16 +75,20 @@ const CHIPS_LIMIT = 6;
 
 function RoleSelect({
   title,
+  required,
   people,
   value,
   onToggle,
   disabled,
+  hint,
 }: {
   title: string;
+  required?: boolean;
   people: ProfileShort[];
   value: string[];
   onToggle: (profileId: string, checked: boolean) => void;
   disabled?: boolean;
+  hint?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -64,13 +101,17 @@ function RoleSelect({
 
   return (
     <div className="rounded-md border border-border bg-card p-4">
-      <div className="mb-3 flex items-baseline gap-2">
-        <span className="text-sm font-semibold">{title}</span>
+      <div className="mb-3 flex flex-wrap items-baseline gap-2">
+        <span className="text-sm font-semibold">
+          {title}
+          {required && <span className="text-destructive"> *</span>}
+        </span>
         {people.length > 0 && (
           <span className="text-xs text-muted-foreground">
             выбрано {picked.length} из {people.length}
           </span>
         )}
+        {hint && <span className="w-full text-xs text-muted-foreground">{hint}</span>}
       </div>
 
       {people.length === 0 ? (

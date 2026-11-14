@@ -6,7 +6,10 @@ import { formatDate } from "@/lib/format";
 import { daysBetween, mskToday } from "@/lib/dates";
 import { OBJECTS_KEY } from "@/components/objects/data";
 
-export type RequestStatus = "new" | "ready" | "sent" | "accepted" | "done";
+export type RequestStatus = "new" | "ready" | "sent" | "accepted" | "done" | "rework";
+
+/** Основной ход заявки (без боковой ветки rework). */
+export const REQUEST_FLOW_STATUSES: RequestStatus[] = ["new", "ready", "sent", "accepted", "done"];
 
 export const REQUEST_STATUSES: { v: RequestStatus; label: string; next: string; color: string; sort: number }[] = [
   { v: "new", label: "Новая", next: "", color: "#E2553D", sort: 1 },
@@ -14,6 +17,7 @@ export const REQUEST_STATUSES: { v: RequestStatus; label: string; next: string; 
   { v: "sent", label: "Отправлена", next: "Отправить", color: "#5B9BC7", sort: 3 },
   { v: "accepted", label: "Принята заказчиком", next: "Принята заказчиком", color: "#3A9BB0", sort: 4 },
   { v: "done", label: "Исполнена", next: "Исполнено", color: "#3DB87A", sort: 5 },
+  { v: "rework", label: "Требует доработки", next: "На доработку", color: "#C45C26", sort: 15 },
 ];
 
 export type RequestStatusDef = (typeof REQUEST_STATUSES)[number];
@@ -25,7 +29,7 @@ export const REQUEST_STATUSES_KEY = ["dir-request-statuses"] as const;
 
 /**
  * Шаги «Хода заявки». Порядок кодов фиксирован (new → ready → sent → accepted → done).
- * Из справочника берутся только название, текст кнопки и цвет.
+ * rework — боковая ветка. Из справочника берутся только название, текст кнопки и цвет.
  */
 export function useRequestStatuses(): RequestStatusDef[] {
   const { data } = useQuery({
@@ -52,6 +56,11 @@ export function useRequestStatuses(): RequestStatusDef[] {
         }
       : d;
   });
+}
+
+/** Только линейный ход — для степпера. */
+export function useRequestFlowStatuses(): RequestStatusDef[] {
+  return useRequestStatuses().filter((s) => REQUEST_FLOW_STATUSES.includes(s.v));
 }
 
 export type RequestRow = {
@@ -102,23 +111,41 @@ export function sortRequests(rows: RequestRow[]) {
 }
 
 /**
- * Номер вызова в рамках этапа: «15.2» (этап 15, второй вызов —
- * технадзор, ГИП, геотрест и т. д.). Без этапа — null.
+ * Номер вызова в рамках этапа: «15.2» / для подэтапа «12.1.2»
+ * (code этапа + порядковый вызов). Без этапа — null.
  */
 export function stageCallLabel(
   request: RequestRow,
   allOnObject: RequestRow[],
-  stageNumberById: Record<string, number>,
+  stageCodeById: Record<string, string | number>,
 ): string | null {
   if (!request.stage_id) return null;
-  const stageNo = stageNumberById[request.stage_id];
-  if (stageNo == null) return null;
+  const stageCode = stageCodeById[request.stage_id];
+  if (stageCode == null || stageCode === "") return null;
   const peers = allOnObject
     .filter((r) => r.stage_id === request.stage_id)
     .sort((a, b) => a.number - b.number || a.created_at.localeCompare(b.created_at));
   const idx = peers.findIndex((r) => r.id === request.id);
   if (idx < 0) return null;
-  return `${stageNo}.${idx + 1}`;
+  return `${stageCode}.${idx + 1}`;
+}
+
+/** Подпись этапа для списка/Excel: «12 — Название» или с родителем для подэтапа. */
+export function stageDisplayLabel(stage: {
+  code?: string | null;
+  number?: number | null;
+  name: string;
+  parent_code?: string | null;
+  parent_name?: string | null;
+  parent_id?: string | null;
+}): string {
+  const code = stage.code || (stage.number != null ? String(stage.number) : "");
+  const base = code ? `${code} — ${stage.name}` : stage.name;
+  if (stage.parent_id && (stage.parent_code || stage.parent_name)) {
+    const parent = [stage.parent_code, stage.parent_name].filter(Boolean).join(" ");
+    return parent ? `${base} (этап ${parent})` : base;
+  }
+  return base;
 }
 
 export type RequestListFilters = {

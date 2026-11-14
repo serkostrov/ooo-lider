@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import {
   KeyboardSensor,
   PointerSensor,
@@ -7,6 +8,7 @@ import {
   type UniqueIdentifier,
 } from "@dnd-kit/core";
 import { arrayMove, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
+import { CSS, type Transform } from "@dnd-kit/utilities";
 
 /** Sensors: мышь/тач + клавиатура (a11y). */
 export function useDirectoryDndSensors() {
@@ -27,4 +29,20 @@ export function orderedIdsAfterDrag(
   const to = ids.indexOf(over.id);
   if (from < 0 || to < 0) return null;
   return arrayMove(ids.map(String), from, to);
+}
+
+/**
+ * Только вертикальный сдвиг: иначе при тяге вправо таблица с overflow-auto
+ * раздувается и появляется горизонтальный скролл.
+ */
+export function verticalSortableStyle(
+  transform: Transform | null,
+  transition: string | undefined,
+  extras?: CSSProperties,
+): CSSProperties {
+  return {
+    transform: CSS.Transform.toString(transform ? { ...transform, x: 0 } : null),
+    transition,
+    ...extras,
+  };
 }

@@ -13,7 +13,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useProfile } from "@/lib/profile";
 import { cn } from "@/lib/utils";
-import { SortableTh } from "@/components/SortableTh";
+import { SortableTh, type ThResizeProps } from "@/components/SortableTh";
+import { TableColgroup } from "@/components/TableColgroup";
+import { useTableColumnWidths, type ColumnWidthDef, type ColumnWidths } from "@/lib/table-column-widths";
 import { ConditionToggle } from "./ConditionToggle";
 import {
   StatusBadge,
@@ -25,10 +27,71 @@ import {
   type StageCondition,
 } from "./data";
 
+const STAGE_COLUMNS_CORE: ColumnWidthDef[] = [
+  { id: "number", defaultWidth: 56, minWidth: 44, maxWidth: 100 },
+  { id: "name", defaultWidth: 240, minWidth: 120 },
+  { id: "conditions", defaultWidth: 280, minWidth: 140 },
+  { id: "due", defaultWidth: 112, minWidth: 80, maxWidth: 160 },
+  { id: "status", defaultWidth: 140, minWidth: 100, maxWidth: 220 },
+  { id: "confirmer", defaultWidth: 150, minWidth: 100 },
+];
+
+const STAGE_EXECUTOR_COL: ColumnWidthDef = {
+  id: "executor",
+  defaultWidth: 180,
+  minWidth: 100,
+};
+
+function stageColumns(showExecutor: boolean): ColumnWidthDef[] {
+  if (!showExecutor) return STAGE_COLUMNS_CORE;
+  const out = [...STAGE_COLUMNS_CORE];
+  out.splice(5, 0, STAGE_EXECUTOR_COL);
+  return out;
+}
+
+/** Группы — по виду работ; даты — по сроку; порядок — DnD / sort. */
+export type StagesViewMode = "groups" | "dates" | "order";
+const STAGES_VIEW_KEY = "lider.stages.view";
+const STAGES_VIEW_MODES: StagesViewMode[] = ["groups", "dates", "order"];
+
+function useStagesView(): [StagesViewMode, (v: StagesViewMode) => void] {
+  const [view, setView] = useState<StagesViewMode>(() => {
+    try {
+      const saved = localStorage.getItem(STAGES_VIEW_KEY);
+      if (saved && STAGES_VIEW_MODES.includes(saved as StagesViewMode)) return saved as StagesViewMode;
+    } catch {
+      /* ignore */
+    }
+    return "groups";
+  });
+  return [
+    view,
+    (v) => {
+      setView(v);
+      try {
+        localStorage.setItem(STAGES_VIEW_KEY, v);
+      } catch {
+        /* ignore */
+      }
+    },
+  ];
+}
+
+/** Плоский список: колоночная сортировка или дефолт режима (срок / DnD). */
+function flatStagesForView(
+  rows: ObjectStage[],
+  view: Exclude<StagesViewMode, "groups">,
+  sort: SortState<StageSort> | null,
+): ObjectStage[] {
+  if (sort) return sortRows(rows, sort, STAGE_GETTERS);
+  if (view === "dates") return sortRows(rows, { key: "due", dir: "asc" }, STAGE_GETTERS);
+  return flattenStagesHierarchy(rows);
+}
+
 type StageSort = "number" | "name" | "conditions" | "due" | "status" | "executor" | "confirmer";
 
 const STAGE_GETTERS: Record<StageSort, (s: ObjectStage) => unknown> = {
-  number: (s) => s.number,
+  number: (s) => s.code || String(s.number),
   name: (s) => s.name,
   conditions: (s) => (s.conditions_total ? s.conditions_done / s.conditions_total : -1),
   due: (s) => s.due_date,
@@ -36,6 +99,21 @@ const STAGE_GETTERS: Record<StageSort, (s: ObjectStage) => unknown> = {
   executor: (s) => s.executor_name,
   confirmer: (s) => s.confirmer_name ?? s.confirmer_role_name,
 };
+
+/** Топ-уровень + дети сразу под родителем (DFS по sort). */
+export function flattenStagesHierarchy(stages: ObjectStage[]): ObjectStage[] {
+  const tops = stages.filter((s) => !s.parent_id).sort((a, b) => a.sort - b.sort || a.number - b.number);
+  const out: ObjectStage[] = [];
+  for (const t of tops) {
+    out.push(t);
+    out.push(
+      ...stages
+        .filter((s) => s.parent_id === t.id)
+        .sort((a, b) => a.sort - b.sort || a.code.localeCompare(b.code, "ru")),
+    );
+  }
+  return out;
+}
 
 
 const ALL = "__all";
@@ -82,12 +160,18 @@ export function StagesTable({
 }) {
   const { role_code, is_admin } = useProfile();
   const showExecutor = is_admin || role_code !== "foreman";
+  const columns = useMemo(() => stageColumns(showExecutor), [showExecutor]);
+  const { widths: colWidths, totalWidth: colsTotal, resizeProps } = useTableColumnWidths(
+    showExecutor ? "object-stages" : "object-stages-no-exec",
+    columns,
+  );
   const { data: stages = [], isLoading } = useObjectStages(objectId);
   const ids = stages.map((s) => s.id);
   const { data: conditions = [] } = useObjectConditions(objectId, ids);
   const { data: preds = {} } = useObjectPredecessors(objectId, ids);
   const refresh = useRefreshStages();
 
+  const [view, setView] = useStagesView();
   const [f, setF] = useState<StagesTableFilters>({
     workType: ALL,
     executor: ALL,
@@ -114,13 +198,13 @@ export function StagesTable({
     for (const c of conditions) (m[c.stage_id] ??= []).push(c);
     return m;
   }, [conditions]);
-  const numberById = useMemo(() => Object.fromEntries(stages.map((s) => [s.id, s.number])), [stages]);
+  const codeById = useMemo(() => Object.fromEntries(stages.map((s) => [s.id, s.code || String(s.number)])), [stages]);
 
   const visible = filterStages(stages, f);
   const open = visible.filter((s) => !s.is_closed);
   const closed = visible.filter((s) => s.is_closed);
 
-  // Группы по видам работ
+  // Группы по видам работ; внутри — иерархия (подэтапы под родителем)
   const groups = useMemo(() => {
     const order: { id: string; name: string }[] = [];
     const seen = new Set<string>();
@@ -132,24 +216,38 @@ export function StagesTable({
       }
     }
     return order
-      .map((g) => ({
-        ...g,
-        rows: sortRows(
-          open.filter((s) => (s.work_type_id ?? "") === g.id),
-          sort,
-          STAGE_GETTERS,
-        ),
-      }))
+      .map((g) => {
+        const inGroup = open.filter((s) => (s.work_type_id ?? "") === g.id);
+        const hierarchical = flattenStagesHierarchy(inGroup);
+        const rows = sort
+          ? sortRows(inGroup, sort, STAGE_GETTERS)
+          : hierarchical;
+        return { ...g, rows };
+      })
       .filter((g) => g.rows.length > 0);
   }, [stages, open, sort]);
 
-  const closedSorted = useMemo(() => sortRows(closed, sort, STAGE_GETTERS), [closed, sort]);
+  const openFlat = useMemo(() => {
+    if (view === "groups") return [] as ObjectStage[];
+    return flatStagesForView(open, view, sort);
+  }, [open, view, sort]);
 
-  if (isLoading) return <StagesTableSkeleton showExecutor={showExecutor} />;
+  const closedSorted = useMemo(() => {
+    if (view === "groups") {
+      if (sort) return sortRows(closed, sort, STAGE_GETTERS);
+      return flattenStagesHierarchy(closed);
+    }
+    return flatStagesForView(closed, view, sort);
+  }, [closed, view, sort]);
+
+  if (isLoading) {
+    return <StagesTableSkeleton showExecutor={showExecutor} columns={columns} widths={colWidths} totalWidth={colsTotal} />;
+  }
 
   const set = <K extends keyof StagesTableFilters>(k: K, v: StagesTableFilters[K]) => setF((x) => ({ ...x, [k]: v }));
   const onChanged = () => refresh(objectId);
-  const rowProps = { objectId, condByStage, preds, numberById, onChanged };
+  const showGroup = view !== "groups";
+  const rowProps = { objectId, condByStage, preds, codeById, onChanged, showGroup };
 
   const activeFilterCount =
     (f.workType !== ALL ? 1 : 0) +
@@ -167,8 +265,40 @@ export function StagesTable({
       showExcluded: false,
     });
 
+  const hasOpenRows = view === "groups" ? groups.length > 0 : openFlat.length > 0;
+
+  const viewButtons: { id: StagesViewMode; label: string; title: string }[] = [
+    { id: "groups", label: "Группы", title: "По группам работ" },
+    { id: "dates", label: "Даты", title: "По сроку этапа" },
+    { id: "order", label: "Порядок", title: "В порядке DnD / добавления" },
+  ];
+
   const chrome = (
     <>
+      <div
+        className="inline-flex h-9 shrink-0 items-stretch overflow-hidden rounded-md border border-border"
+        role="group"
+        aria-label="Вид этапов"
+      >
+        {viewButtons.map((b, i) => (
+          <button
+            key={b.id}
+            type="button"
+            title={b.title}
+            aria-pressed={view === b.id}
+            onClick={() => setView(b.id)}
+            className={cn(
+              "px-3 text-sm transition-colors",
+              i > 0 && "border-l border-border",
+              view === b.id
+                ? "bg-primary/14 font-medium text-primary"
+                : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
+            )}
+          >
+            {b.label}
+          </button>
+        ))}
+      </div>
       <div className="inline-flex h-9 shrink-0 items-stretch overflow-hidden rounded-md border border-border">
         <Popover>
           <PopoverTrigger asChild>
@@ -282,37 +412,55 @@ export function StagesTable({
         )}
 
       <div className="min-h-0 flex-1 overflow-auto">
-        {groups.length === 0 && (f.onlyOpen || closedSorted.length === 0) ? (
+        {!hasOpenRows && (f.onlyOpen || closedSorted.length === 0) ? (
           <div className="rounded-md border border-border bg-card py-10 text-center text-sm text-muted-foreground">
             {stages.length === 0 ? "На объекте нет этапов" : "Нет этапов по выбранным условиям"}
           </div>
         ) : (
           /* Одна обёртка: sticky-шапка живёт до конца скролла, в т.ч. по «Закрытым» */
-          <div className="min-w-[1180px] space-y-3 pb-1">
+          <div className="space-y-3 pb-1" style={{ minWidth: colsTotal }}>
             <div className="sticky top-0 z-20 overflow-hidden rounded-md border border-border bg-muted/30 backdrop-blur-sm">
-              <table className="w-full table-fixed text-sm">
-                <StagesColgroup showExecutor={showExecutor} />
-                <StagesHead showExecutor={showExecutor} sort={sort} onToggle={toggle} />
+              <table className="w-full table-fixed text-sm" style={{ minWidth: colsTotal }}>
+                <TableColgroup columns={columns} widths={colWidths} />
+                <StagesHead
+                  showExecutor={showExecutor}
+                  sort={sort}
+                  onToggle={toggle}
+                  resizeProps={resizeProps}
+                />
               </table>
             </div>
 
-            {groups.map((g) => (
-              <section key={g.id} className="overflow-hidden rounded-md border border-border bg-card">
-                <header className="border-b border-border/80 bg-muted/40 px-4 py-2">
-                  <h3 className="truncate text-sm font-semibold tracking-tight text-foreground">
-                    {g.name}
-                  </h3>
-                </header>
-                <table className="w-full table-fixed text-sm">
-                  <StagesColgroup showExecutor={showExecutor} />
+            {view === "groups" ? (
+              groups.map((g) => (
+                <section key={g.id} className="overflow-hidden rounded-md border border-border bg-card">
+                  <header className="border-b border-border/80 bg-muted/40 px-4 py-2">
+                    <h3 className="truncate text-sm font-semibold tracking-tight text-foreground">
+                      {g.name}
+                    </h3>
+                  </header>
+                  <table className="w-full table-fixed text-sm" style={{ minWidth: colsTotal }}>
+                    <TableColgroup columns={columns} widths={colWidths} />
+                    <tbody>
+                      {g.rows.map((s) => (
+                        <StageRow key={s.id} s={s} showExecutor={showExecutor} {...rowProps} />
+                      ))}
+                    </tbody>
+                  </table>
+                </section>
+              ))
+            ) : openFlat.length > 0 ? (
+              <section className="overflow-hidden rounded-md border border-border bg-card">
+                <table className="w-full table-fixed text-sm" style={{ minWidth: colsTotal }}>
+                  <TableColgroup columns={columns} widths={colWidths} />
                   <tbody>
-                    {g.rows.map((s) => (
+                    {openFlat.map((s) => (
                       <StageRow key={s.id} s={s} showExecutor={showExecutor} {...rowProps} />
                     ))}
                   </tbody>
                 </table>
               </section>
-            ))}
+            ) : null}
 
             {!f.onlyOpen && closedSorted.length > 0 && (
               <div className="rounded-md border border-border bg-card">
@@ -326,8 +474,11 @@ export function StagesTable({
                   <span className="tabular-nums">{closedSorted.length}</span>
                 </button>
                 {closedOpen && (
-                  <table className="w-full table-fixed border-t border-border text-sm">
-                    <StagesColgroup showExecutor={showExecutor} />
+                  <table
+                    className="w-full table-fixed border-t border-border text-sm"
+                    style={{ minWidth: colsTotal }}
+                  >
+                    <TableColgroup columns={columns} widths={colWidths} />
                     <tbody>
                       {closedSorted.map((s) => (
                         <StageRow key={s.id} s={s} showExecutor={showExecutor} {...rowProps} />
@@ -344,14 +495,28 @@ export function StagesTable({
   );
 }
 
-function StagesTableSkeleton({ showExecutor, groups = 2, rows = 5 }: { showExecutor: boolean; groups?: number; rows?: number }) {
+function StagesTableSkeleton({
+  showExecutor,
+  columns,
+  widths,
+  totalWidth,
+  groups = 2,
+  rows = 5,
+}: {
+  showExecutor: boolean;
+  columns: ColumnWidthDef[];
+  widths: ColumnWidths;
+  totalWidth: number;
+  groups?: number;
+  rows?: number;
+}) {
   const td = "px-5 py-2.5 align-middle";
   return (
     <div className="min-h-0 flex-1 overflow-auto">
-      <div className="min-w-[1180px] space-y-3 pb-1">
+      <div className="space-y-3 pb-1" style={{ minWidth: totalWidth }}>
         <div className="overflow-hidden rounded-md border border-border bg-muted/30">
-          <table className="w-full table-fixed text-sm">
-            <StagesColgroup showExecutor={showExecutor} />
+          <table className="w-full table-fixed text-sm" style={{ minWidth: totalWidth }}>
+            <TableColgroup columns={columns} widths={widths} />
             <thead>
               <tr>
                 <th className="px-5 py-2.5 text-left text-xs font-medium text-muted-foreground">N</th>
@@ -372,8 +537,8 @@ function StagesTableSkeleton({ showExecutor, groups = 2, rows = 5 }: { showExecu
             <header className="border-b border-border/80 bg-muted/40 px-4 py-2">
               <Skeleton height={16} width={`${38 + g * 10}%`} />
             </header>
-            <table className="w-full table-fixed text-sm">
-              <StagesColgroup showExecutor={showExecutor} />
+            <table className="w-full table-fixed text-sm" style={{ minWidth: totalWidth }}>
+              <TableColgroup columns={columns} widths={widths} />
               <tbody>
                 {Array.from({ length: rows }, (_, i) => (
                   <tr key={i} className="border-t border-border/50">
@@ -411,46 +576,61 @@ function StagesTableSkeleton({ showExecutor, groups = 2, rows = 5 }: { showExecu
   );
 }
 
-function StagesColgroup({ showExecutor }: { showExecutor: boolean }) {
-  return (
-    <colgroup>
-      <col className="w-12" />
-      <col className="w-[22%]" />
-      {/* Шире — чтобы раскрытый чеклист условий не ломал строки; лишнее — в горизонтальный скролл */}
-      <col className="w-72" />
-      <col className="w-28" />
-      <col className="w-[11.5rem]" />
-      {showExecutor && <col className="w-52" />}
-      <col className="w-36" />
-    </colgroup>
-  );
-}
-
 function StagesHead({
   showExecutor,
   sort,
   onToggle,
+  resizeProps,
 }: {
   showExecutor: boolean;
   sort: SortState<StageSort> | null;
   onToggle: (key: StageSort) => void;
+  resizeProps: (columnId: string) => ThResizeProps;
 }) {
   /** Без border-b — иначе с рамкой sticky-шапки получается толстая двойная линия. */
   const th = "border-b-0 bg-transparent";
   return (
     <thead>
       <tr>
-        <SortableTh column="number" sort={sort} onToggle={onToggle} className={th}>N</SortableTh>
-        <SortableTh column="name" sort={sort} onToggle={onToggle} className={th}>Этап</SortableTh>
-        <SortableTh column="conditions" sort={sort} onToggle={onToggle} className={th}>Условия</SortableTh>
-        <SortableTh column="due" sort={sort} onToggle={onToggle} className={th}>Срок</SortableTh>
-        <SortableTh column="status" sort={sort} onToggle={onToggle} className={th}>Статус</SortableTh>
+        <SortableTh column="number" sort={sort} onToggle={onToggle} className={th} resize={resizeProps("number")}>
+          N
+        </SortableTh>
+        <SortableTh column="name" sort={sort} onToggle={onToggle} className={th} resize={resizeProps("name")}>
+          Этап
+        </SortableTh>
+        <SortableTh
+          column="conditions"
+          sort={sort}
+          onToggle={onToggle}
+          className={th}
+          resize={resizeProps("conditions")}
+        >
+          Условия
+        </SortableTh>
+        <SortableTh column="due" sort={sort} onToggle={onToggle} className={th} resize={resizeProps("due")}>
+          Срок
+        </SortableTh>
+        <SortableTh column="status" sort={sort} onToggle={onToggle} className={th} resize={resizeProps("status")}>
+          Статус
+        </SortableTh>
         {showExecutor && (
-          <SortableTh column="executor" sort={sort} onToggle={onToggle} className={cn(th, "pr-6")}>
+          <SortableTh
+            column="executor"
+            sort={sort}
+            onToggle={onToggle}
+            className={cn(th, "pr-6")}
+            resize={resizeProps("executor")}
+          >
             Исполнитель
           </SortableTh>
         )}
-        <SortableTh column="confirmer" sort={sort} onToggle={onToggle} className={th}>
+        <SortableTh
+          column="confirmer"
+          sort={sort}
+          onToggle={onToggle}
+          className={th}
+          resize={resizeProps("confirmer")}
+        >
           Адресат
         </SortableTh>
       </tr>
@@ -463,50 +643,73 @@ function StageRow({
   objectId,
   condByStage,
   preds,
-  numberById,
+  codeById,
   onChanged,
   showExecutor,
+  showGroup,
 }: {
   s: ObjectStage;
   objectId: string;
   condByStage: Record<string, StageCondition[]>;
   preds: Record<string, string[]>;
-  numberById: Record<string, number>;
+  codeById: Record<string, string>;
   onChanged: () => void;
   showExecutor: boolean;
+  showGroup?: boolean;
 }) {
   const conds = condByStage[s.id] ?? [];
-  const predNumbers = (preds[s.id] ?? []).map((id) => numberById[id]).filter((x) => x !== undefined).sort((a, b) => a - b);
+  const predNumbers = (preds[s.id] ?? [])
+    .map((id) => codeById[id])
+    .filter((x): x is string => !!x)
+    .sort((a, b) => a.localeCompare(b, "ru", { numeric: true }));
   const noResponseDays = s.is_no_response && s.response_due ? daysBetween(s.response_due, mskToday()) : 0;
   const link = { to: "/objects/$id/stages/$stageId" as const, params: { id: objectId, stageId: s.id } };
   const docsHint = [s.outgoing_doc && `от нас: ${s.outgoing_doc}`, s.expected_doc && `ждём: ${s.expected_doc}`]
     .filter(Boolean)
     .join(" · ");
+  const groupName = s.work_type_name?.trim() || "Без группы";
   /** top + py: при раскрытых условиях соседние ячейки не «висят» по центру пустоты */
   const td = "px-5 py-2.5 align-top";
+  const isSub = !!s.parent_id;
 
   return (
     <tr className={cn("group border-t border-border/50", rowTone(s))}>
       <td className={td}>
-        <Link {...link} className="inline-flex h-7 items-center gap-1 tabular-nums leading-none text-muted-foreground hover:text-primary">
-          {s.number}
+        <Link
+          {...link}
+          className={cn(
+            "inline-flex h-7 items-center gap-1 tabular-nums leading-none text-muted-foreground hover:text-primary",
+            isSub && "pl-3",
+          )}
+        >
+          {s.code || s.number}
           {s.is_critical && <Flag className="size-3 fill-destructive text-destructive" aria-label="Критичный" />}
         </Link>
       </td>
       <td className={td}>
-        <div className="flex min-h-7 min-w-0 items-center gap-2">
-          <Link {...link} className="min-w-0 flex-1 truncate font-medium hover:underline" title={docsHint || s.name}>
-            {s.name}
-          </Link>
-          {s.out_of_order && (
+        <div className={cn("min-w-0 space-y-1", isSub && "pl-3")}>
+          <div className="flex min-h-7 min-w-0 items-center gap-2">
+            <Link {...link} className="min-w-0 flex-1 truncate font-medium hover:underline" title={docsHint || s.name}>
+              {s.name}
+            </Link>
+            {s.out_of_order && (
+              <span
+                title={`Взят вне очереди: по регламенту после этапов ${predNumbers.join(", ") || "—"}`}
+                className="inline-flex shrink-0 items-center text-[11px] text-warning"
+              >
+                <AlertTriangle className="size-3" />
+              </span>
+            )}
+            {s.is_excluded && <span className="shrink-0 text-[11px] text-muted-foreground">искл.</span>}
+          </div>
+          {showGroup && (
             <span
-              title={`Взят вне очереди: по регламенту после этапов ${predNumbers.join(", ") || "—"}`}
-              className="inline-flex shrink-0 items-center text-[11px] text-warning"
+              className="inline-flex max-w-full truncate rounded bg-muted px-1.5 py-0.5 text-[11px] font-medium leading-none text-muted-foreground"
+              title={groupName}
             >
-              <AlertTriangle className="size-3" />
+              {groupName}
             </span>
           )}
-          {s.is_excluded && <span className="shrink-0 text-[11px] text-muted-foreground">искл.</span>}
         </div>
       </td>
       <td className={td}>
