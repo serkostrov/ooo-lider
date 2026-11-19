@@ -142,9 +142,37 @@ describe("Контакты заказчика", () => {
 describe("Сотрудники", () => {
   it("ФИО и роль обязательны", () => {
     expect(validateEmployee({ full_name: "", role_code: "", phone: "", email: "" })).toMatch(/ФИО и роль/);
+    expect(validateEmployee({ full_name: "Петр", role_codes: [], phone: "", email: "" })).toMatch(/ФИО и роль/);
     expect(
       validateEmployee({ full_name: "Петр", role_code: "foreman", phone: "", email: "" }),
     ).toBeNull();
+  });
+
+  it("мультироль только сметчик+снабжение", () => {
+    expect(
+      validateEmployee({
+        full_name: "Петр",
+        role_codes: ["estimator", "supply"],
+        phone: "",
+        email: "",
+      }),
+    ).toBeNull();
+    expect(
+      validateEmployee({
+        full_name: "Петр",
+        role_codes: ["foreman", "pto"],
+        phone: "",
+        email: "",
+      }),
+    ).toMatch(/сметчика и снабжения/);
+    expect(
+      validateEmployee({
+        full_name: "Петр",
+        role_codes: ["estimator", "foreman"],
+        phone: "",
+        email: "",
+      }),
+    ).toMatch(/сметчика и снабжения/);
   });
 });
 

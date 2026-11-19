@@ -36,6 +36,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { fieldLabelClass, fieldStackClass, panelClass, tabsListClass, tabTriggerClass } from "@/lib/ui";
 import { useProfile } from "@/lib/profile";
+import { isRequestInitiatorRole, isRequestOfficeRole } from "@/lib/permissions";
 
 /** Основная работа + вторичные вкладки. Старые tab=initiator|office|files → work. */
 const TABS = ["work", "comments", "history"] as const;
@@ -213,16 +214,13 @@ function RequestCard() {
   const orphan = values.filter((v) => !activeIds.has(v.field_id) && v.field_type !== "file");
   const doneByName = r.done_by ? profiles.find((p) => p.id === r.done_by)?.full_name ?? null : null;
   // Прораб/ПТО (и админ) — initiator на «Новая»/доработке; офис (и админ) — office только на «Готова».
-  const isInitiatorRole = me.role_code === "foreman" || me.role_code === "pto";
-  const isOfficeRole = me.role_code === "office";
   const statusAllowsInitiator = r.status === "new" || r.status === "rework";
   const statusAllowsOffice = r.status === "ready";
-  const canEditInitiator = (me.is_admin || isInitiatorRole) && statusAllowsInitiator;
-  const canEditOffice = (me.is_admin || isOfficeRole) && statusAllowsOffice;
+  const canEditInitiator = isRequestInitiatorRole(me) && statusAllowsInitiator;
+  const canEditOffice = isRequestOfficeRole(me) && statusAllowsOffice;
   const canEditFiles =
-    (me.is_admin && (statusAllowsInitiator || statusAllowsOffice)) ||
-    (isInitiatorRole && statusAllowsInitiator) ||
-    (isOfficeRole && statusAllowsOffice);
+    (isRequestInitiatorRole(me) && statusAllowsInitiator) ||
+    (isRequestOfficeRole(me) && statusAllowsOffice);
   const canEditAnything = canEditInitiator || canEditOffice || canEditFiles;
   const initiatorFields = active.filter((f) => f.filled_by === "initiator");
   const officeFields = active.filter((f) => f.filled_by === "office");
@@ -260,7 +258,7 @@ function RequestCard() {
     n > 0 ? (
       <span
         aria-hidden
-        className="ml-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary/15 px-1 text-[10px] font-semibold leading-none tabular-nums text-primary"
+        className="ml-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded bg-primary/15 px-1 text-[10px] font-semibold leading-none tabular-nums text-primary"
       >
         {n > 99 ? "99+" : n}
       </span>
@@ -297,7 +295,7 @@ function RequestCard() {
                 Заполнение
               </TabsTrigger>
               <TabsTrigger value="comments" className={cn(tabTriggerClass, "justify-center px-2")}>
-                Переписка{count(comments.length)}
+                Сообщения{count(comments.length)}
               </TabsTrigger>
               <TabsTrigger value="history" className={cn(tabTriggerClass, "justify-center px-2")}>
                 История
@@ -421,19 +419,22 @@ function RequestCard() {
       </div>
 
       {showBar && (
-        <div className="shrink-0 border-t border-border bg-background py-3">
-          <div className="flex min-w-0 flex-wrap items-center justify-end gap-2 sm:gap-3">
+        <div className="shrink-0 border-t border-border bg-background px-0 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+          <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end sm:gap-3">
             {canEditAnything && !editing && (
-              <Button className="h-9 shrink-0 gap-1.5 px-4 text-sm" onClick={() => setEditing(true)}>
+              <Button
+                className="h-10 w-full gap-1.5 px-4 text-sm sm:h-9 sm:w-auto sm:shrink-0"
+                onClick={() => setEditing(true)}
+              >
                 <EditIcon className="size-3.5" />
                 {editButtonLabel}
               </Button>
             )}
             {canEditAnything && editing && (
-              <>
+              <div className="flex w-full gap-2 sm:w-auto">
                 <Button
                   variant="outline"
-                  className="h-9 shrink-0 text-sm"
+                  className="h-10 flex-1 text-sm sm:h-9 sm:flex-none sm:shrink-0"
                   disabled={saving}
                   onClick={exitEditing}
                 >
@@ -442,11 +443,11 @@ function RequestCard() {
                 <Button
                   onClick={() => void saveAll().catch(() => undefined)}
                   disabled={!dirty || saving}
-                  className="h-9 shrink-0 px-4 text-sm"
+                  className="h-10 flex-1 px-4 text-sm sm:h-9 sm:flex-none sm:shrink-0"
                 >
                   {saving ? "Сохранение…" : "Сохранить"}
                 </Button>
-              </>
+              </div>
             )}
             <RequestStatusActions
               r={r}
@@ -459,7 +460,7 @@ function RequestCard() {
                 setEditing(false);
                 refresh();
               }}
-              className="shrink-0"
+              className="min-w-0 sm:shrink-0"
             />
           </div>
         </div>

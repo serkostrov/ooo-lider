@@ -54,7 +54,14 @@ function NewObjectPage() {
     const need = requiredRoleCodes(roles);
     return need
       .map((code) => roles.find((r) => r.code === code)!)
-      .filter((role) => !profiles.some((p) => memberIds.includes(p.id) && p.role_code === role.code));
+      .filter(
+        (role) =>
+          !profiles.some(
+            (p) =>
+              memberIds.includes(p.id) &&
+              (p.role_codes.includes(role.code) || p.role_code === role.code),
+          ),
+      );
   };
 
   const create = useMutation({

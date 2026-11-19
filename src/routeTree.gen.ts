@@ -12,8 +12,10 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as AuthenticatedDirectorRouteImport } from './routes/_authenticated/director'
 import { Route as AuthenticatedDirectoriesRouteImport } from './routes/_authenticated/directories'
 import { Route as AuthenticatedHistoryRouteImport } from './routes/_authenticated/history'
+import { Route as AuthenticatedNotificationsRouteImport } from './routes/_authenticated/notifications'
 import { Route as AuthenticatedObjectsRouteImport } from './routes/_authenticated/objects'
 import { Route as AuthenticatedOverdueRouteImport } from './routes/_authenticated/overdue'
 import { Route as AuthenticatedRequestsRouteImport } from './routes/_authenticated/requests'
@@ -42,6 +44,11 @@ const LoginRoute = LoginRouteImport.update({
   path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedDirectorRoute = AuthenticatedDirectorRouteImport.update({
+  id: '/director',
+  path: '/director',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedDirectoriesRoute =
   AuthenticatedDirectoriesRouteImport.update({
     id: '/directories',
@@ -53,6 +60,12 @@ const AuthenticatedHistoryRoute = AuthenticatedHistoryRouteImport.update({
   path: '/history',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedNotificationsRoute =
+  AuthenticatedNotificationsRouteImport.update({
+    id: '/notifications',
+    path: '/notifications',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedObjectsRoute = AuthenticatedObjectsRouteImport.update({
   id: '/objects',
   path: '/objects',
@@ -129,8 +142,10 @@ const AuthenticatedObjectsIdStagesStageIdRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/director': typeof AuthenticatedDirectorRoute
   '/directories': typeof AuthenticatedDirectoriesRoute
   '/history': typeof AuthenticatedHistoryRoute
+  '/notifications': typeof AuthenticatedNotificationsRoute
   '/objects': typeof AuthenticatedObjectsRoute
   '/overdue': typeof AuthenticatedOverdueRoute
   '/requests': typeof AuthenticatedRequestsRoute
@@ -148,8 +163,10 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/director': typeof AuthenticatedDirectorRoute
   '/directories': typeof AuthenticatedDirectoriesRoute
   '/history': typeof AuthenticatedHistoryRoute
+  '/notifications': typeof AuthenticatedNotificationsRoute
   '/objects': typeof AuthenticatedObjectsRoute
   '/overdue': typeof AuthenticatedOverdueRoute
   '/requests': typeof AuthenticatedRequestsRoute
@@ -169,8 +186,10 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/login': typeof LoginRoute
+  '/_authenticated/director': typeof AuthenticatedDirectorRoute
   '/_authenticated/directories': typeof AuthenticatedDirectoriesRoute
   '/_authenticated/history': typeof AuthenticatedHistoryRoute
+  '/_authenticated/notifications': typeof AuthenticatedNotificationsRoute
   '/_authenticated/objects': typeof AuthenticatedObjectsRoute
   '/_authenticated/overdue': typeof AuthenticatedOverdueRoute
   '/_authenticated/requests': typeof AuthenticatedRequestsRoute
@@ -190,8 +209,10 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/login'
+    | '/director'
     | '/directories'
     | '/history'
+    | '/notifications'
     | '/objects'
     | '/overdue'
     | '/requests'
@@ -209,8 +230,10 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/login'
+    | '/director'
     | '/directories'
     | '/history'
+    | '/notifications'
     | '/objects'
     | '/overdue'
     | '/requests'
@@ -229,8 +252,10 @@ export interface FileRouteTypes {
     | '/'
     | '/_authenticated'
     | '/login'
+    | '/_authenticated/director'
     | '/_authenticated/directories'
     | '/_authenticated/history'
+    | '/_authenticated/notifications'
     | '/_authenticated/objects'
     | '/_authenticated/overdue'
     | '/_authenticated/requests'
@@ -275,6 +300,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/director': {
+      id: '/_authenticated/director'
+      path: '/director'
+      fullPath: '/director'
+      preLoaderRoute: typeof AuthenticatedDirectorRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/directories': {
       id: '/_authenticated/directories'
       path: '/directories'
@@ -287,6 +319,13 @@ declare module '@tanstack/react-router' {
       path: '/history'
       fullPath: '/history'
       preLoaderRoute: typeof AuthenticatedHistoryRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/notifications': {
+      id: '/_authenticated/notifications'
+      path: '/notifications'
+      fullPath: '/notifications'
+      preLoaderRoute: typeof AuthenticatedNotificationsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/objects': {
@@ -384,8 +423,10 @@ declare module '@tanstack/react-router' {
 }
 
 interface AuthenticatedRouteRouteChildren {
+  AuthenticatedDirectorRoute: typeof AuthenticatedDirectorRoute
   AuthenticatedDirectoriesRoute: typeof AuthenticatedDirectoriesRoute
   AuthenticatedHistoryRoute: typeof AuthenticatedHistoryRoute
+  AuthenticatedNotificationsRoute: typeof AuthenticatedNotificationsRoute
   AuthenticatedObjectsRoute: typeof AuthenticatedObjectsRoute
   AuthenticatedOverdueRoute: typeof AuthenticatedOverdueRoute
   AuthenticatedRequestsRoute: typeof AuthenticatedRequestsRoute
@@ -402,8 +443,10 @@ interface AuthenticatedRouteRouteChildren {
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedDirectorRoute: AuthenticatedDirectorRoute,
   AuthenticatedDirectoriesRoute: AuthenticatedDirectoriesRoute,
   AuthenticatedHistoryRoute: AuthenticatedHistoryRoute,
+  AuthenticatedNotificationsRoute: AuthenticatedNotificationsRoute,
   AuthenticatedObjectsRoute: AuthenticatedObjectsRoute,
   AuthenticatedOverdueRoute: AuthenticatedOverdueRoute,
   AuthenticatedRequestsRoute: AuthenticatedRequestsRoute,

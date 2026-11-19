@@ -16,11 +16,12 @@ export const fieldStackClass = "flex flex-col gap-2";
 /** Подпись поля (Label / dt). */
 export const fieldLabelClass = "block text-sm font-medium leading-snug text-muted-foreground";
 
+/** Табы: на мобилке — полная ширина, ряды по центру (~3+2); на sm+ — по содержимому. */
 export const tabsListClass =
-  "mb-4 inline-flex h-9 max-w-full flex-wrap items-center justify-start gap-0.5 rounded-md bg-muted p-0.5";
+  "mb-4 flex h-auto min-h-9 w-full max-w-full flex-wrap items-center justify-center gap-0.5 rounded-md bg-muted p-0.5 sm:inline-flex sm:w-fit sm:justify-start";
 
 export const tabTriggerClass =
-  "h-8 rounded-sm px-3 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground " +
+  "h-8 max-sm:basis-[calc(33.333%-2px)] max-sm:justify-center shrink-0 rounded-sm px-2.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground sm:basis-auto sm:px-3 " +
   "data-[state=active]:bg-card data-[state=active]:text-foreground " +
   "disabled:opacity-40";
 

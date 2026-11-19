@@ -3,6 +3,8 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { AlertTriangle, CheckCircle2 } from "lucide-react";
 import { tabsListClass, tabTriggerClass, tableWrapClass, thClass } from "@/lib/ui";
 import { useSortedRows, useTableSort } from "@/lib/table-sort";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { cn } from "@/lib/utils";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
@@ -53,6 +55,7 @@ type Kind = "all" | "stage" | "request";
 
 function OverduePage() {
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const scrollRef = useRef<HTMLDivElement>(null);
   const [kind, setKind] = useState<Kind>("all");
   const [objectId, setObjectId] = useState(ALL);
@@ -109,9 +112,9 @@ function OverduePage() {
             description="Этапы, у которых прошёл срок, и заявки, не исполненные к дате созвона. Сначала то, что опаздывает дольше всего."
             className="mb-3"
           />
-          <div className="flex flex-wrap items-center gap-3">
-            <Tabs value={kind} onValueChange={(v) => setKind(v as Kind)}>
-              <TabsList className={`${tabsListClass} mb-0`}>
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
+            <Tabs value={kind} onValueChange={(v) => setKind(v as Kind)} className="min-w-0">
+              <TabsList className={`${tabsListClass} mb-0 w-full sm:w-auto`}>
                 <TabsTrigger value="all" className={tabTriggerClass}>
                   Всё ({countsLoading ? "…" : total})
                 </TabsTrigger>
@@ -124,7 +127,7 @@ function OverduePage() {
               </TabsList>
             </Tabs>
             <Select value={objectId} onValueChange={setObjectId}>
-              <SelectTrigger className="h-9 w-72 max-w-full text-sm">
+              <SelectTrigger className="h-9 w-full text-sm sm:w-72 sm:max-w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -143,36 +146,48 @@ function OverduePage() {
       }
     >
       {isLoading ? (
-        <div className={tableWrapClass}>
-          <table className="w-full min-w-[760px] text-sm">
-            <thead className="sticky top-0 z-10 bg-card">
-              <tr className="text-left">
-                <SortableTh column="what" sort={sort} onToggle={toggle}>
-                  Что
-                </SortableTh>
-                <SortableTh column="object" sort={sort} onToggle={toggle}>
-                  Объект
-                </SortableTh>
-                <SortableTh column="status" sort={sort} onToggle={toggle}>
-                  Статус
-                </SortableTh>
-                <SortableTh column="responsible" sort={sort} onToggle={toggle}>
-                  Ответственный
-                </SortableTh>
-                <SortableTh column="due" sort={sort} onToggle={toggle}>
-                  Срок
-                </SortableTh>
-                <SortableTh column="days" sort={sort} onToggle={toggle}>
-                  Просрочено
-                </SortableTh>
-                <th className={thClass} />
-              </tr>
-            </thead>
-            <tbody>
-              <OverdueTableSkeleton />
-            </tbody>
-          </table>
-        </div>
+        isMobile ? (
+          <div className="space-y-2 overflow-auto p-0.5">
+            {Array.from({ length: 5 }, (_, i) => (
+              <div key={i} className="rounded-lg border border-border/70 p-3">
+                <Skeleton height={16} width="70%" />
+                <Skeleton height={12} width="50%" className="mt-2" />
+                <Skeleton height={12} width="40%" className="mt-1.5" />
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className={tableWrapClass}>
+            <table className="w-full min-w-[760px] text-sm">
+              <thead className="sticky top-0 z-10 bg-card">
+                <tr className="text-left">
+                  <SortableTh column="what" sort={sort} onToggle={toggle}>
+                    Что
+                  </SortableTh>
+                  <SortableTh column="object" sort={sort} onToggle={toggle}>
+                    Объект
+                  </SortableTh>
+                  <SortableTh column="status" sort={sort} onToggle={toggle}>
+                    Статус
+                  </SortableTh>
+                  <SortableTh column="responsible" sort={sort} onToggle={toggle}>
+                    Ответственный
+                  </SortableTh>
+                  <SortableTh column="due" sort={sort} onToggle={toggle}>
+                    Срок
+                  </SortableTh>
+                  <SortableTh column="days" sort={sort} onToggle={toggle}>
+                    Просрочено
+                  </SortableTh>
+                  <th className={thClass} />
+                </tr>
+              </thead>
+              <tbody>
+                <OverdueTableSkeleton />
+              </tbody>
+            </table>
+          </div>
+        )
       ) : tabTotal === 0 ? (
         <div className="flex h-full flex-col items-center justify-center gap-2 rounded-md border border-border bg-card py-12 text-center">
           <CheckCircle2 className="size-8 text-success" />
@@ -184,6 +199,46 @@ function OverduePage() {
               ? "Сбросьте фильтр или выберите другой объект"
               : "Все этапы и заявки в срок"}
           </p>
+        </div>
+      ) : isMobile ? (
+        <div ref={scrollRef} className="h-full min-h-0 space-y-2 overflow-auto p-0.5">
+          {rows.map((it) => (
+            <button
+              key={it.key}
+              type="button"
+              onClick={() => open(it)}
+              className="w-full rounded-lg border border-danger/25 bg-danger-soft/40 p-3 text-left transition-colors hover:bg-danger-soft/70"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="font-medium leading-snug">{it.title}</div>
+                  {it.note ? (
+                    <div className="mt-0.5 text-xs text-muted-foreground">{it.note}</div>
+                  ) : null}
+                </div>
+                <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-danger px-1.5 py-0.5 text-[11px] font-bold tabular-nums text-danger-foreground">
+                  <AlertTriangle className="size-3" />
+                  {it.days} дн.
+                </span>
+              </div>
+              <div className="mt-1.5 truncate text-xs text-foreground/80">{it.objectName}</div>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <ToneBadge color={it.statusColor}>{it.status}</ToneBadge>
+                <span className="text-xs tabular-nums text-muted-foreground">
+                  до {formatDay(it.dueDate)}
+                </span>
+                <span className={cn("text-xs", it.responsible ? "text-muted-foreground" : "text-warning")}>
+                  {it.responsible ?? "Не назначен"}
+                </span>
+              </div>
+            </button>
+          ))}
+          <InfiniteScrollSentinel
+            rootRef={scrollRef}
+            hasMore={!!pageQuery.hasNextPage}
+            loading={pageQuery.isFetchingNextPage}
+            onLoadMore={() => void pageQuery.fetchNextPage()}
+          />
         </div>
       ) : (
         <div ref={scrollRef} className={tableWrapClass}>

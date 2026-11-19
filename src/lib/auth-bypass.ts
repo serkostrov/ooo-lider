@@ -14,6 +14,7 @@ export const BYPASS_PROFILE: CurrentProfile = {
   id: "00000000-0000-4000-8000-000000000002",
   full_name: "Тестовый админ",
   role_code: "admin",
+  role_codes: ["admin"],
   role_name: "Администратор (без входа)",
   is_admin: true,
 };

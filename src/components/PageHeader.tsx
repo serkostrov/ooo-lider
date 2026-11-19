@@ -13,16 +13,27 @@ export function PageHeader({
   className?: string;
 }) {
   return (
-    <div className={cn("mb-4 flex flex-wrap items-start justify-between gap-3", className)}>
-      <div className="min-w-0 space-y-1.5">
-        <h1 className="font-[family-name:var(--font-display)] text-[1.85rem] font-semibold tracking-[-0.03em] text-foreground">
+    <div
+      className={cn(
+        "mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between",
+        className,
+      )}
+    >
+      <div className="min-w-0 space-y-1">
+        <h1 className="font-[family-name:var(--font-display)] text-xl font-semibold tracking-[-0.03em] text-foreground sm:text-[1.85rem]">
           {title}
         </h1>
         {description ? (
-          <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">{description}</p>
+          <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground line-clamp-2 sm:line-clamp-none">
+            {description}
+          </p>
         ) : null}
       </div>
-      {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
+      {actions ? (
+        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
+          {actions}
+        </div>
+      ) : null}
     </div>
   );
 }

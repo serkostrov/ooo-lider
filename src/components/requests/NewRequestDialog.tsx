@@ -5,6 +5,8 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDate, showError } from "@/lib/format";
 import { mskToday } from "@/lib/dates";
+import { useProfile } from "@/lib/profile";
+import { canCreateRequest } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
 import { DateField } from "@/components/ui/DateField";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -56,6 +58,7 @@ function NewRequestForm({
   onDone: () => void;
 }) {
   const navigate = useNavigate();
+  const me = useProfile();
   const refresh = useRefreshRequests();
   const { data: objects = [] } = useObjects();
   const { data: types = [] } = useRequestTypes();
@@ -74,6 +77,7 @@ function NewRequestForm({
 
   const create = useMutation({
     mutationFn: async () => {
+      if (!canCreateRequest(me)) throw new Error("Нет прав на создание заявки");
       if (!objectId) throw new Error("Выберите объект");
       if (!typeId) throw new Error("Выберите вид заявки");
       if (!callDate) throw new Error("Укажите дату вызова");

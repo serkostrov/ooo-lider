@@ -14,6 +14,70 @@ export type Database = {
   }
   public: {
     Tables: {
+      stage_messages: {
+        Row: {
+          id: string
+          stage_id: string
+          object_id: string
+          author_id: string
+          body: string
+          parent_id: string | null
+          kind: string
+          mention_profile_id: string | null
+          status_ask_id: string | null
+          created_at: string
+          deleted_at: string | null
+        }
+        Insert: {
+          id?: string
+          stage_id: string
+          object_id: string
+          author_id: string
+          body: string
+          parent_id?: string | null
+          kind?: string
+          mention_profile_id?: string | null
+          status_ask_id?: string | null
+          created_at?: string
+          deleted_at?: string | null
+        }
+        Update: {
+          id?: string
+          stage_id?: string
+          object_id?: string
+          author_id?: string
+          body?: string
+          parent_id?: string | null
+          kind?: string
+          mention_profile_id?: string | null
+          status_ask_id?: string | null
+          created_at?: string
+          deleted_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stage_messages_stage_id_fkey"
+            columns: ["stage_id"]
+            isOneToOne: false
+            referencedRelation: "object_stages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stage_messages_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stage_messages_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "stage_messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_settings: {
         Row: {
           key: string
@@ -36,6 +100,32 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "user_settings_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notification_reads: {
+        Row: {
+          event_key: string
+          profile_id: string
+          read_at: string
+        }
+        Insert: {
+          event_key: string
+          profile_id: string
+          read_at?: string
+        }
+        Update: {
+          event_key?: string
+          profile_id?: string
+          read_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_reads_profile_id_fkey"
             columns: ["profile_id"]
             isOneToOne: false
             referencedRelation: "profiles"
@@ -563,10 +653,12 @@ export type Database = {
           note: string | null
           number: number
           object_id: string
+          is_adhoc: boolean
           out_of_order: boolean
           outgoing_doc: string | null
           parent_id: string | null
           remind_days: number | null
+          requires_id_folder_complete: boolean
           response_days: number | null
           response_due: string | null
           response_received_at: string | null
@@ -604,6 +696,7 @@ export type Database = {
           outgoing_doc?: string | null
           parent_id?: string | null
           remind_days?: number | null
+          requires_id_folder_complete?: boolean
           response_days?: number | null
           response_due?: string | null
           response_received_at?: string | null
@@ -641,6 +734,7 @@ export type Database = {
           outgoing_doc?: string | null
           parent_id?: string | null
           remind_days?: number | null
+          requires_id_folder_complete?: boolean
           response_days?: number | null
           response_due?: string | null
           response_received_at?: string | null
@@ -760,6 +854,10 @@ export type Database = {
           curator_contact_id: string | null
           customer_id: string | null
           deleted_at: string | null
+          emergency: boolean
+          emergency_at: string | null
+          emergency_by: string | null
+          emergency_note: string | null
           id: string
           name: string
           notes: string | null
@@ -780,6 +878,10 @@ export type Database = {
           curator_contact_id?: string | null
           customer_id?: string | null
           deleted_at?: string | null
+          emergency?: boolean
+          emergency_at?: string | null
+          emergency_by?: string | null
+          emergency_note?: string | null
           id?: string
           name: string
           notes?: string | null
@@ -800,6 +902,10 @@ export type Database = {
           curator_contact_id?: string | null
           customer_id?: string | null
           deleted_at?: string | null
+          emergency?: boolean
+          emergency_at?: string | null
+          emergency_by?: string | null
+          emergency_note?: string | null
           id?: string
           name?: string
           notes?: string | null
@@ -863,8 +969,12 @@ export type Database = {
           full_name: string
           id: string
           is_active: boolean
+          notify_email: boolean
+          notify_telegram: boolean
           phone: string | null
           role_code: string
+          telegram_chat_id: string | null
+          telegram_username: string | null
           updated_at: string
           user_id: string | null
         }
@@ -875,8 +985,12 @@ export type Database = {
           full_name: string
           id?: string
           is_active?: boolean
+          notify_email?: boolean
+          notify_telegram?: boolean
           phone?: string | null
           role_code: string
+          telegram_chat_id?: string | null
+          telegram_username?: string | null
           updated_at?: string
           user_id?: string | null
         }
@@ -887,8 +1001,12 @@ export type Database = {
           full_name?: string
           id?: string
           is_active?: boolean
+          notify_email?: boolean
+          notify_telegram?: boolean
           phone?: string | null
           role_code?: string
+          telegram_chat_id?: string | null
+          telegram_username?: string | null
           updated_at?: string
           user_id?: string | null
         }
@@ -940,6 +1058,7 @@ export type Database = {
           author_id: string | null
           created_at: string
           id: string
+          parent_id: string | null
           request_id: string
           text: string
         }
@@ -947,6 +1066,7 @@ export type Database = {
           author_id?: string | null
           created_at?: string
           id?: string
+          parent_id?: string | null
           request_id: string
           text: string
         }
@@ -954,6 +1074,7 @@ export type Database = {
           author_id?: string | null
           created_at?: string
           id?: string
+          parent_id?: string | null
           request_id?: string
           text?: string
         }
@@ -1608,6 +1729,7 @@ export type Database = {
           number: number
           outgoing_doc: string | null
           remind_days: number | null
+          requires_id_folder_complete: boolean
           response_days: number | null
           sort: number
           updated_at: string
@@ -1628,6 +1750,7 @@ export type Database = {
           number: number
           outgoing_doc?: string | null
           remind_days?: number | null
+          requires_id_folder_complete?: boolean
           response_days?: number | null
           sort?: number
           updated_at?: string
@@ -1648,6 +1771,7 @@ export type Database = {
           number?: number
           outgoing_doc?: string | null
           remind_days?: number | null
+          requires_id_folder_complete?: boolean
           response_days?: number | null
           sort?: number
           updated_at?: string
@@ -1737,12 +1861,14 @@ export type Database = {
           note: string | null
           number: number | null
           object_id: string | null
+          is_adhoc: boolean | null
           out_of_order: boolean | null
           outgoing_doc: string | null
           parent_code: string | null
           parent_id: string | null
           parent_name: string | null
           remind_days: number | null
+          requires_id_folder_complete: boolean | null
           response_days: number | null
           response_due: string | null
           response_received_at: string | null
@@ -1846,6 +1972,10 @@ export type Database = {
           customer_id: string | null
           customer_name: string | null
           deleted_at: string | null
+          emergency: boolean | null
+          emergency_at: string | null
+          emergency_by: string | null
+          emergency_note: string | null
           id: string | null
           name: string | null
           notes: string | null
@@ -2030,8 +2160,75 @@ export type Database = {
         Returns: undefined
       }
       msk_today: { Args: never; Returns: string }
+      notification_mark_read: {
+        Args: { p_event_keys: string[] }
+        Returns: number
+      }
       reorder_object_stages: {
         Args: { p_object_id: string; p_ordered_ids: string[] }
+        Returns: undefined
+      }
+      set_object_stage_code: {
+        Args: { p_stage_id: string; p_code: string }
+        Returns: undefined
+      }
+      telegram_create_link_code: { Args: Record<string, never>; Returns: string }
+      telegram_unlink: { Args: Record<string, never>; Returns: undefined }
+      notification_set_channels: {
+        Args: { p_telegram?: boolean | null; p_email?: boolean | null }
+        Returns: undefined
+      }
+      object_stages_bulk_deadlines: {
+        Args: {
+          p_object_id: string
+          p_shift_days?: number | null
+          p_fill_empty?: string | null
+          p_stage_ids?: string[] | null
+        }
+        Returns: number
+      }
+      object_set_emergency: {
+        Args: {
+          p_object_id: string
+          p_active: boolean
+          p_note?: string | null
+        }
+        Returns: undefined
+      }
+      add_object_adhoc_stage: {
+        Args: {
+          p_object_id: string
+          p_name: string
+          p_description?: string | null
+          p_executor_id?: string | null
+          p_duration_days?: number | null
+          p_work_type_id?: string | null
+        }
+        Returns: string
+      }
+      request_stage_status: {
+        Args: { p_stage_id: string; p_note?: string | null }
+        Returns: string
+      }
+      stage_message_post: {
+        Args: {
+          p_stage_id: string
+          p_body: string
+          p_parent_id?: string | null
+          p_mention_profile_id?: string | null
+        }
+        Returns: string
+      }
+      stage_message_status_reply: {
+        Args: { p_ask_id: string; p_body: string }
+        Returns: string
+      }
+      can_post_stage_message: {
+        Args: { p_stage_id: string }
+        Returns: boolean
+      }
+      stage_status_ask_seen: {
+        Args: { p_ask_id: string }
         Returns: undefined
       }
       request_create: {

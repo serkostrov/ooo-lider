@@ -11,6 +11,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useProfile } from "@/lib/profile";
 import {
+  canAdvanceRequestStatus,
+  canRequestStatusBack,
+  canSendRequestToRework,
+} from "@/lib/permissions";
+import {
   scenarioRoleForTransition,
   useRequestTypeScenario,
 } from "@/components/directories/request-types/data";
@@ -21,19 +26,6 @@ import {
   type RequestRow,
   type RequestStatusDef,
 } from "../data";
-
-/** Кто жмёт переход: роль из сценария вида, иначе запасной дефолт. Админ — все. */
-function canAdvanceStatus(
-  roleCode: string,
-  isAdmin: boolean,
-  toStatus: string,
-  scenarioRole: string | null,
-) {
-  if (isAdmin) return true;
-  if (scenarioRole) return roleCode === scenarioRole;
-  if (toStatus === "ready") return roleCode === "foreman" || roleCode === "pto";
-  return roleCode === "office";
-}
 
 function useStatusFlow(r: RequestRow) {
   const flow = useRequestFlowStatuses();
@@ -100,7 +92,7 @@ export function RequestStatusStepper({
           <span className="text-xs text-muted-foreground">Ожидает правок прораба</span>
         </div>
       )}
-      <ol className="flex min-w-0 flex-wrap gap-0.5 rounded-md border border-border bg-muted/40 p-0.5 sm:flex-nowrap">
+      <ol className="flex min-w-0 flex-wrap justify-center gap-0.5 rounded-md border border-border bg-muted/40 p-0.5 sm:flex-nowrap sm:justify-start">
         {flow.map((s, i) => {
           const done = !onRework && i <= idx;
           const current = !onRework && i === idx;
@@ -109,7 +101,7 @@ export function RequestStatusStepper({
           const active = current && !finished;
           const meta = whenLines(r, s.v, doneByName);
           return (
-            <li key={s.v} className="min-w-0 flex-1">
+            <li key={s.v} className="max-w-full sm:min-w-0 sm:flex-1 sm:basis-0">
               <div
                 className={cn(
                   "flex h-8 w-full items-center justify-center gap-1 rounded-lg px-1.5 text-[11px] font-medium transition-colors sm:px-2 sm:text-xs",
@@ -118,7 +110,7 @@ export function RequestStatusStepper({
                   !done && !current && "text-muted-foreground",
                   onRework && "opacity-70",
                 )}
-                title={meta.join(" · ") || undefined}
+                title={[s.label, ...meta].filter(Boolean).join(" · ") || undefined}
               >
                 <span
                   className={cn(
@@ -132,7 +124,7 @@ export function RequestStatusStepper({
                 >
                   {done ? <Check className="size-2" strokeWidth={3} /> : i + 1}
                 </span>
-                <span className="truncate">{s.label}</span>
+                <span className="whitespace-nowrap sm:min-w-0 sm:truncate">{s.label}</span>
               </div>
             </li>
           );
@@ -169,12 +161,9 @@ export function RequestStatusActions({
   const [reason, setReason] = useState("");
   // Обязательные поля шага (сценарий) — блокируют следующий переход.
   const blockedByFields = missingRequired.length > 0 && !!next;
-  const canNext = !!next && canAdvanceStatus(me.role_code, me.is_admin, next.v, scenarioRole);
-  const canBack =
-    !!prev &&
-    !onRework &&
-    (me.is_admin || me.role_code === "office" || me.role_code === "foreman" || me.role_code === "pto");
-  const canRework = canSendToRework && (me.is_admin || me.role_code === "office");
+  const canNext = !!next && canAdvanceRequestStatus(me, next.v, scenarioRole);
+  const canBack = !!prev && !onRework && canRequestStatusBack(me);
+  const canRework = canSendToRework && canSendRequestToRework(me);
 
   const m = useMutation({
     mutationFn: async ({ to, comment }: { to: string; comment?: string }) => {
@@ -210,18 +199,12 @@ export function RequestStatusActions({
     );
   }
 
-  if (!canNext && !canBack && !canRework) {
-    return (
-      <p className={cn("text-sm text-muted-foreground", className)}>
-        Смену статуса выполняют роли сценария этого вида заявки.
-      </p>
-    );
-  }
+  if (!canNext && !canBack && !canRework) return null;
 
   const doneComment = (resultText ?? r.result_text ?? "").trim();
 
-  return (
-    <div className={cn("flex flex-nowrap items-center gap-2", className)}>
+  const secondary = (
+    <>
       {canRework && (
         <Button
           variant="outline"
@@ -229,23 +212,39 @@ export function RequestStatusActions({
             setReason("");
             setReworkOpen(true);
           }}
-          className="h-9 shrink-0 gap-1.5 text-sm text-warning hover:text-warning"
+          className="h-9 min-w-0 flex-1 gap-1.5 px-2.5 text-sm text-warning hover:text-warning sm:w-auto sm:flex-none sm:shrink-0"
         >
-          <RotateCcw className="size-3.5" />
-          {reworkDef?.next || "На доработку"}
+          <RotateCcw className="size-3.5 shrink-0" />
+          <span className="truncate">{reworkDef?.next || "На доработку"}</span>
         </Button>
       )}
       {canBack && prev && (
         <Button
           variant="ghost"
+          title={`Назад («${prev.label}»)`}
           onClick={() => {
             setReason("");
             setBack(true);
           }}
-          className="h-9 shrink-0 text-sm text-muted-foreground"
+          className="h-9 min-w-0 flex-1 gap-1.5 px-2.5 text-sm text-muted-foreground sm:w-auto sm:flex-none sm:shrink-0"
         >
-          <Undo2 className="size-4" /> Назад («{prev.label}»)
+          <Undo2 className="size-3.5 shrink-0" />
+          <span className="sm:hidden">Назад</span>
+          <span className="hidden sm:inline">Назад («{prev.label}»)</span>
         </Button>
+      )}
+    </>
+  );
+
+  return (
+    <div
+      className={cn(
+        "flex w-full min-w-0 flex-col gap-1.5 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:gap-2",
+        className,
+      )}
+    >
+      {(canRework || canBack) && (
+        <div className="order-2 flex w-full gap-1.5 sm:order-1 sm:contents">{secondary}</div>
       )}
       {canNext && next && (
         <Button
@@ -257,7 +256,7 @@ export function RequestStatusActions({
           }
           disabled={m.isPending || blockedByFields}
           title={blockedByFields ? `Сначала заполните: ${missingRequired.join(", ")}` : undefined}
-          className="h-9 shrink-0 bg-success px-4 text-sm text-success-foreground shadow-none hover:bg-success/90"
+          className="order-1 h-9 w-full bg-success px-3 text-sm text-success-foreground shadow-none hover:bg-success/90 sm:order-2 sm:w-auto sm:shrink-0"
         >
           {onRework ? "Готова к отправке" : next.next || next.label}
         </Button>

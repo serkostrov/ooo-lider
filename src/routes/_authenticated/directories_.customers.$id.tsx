@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -19,7 +20,7 @@ function CustomerCardPage() {
 
   const { data: customer = null, isLoading } = useQuery({
     queryKey: [...CUSTOMERS_KEY, id],
-    enabled: !isNew,
+    enabled: !isNew && is_admin,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("customers")
@@ -31,6 +32,10 @@ function CustomerCardPage() {
       return data as Customer | null;
     },
   });
+
+  useEffect(() => {
+    if (!is_admin) void navigate({ to: "/objects" });
+  }, [is_admin, navigate]);
 
   const back = (
     <Link
@@ -44,19 +49,20 @@ function CustomerCardPage() {
 
   const goList = () => navigate({ to: "/directories", search: { tab: "customers" } });
 
+  if (!is_admin) {
+    return (
+      <div className="py-10 text-sm text-muted-foreground">
+        Раздел доступен только администратору и руководителю.{" "}
+        <Link to="/objects" className="text-primary hover:underline">
+          К объектам
+        </Link>
+      </div>
+    );
+  }
+
   if (isLoading) return <div className="text-base text-muted-foreground">Загрузка…</div>;
 
   if (isNew) {
-    if (!is_admin) {
-      return (
-        <div>
-          {back}
-          <p className="py-10 text-base text-muted-foreground">
-            Добавлять заказчиков может только администратор
-          </p>
-        </div>
-      );
-    }
     return (
       <div className="min-h-0 flex-1 space-y-5 overflow-x-hidden overflow-y-auto overscroll-y-contain pb-6">
         {back}

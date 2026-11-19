@@ -11,7 +11,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Field } from "@/components/directories/common";
 import { CustomerForm } from "@/components/directories/CustomerForm";
 import { CustomerContactForm } from "@/components/directories/CustomerContactForm";
-import { OBJECT_STATUSES, useActiveProfiles, useCustomersShort, useObjectTypes } from "./data";
+import {
+  OBJECT_STATUSES,
+  formatProfileOption,
+  useActiveProfiles,
+  useCustomersShort,
+  useObjectTypes,
+} from "./data";
 
 export type ObjectDraft = {
   name: string;
@@ -291,7 +297,7 @@ export function ObjectCardFields({
               </SelectItem>
               {profiles.map((p) => (
                 <SelectItem key={p.id} value={p.id} className="text-sm">
-                  {p.full_name}
+                  {formatProfileOption(p)}
                 </SelectItem>
               ))}
             </SelectContent>

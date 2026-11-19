@@ -17,12 +17,13 @@ export type StageTemplate = {
   response_days: number | null;
   remind_days: number | null;
   is_critical: boolean;
+  requires_id_folder_complete: boolean;
   is_active: boolean;
   sort: number;
 };
 
 export const STAGE_FIELDS =
-  "id, number, name, work_type_id, description, duration_days, executor_role, confirmer_role, outgoing_doc, expected_doc, response_days, remind_days, is_critical, is_active, sort";
+  "id, number, name, work_type_id, description, duration_days, executor_role, confirmer_role, outgoing_doc, expected_doc, response_days, remind_days, is_critical, requires_id_folder_complete, is_active, sort";
 
 /** Все этапы справочника (без удалённых), по номеру. */
 export function useStageTemplatesFull() {

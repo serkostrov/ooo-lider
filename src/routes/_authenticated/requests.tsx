@@ -6,6 +6,7 @@ import { PageFrame } from "@/components/PageFrame";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { useProfile } from "@/lib/profile";
+import { canCreateRequest } from "@/lib/permissions";
 import { useRequestTypes } from "@/components/directories/request-types/data";
 
 export const Route = createFileRoute("/_authenticated/requests")({
@@ -19,14 +20,18 @@ export const Route = createFileRoute("/_authenticated/requests")({
 });
 
 function RequestsPage() {
-  const { role_code } = useProfile();
+  const me = useProfile();
   const { data: types = [] } = useRequestTypes();
   const [createOpen, setCreateOpen] = useState(false);
+  const allowCreate = canCreateRequest(me);
   const supplyTypeId = useMemo(
-    () => (role_code === "supply" ? types.find((t) => /снабжен/i.test(t.name))?.id : undefined),
-    [role_code, types],
+    () =>
+      me.role_codes.includes("supply") || me.role_code === "supply"
+        ? types.find((t) => /снабжен/i.test(t.name))?.id
+        : undefined,
+    [me.role_code, me.role_codes, types],
   );
-  const officeReadyHint = role_code === "office";
+  const officeReadyHint = me.role_codes.includes("office") || me.role_code === "office";
 
   return (
     <PageFrame
@@ -42,10 +47,15 @@ function RequestsPage() {
           }
           className="mb-0"
           actions={
-            <Button onClick={() => setCreateOpen(true)} className="h-9 gap-2 px-3 text-sm">
-              <Plus className="size-4" />
-              Создать заявку
-            </Button>
+            allowCreate ? (
+              <Button
+                onClick={() => setCreateOpen(true)}
+                className="h-10 w-full gap-2 px-3 text-sm sm:h-9 sm:w-auto"
+              >
+                <Plus className="size-4" />
+                Создать заявку
+              </Button>
+            ) : undefined
           }
         />
       }

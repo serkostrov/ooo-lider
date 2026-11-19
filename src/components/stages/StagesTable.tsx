@@ -5,6 +5,7 @@ import { AlertTriangle, ChevronDown, ChevronRight, Flag, ListFilter, X } from "l
 import { formatDate } from "@/lib/format";
 import { daysBetween, mskToday } from "@/lib/dates";
 import { sortRows, useTableSort, type SortState } from "@/lib/table-sort";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { fieldLabelClass, fieldStackClass } from "@/lib/ui";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -12,6 +13,7 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useProfile } from "@/lib/profile";
+import { canWorkStage } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
 import { SortableTh, type ThResizeProps } from "@/components/SortableTh";
 import { TableColgroup } from "@/components/TableColgroup";
@@ -158,8 +160,10 @@ export function StagesTable({
   /** Если задан — фильтры/Excel рендерятся сюда (одна строка с табами), иначе над таблицей. */
   chromeHost?: HTMLElement | null;
 }) {
-  const { role_code, is_admin } = useProfile();
-  const showExecutor = is_admin || role_code !== "foreman";
+  const { role_codes, role_code, is_admin } = useProfile();
+  const isMobile = useIsMobile();
+  const roles = role_codes.length ? role_codes : [role_code];
+  const showExecutor = is_admin || !(roles.length === 1 && roles[0] === "foreman");
   const columns = useMemo(() => stageColumns(showExecutor), [showExecutor]);
   const { widths: colWidths, totalWidth: colsTotal, resizeProps } = useTableColumnWidths(
     showExecutor ? "object-stages" : "object-stages-no-exec",
@@ -276,7 +280,7 @@ export function StagesTable({
   const chrome = (
     <>
       <div
-        className="inline-flex h-9 shrink-0 items-stretch overflow-hidden rounded-md border border-border"
+        className="flex h-8 min-w-0 flex-1 items-stretch overflow-hidden rounded-md border border-border sm:inline-flex sm:w-auto sm:flex-none"
         role="group"
         aria-label="Вид этапов"
       >
@@ -288,7 +292,7 @@ export function StagesTable({
             aria-pressed={view === b.id}
             onClick={() => setView(b.id)}
             className={cn(
-              "px-3 text-sm transition-colors",
+              "flex-1 px-2 text-center text-sm transition-colors sm:flex-none sm:px-2.5",
               i > 0 && "border-l border-border",
               view === b.id
                 ? "bg-primary/14 font-medium text-primary"
@@ -299,15 +303,17 @@ export function StagesTable({
           </button>
         ))}
       </div>
-      <div className="inline-flex h-9 shrink-0 items-stretch overflow-hidden rounded-md border border-border">
+      <div className="inline-flex h-8 shrink-0 items-stretch overflow-hidden rounded-md border border-border">
         <Popover>
           <PopoverTrigger asChild>
             <button
               type="button"
-              className="inline-flex items-center gap-1.5 px-3 text-sm transition-colors hover:bg-accent hover:text-accent-foreground"
+              title="Фильтры"
+              aria-label="Фильтры"
+              className="inline-flex items-center gap-1.5 px-2 text-sm transition-colors hover:bg-accent hover:text-accent-foreground sm:px-2.5"
             >
-              <ListFilter className="size-4" />
-              Фильтры
+              <ListFilter className="size-3.5 shrink-0" />
+              <span className="hidden sm:inline">Фильтры</span>
               {activeFilterCount > 0 ? (
                 <span className="inline-flex h-5 min-w-5 items-center justify-center rounded bg-primary px-1 text-[11px] font-semibold tabular-nums text-primary-foreground">
                   {activeFilterCount}
@@ -397,7 +403,7 @@ export function StagesTable({
           </button>
         )}
       </div>
-      {toolbar ? <div className="flex shrink-0 gap-2">{toolbar(visible)}</div> : null}
+      {toolbar ? <div className="flex shrink-0 gap-1.5">{toolbar(visible)}</div> : null}
     </>
   );
 
@@ -406,7 +412,7 @@ export function StagesTable({
       {chromeHost
         ? createPortal(chrome, chromeHost)
         : (
-          <div className="flex shrink-0 flex-wrap items-center gap-2">
+          <div className="flex shrink-0 flex-wrap items-center gap-1.5 sm:gap-2">
             {chrome}
           </div>
         )}
@@ -415,6 +421,68 @@ export function StagesTable({
         {!hasOpenRows && (f.onlyOpen || closedSorted.length === 0) ? (
           <div className="rounded-md border border-border bg-card py-10 text-center text-sm text-muted-foreground">
             {stages.length === 0 ? "На объекте нет этапов" : "Нет этапов по выбранным условиям"}
+          </div>
+        ) : isMobile ? (
+          <div className="space-y-3 pb-1">
+            {view === "groups" ? (
+              groups.map((g) => (
+                <section key={g.id} className="space-y-2">
+                  <h3 className="px-1 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                    {g.name}
+                  </h3>
+                  <div className="space-y-2">
+                    {g.rows.map((s) => (
+                      <StageMobileCard
+                        key={s.id}
+                        s={s}
+                        objectId={objectId}
+                        showExecutor={showExecutor}
+                        showGroup={false}
+                      />
+                    ))}
+                  </div>
+                </section>
+              ))
+            ) : openFlat.length > 0 ? (
+              <div className="space-y-2">
+                {openFlat.map((s) => (
+                  <StageMobileCard
+                    key={s.id}
+                    s={s}
+                    objectId={objectId}
+                    showExecutor={showExecutor}
+                    showGroup
+                  />
+                ))}
+              </div>
+            ) : null}
+
+            {!f.onlyOpen && closedSorted.length > 0 && (
+              <div className="rounded-md border border-border bg-card">
+                <button
+                  type="button"
+                  onClick={() => setClosedOpen((v) => !v)}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-muted-foreground hover:bg-muted/40 hover:text-foreground"
+                >
+                  {closedOpen ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
+                  Закрытые
+                  <span className="tabular-nums">{closedSorted.length}</span>
+                </button>
+                {closedOpen ? (
+                  <div className="space-y-2 border-t border-border p-2">
+                    {closedSorted.map((s) => (
+                      <StageMobileCard
+                        key={s.id}
+                        s={s}
+                        objectId={objectId}
+                        showExecutor={showExecutor}
+                        showGroup={view !== "groups"}
+                      />
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            )}
           </div>
         ) : (
           /* Одна обёртка: sticky-шапка живёт до конца скролла, в т.ч. по «Закрытым» */
@@ -492,6 +560,72 @@ export function StagesTable({
         )}
       </div>
     </div>
+  );
+}
+
+function StageMobileCard({
+  s,
+  objectId,
+  showExecutor,
+  showGroup,
+}: {
+  s: ObjectStage;
+  objectId: string;
+  showExecutor: boolean;
+  showGroup?: boolean;
+}) {
+  const code = s.code || String(s.number);
+  const due = formatDate(s.due_date);
+  return (
+    <Link
+      to="/objects/$id/stages/$stageId"
+      params={{ id: objectId, stageId: s.id }}
+      className={cn(
+        "block rounded-lg border border-border/70 p-3 transition-colors hover:bg-elevated/50",
+        rowTone(s),
+      )}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="font-semibold tabular-nums text-muted-foreground">{code}</span>
+            {s.is_critical ? (
+              <Flag className="size-3.5 shrink-0 text-danger" aria-label="Критический" />
+            ) : null}
+            {s.is_adhoc ? (
+              <span className="rounded bg-info-soft px-1 py-0.5 text-[10px] font-medium text-info">
+                вне регл.
+              </span>
+            ) : null}
+          </div>
+          <div className="mt-0.5 font-medium leading-snug">{s.name}</div>
+          {showGroup && s.work_type_name ? (
+            <div className="mt-1 truncate text-[11px] text-muted-foreground">{s.work_type_name}</div>
+          ) : null}
+        </div>
+        <StatusBadge name={s.status_name} color={s.status_color} className="max-w-[7.5rem] shrink-0" />
+      </div>
+      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+        <span
+          className={cn(
+            "tabular-nums",
+            (s.is_overdue || s.is_no_response) && "font-semibold text-danger",
+          )}
+        >
+          {due || "без срока"}
+        </span>
+        {s.conditions_total > 0 ? (
+          <span className="tabular-nums">
+            усл. {s.conditions_done}/{s.conditions_total}
+          </span>
+        ) : null}
+        {showExecutor ? (
+          <span className={cn("truncate", !s.executor_name && !s.is_closed && !s.is_excluded && "text-warning")}>
+            {s.executor_name ?? "не назначен"}
+          </span>
+        ) : null}
+      </div>
+    </Link>
   );
 }
 
@@ -667,10 +801,12 @@ function StageRow({
   const docsHint = [s.outgoing_doc && `от нас: ${s.outgoing_doc}`, s.expected_doc && `ждём: ${s.expected_doc}`]
     .filter(Boolean)
     .join(" · ");
+  const me = useProfile();
   const groupName = s.work_type_name?.trim() || "Без группы";
   /** top + py: при раскрытых условиях соседние ячейки не «висят» по центру пустоты */
   const td = "px-5 py-2.5 align-top";
   const isSub = !!s.parent_id;
+  const condDisabled = s.is_excluded || s.is_closed || !canWorkStage(me, s);
 
   return (
     <tr className={cn("group border-t border-border/50", rowTone(s))}>
@@ -692,6 +828,14 @@ function StageRow({
             <Link {...link} className="min-w-0 flex-1 truncate font-medium hover:underline" title={docsHint || s.name}>
               {s.name}
             </Link>
+            {s.is_adhoc && (
+              <span
+                title="Этап вне регламента"
+                className="shrink-0 rounded bg-info-soft px-1 py-0.5 text-[10px] font-medium text-info"
+              >
+                вне регл.
+              </span>
+            )}
             {s.out_of_order && (
               <span
                 title={`Взят вне очереди: по регламенту после этапов ${predNumbers.join(", ") || "—"}`}
@@ -713,7 +857,13 @@ function StageRow({
         </div>
       </td>
       <td className={td}>
-        <ConditionsCell conds={conds} done={s.conditions_done} total={s.conditions_total} disabled={s.is_excluded} onDone={onChanged} />
+        <ConditionsCell
+          conds={conds}
+          done={s.conditions_done}
+          total={s.conditions_total}
+          disabled={condDisabled}
+          onDone={onChanged}
+        />
       </td>
       <td className={td}>
         <span

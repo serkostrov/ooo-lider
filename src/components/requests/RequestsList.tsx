@@ -7,6 +7,7 @@ import { mskToday } from "@/lib/dates";
 import { exportXlsx, printTable, type Column } from "@/lib/export";
 import { sortRows, useTableSort } from "@/lib/table-sort";
 import { useDebouncedValue } from "@/lib/useDebouncedValue";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { fieldLabelClass, fieldStackClass } from "@/lib/ui";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -20,6 +21,8 @@ import { InfiniteScrollSentinel } from "@/components/InfiniteScrollSentinel";
 import { SortableTh } from "@/components/SortableTh";
 import { TableColgroup } from "@/components/TableColgroup";
 import { useTableColumnWidths, type ColumnWidthDef } from "@/lib/table-column-widths";
+import { useProfile } from "@/lib/profile";
+import { canCreateRequest } from "@/lib/permissions";
 import { useRequestTypes } from "@/components/directories/request-types/data";
 import { useObjects } from "@/components/objects/data";
 import { useObjectStages, useStagesByIds } from "@/components/stages/data";
@@ -129,7 +132,10 @@ export function RequestsList({
   chromeHost?: HTMLElement | null;
 }) {
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const scrollRef = useRef<HTMLDivElement>(null);
+  const me = useProfile();
+  const allowCreate = canCreateRequest(me);
   const { data: types = [] } = useRequestTypes();
   const statuses = useRequestStatuses();
   const { data: objects = [] } = useObjects();
@@ -347,6 +353,7 @@ export function RequestsList({
     <Toolbar
       search={search}
       onSearch={setSearch}
+      nowrap={!!chromeHost}
       className={cn(
         "mb-0 min-w-0",
         // flex-1 только в строке с табами объекта; на /requests иначе тулбар раздувается и таблица уезжает вниз
@@ -358,10 +365,12 @@ export function RequestsList({
           <PopoverTrigger asChild>
             <button
               type="button"
-              className="inline-flex items-center gap-1.5 px-3 text-sm transition-colors hover:bg-accent hover:text-accent-foreground"
+              title="Фильтры"
+              aria-label="Фильтры"
+              className="inline-flex items-center gap-1.5 px-2.5 text-sm transition-colors hover:bg-accent hover:text-accent-foreground sm:px-3"
             >
-              <ListFilter className="size-4" />
-              Фильтры
+              <ListFilter className="size-4 shrink-0" />
+              <span className="hidden sm:inline">Фильтры</span>
               {activeFilterCount > 0 ? (
                 <span className="inline-flex h-5 min-w-5 items-center justify-center rounded bg-primary px-1 text-[11px] font-semibold tabular-nums text-primary-foreground">
                   {activeFilterCount}
@@ -369,8 +378,13 @@ export function RequestsList({
               ) : null}
             </button>
           </PopoverTrigger>
-          <PopoverContent align="end" className="w-[min(100vw-2rem,22rem)] p-0">
-            <div className="space-y-3 p-4">
+          <PopoverContent
+            align="end"
+            sideOffset={6}
+            collisionPadding={12}
+            className="w-[min(100vw-1.5rem,22rem)] max-h-[min(70vh,32rem)] overflow-y-auto p-0"
+          >
+            <div className="space-y-3 p-3 sm:p-4">
               {showObject && (
                 <div className={fieldStackClass}>
                   <span className={fieldLabelClass}>Объект</span>
@@ -459,20 +473,26 @@ export function RequestsList({
               </div>
               <div className={fieldStackClass}>
                 <span className={fieldLabelClass}>Период</span>
-                <div className="grid grid-cols-2 gap-2">
-                  <DateField
-                    value={f.from}
-                    onChange={(ymd) => set("from", ymd)}
-                    className="w-full"
-                    aria-label="Дата с"
-                  />
-                  <DateField
-                    value={f.to}
-                    onChange={(ymd) => set("to", ymd)}
-                    className="w-full"
-                    aria-label="Дата по"
-                    {...(f.from ? { min: f.from } : {})}
-                  />
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <label className="flex min-w-0 flex-col gap-1">
+                    <span className="text-[11px] text-muted-foreground">с</span>
+                    <DateField
+                      value={f.from}
+                      onChange={(ymd) => set("from", ymd)}
+                      className="h-9 w-full min-w-0 max-w-full"
+                      aria-label="Дата с"
+                    />
+                  </label>
+                  <label className="flex min-w-0 flex-col gap-1">
+                    <span className="text-[11px] text-muted-foreground">по</span>
+                    <DateField
+                      value={f.to}
+                      onChange={(ymd) => set("to", ymd)}
+                      className="h-9 w-full min-w-0 max-w-full"
+                      aria-label="Дата по"
+                      {...(f.from ? { min: f.from } : {})}
+                    />
+                  </label>
                 </div>
               </div>
               <label className="flex items-center justify-between gap-3 text-sm">
@@ -503,7 +523,7 @@ export function RequestsList({
               )}
             </div>
             {activeFilterCount > 0 && (
-              <div className="border-t border-border p-3">
+              <div className="sticky bottom-0 border-t border-border bg-popover p-3">
                 <Button
                   type="button"
                   variant="outline"
@@ -530,16 +550,20 @@ export function RequestsList({
       </div>
       <Button
         variant="outline"
-        className="h-9 shrink-0 gap-1.5 px-3 text-sm"
+        title="Excel"
+        aria-label="Excel"
+        className="h-9 shrink-0 gap-1.5 px-2.5 text-sm"
         disabled={sorted.length === 0}
         onClick={() => exportXlsx(`Заявки — ${formatDate(mskToday())}`, "Заявки", columns, sorted)}
       >
-        <FileSpreadsheet className="size-4" />
-        Excel
+        <FileSpreadsheet className="size-4 shrink-0" />
+        <span className="hidden sm:inline">Excel</span>
       </Button>
       <Button
         variant="outline"
-        className="h-9 shrink-0 gap-1.5 px-3 text-sm"
+        title="Печать"
+        aria-label="Печать"
+        className="h-9 shrink-0 gap-1.5 px-2.5 text-sm"
         disabled={sorted.length === 0}
         onClick={() =>
           printTable(
@@ -550,10 +574,10 @@ export function RequestsList({
           )
         }
       >
-        <Printer className="size-4" />
-        Печать
+        <Printer className="size-4 shrink-0" />
+        <span className="hidden sm:inline">Печать</span>
       </Button>
-      {!hideCreateButton && (
+      {!hideCreateButton && allowCreate && (
         <Button onClick={() => setCreateOpen(true)} className="h-9 shrink-0 gap-2 px-3 text-sm">
           <Plus className="size-4" />
           Создать заявку
@@ -580,6 +604,96 @@ export function RequestsList({
           fillHeight && "min-h-0 flex-1",
         )}
       >
+        {isMobile ? (
+          <div className="space-y-2 p-2">
+            {isLoading ? (
+              Array.from({ length: 5 }, (_, i) => (
+                <div key={i} className="rounded-lg border border-border/70 p-3">
+                  <Skeleton height={16} width="40%" />
+                  <Skeleton height={12} width="70%" className="mt-2" />
+                  <Skeleton height={12} width="55%" className="mt-1.5" />
+                </div>
+              ))
+            ) : sorted.length === 0 ? (
+              <div className="px-3 py-10 text-center text-sm text-muted-foreground">
+                {rows.length === 0 && !activeFilterCount && !search.trim()
+                  ? "Заявок пока нет"
+                  : "По выбранным фильтрам ничего не найдено"}
+              </div>
+            ) : (
+              sorted.map((r) => {
+                const dataLine = [
+                  ...keyFields(valuesByRequest[r.id] ?? []),
+                  ...(r.result_text ? [`Результат: ${r.result_text}`] : []),
+                ].join(" · ");
+                return (
+                  <button
+                    key={r.id}
+                    type="button"
+                    onClick={() =>
+                      navigate({
+                        to: "/requests/$requestId",
+                        params: { requestId: r.id },
+                        search: objectId ? { from: "object" } : {},
+                      })
+                    }
+                    className={cn(
+                      "w-full rounded-lg border border-border/70 p-3 text-left transition-colors",
+                      r.is_overdue
+                        ? "bg-danger-soft/40 hover:bg-danger-soft/60"
+                        : "bg-card hover:bg-elevated/50",
+                    )}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="font-semibold tabular-nums">
+                            {callLabel(r) ?? r.number}
+                          </span>
+                          {r.is_new ? (
+                            <span className="rounded bg-danger px-1.5 py-0.5 text-[10px] font-semibold text-danger-foreground">
+                              {r.status === "rework" ? "Доработка" : "Новая"}
+                            </span>
+                          ) : null}
+                          <RequestStatusBadge status={r.status} />
+                        </div>
+                        <div className="mt-1 truncate text-sm text-muted-foreground">
+                          {r.type_name}
+                          {r.representative_name ? ` · ${r.representative_name}` : ""}
+                        </div>
+                      </div>
+                      <div
+                        className={cn(
+                          "shrink-0 text-right text-xs tabular-nums",
+                          r.is_overdue ? "font-semibold text-danger" : "text-muted-foreground",
+                        )}
+                      >
+                        {formatDate(r.call_date)}
+                        {r.is_overdue ? (
+                          <div className="mt-0.5">−{overdueDays(r)}д</div>
+                        ) : null}
+                      </div>
+                    </div>
+                    {showObject && r.object_name ? (
+                      <div className="mt-1.5 truncate text-xs text-foreground/80">{r.object_name}</div>
+                    ) : null}
+                    {dataLine ? (
+                      <div className="mt-1 line-clamp-2 text-xs text-muted-foreground">{dataLine}</div>
+                    ) : null}
+                  </button>
+                );
+              })
+            )}
+            {!scoped && (
+              <InfiniteScrollSentinel
+                rootRef={scrollRef}
+                hasMore={!!pageQuery.hasNextPage}
+                loading={pageQuery.isFetchingNextPage}
+                onLoadMore={() => void pageQuery.fetchNextPage()}
+              />
+            )}
+          </div>
+        ) : (
         <table className="w-full table-fixed text-sm" style={{ minWidth: colsTotal }}>
           <TableColgroup columns={tableCols} widths={colWidths} />
           <thead className="sticky top-0 z-10 border-b border-border bg-card shadow-[0_1px_0_0_var(--border)]">
@@ -754,7 +868,8 @@ export function RequestsList({
             )}
           </tbody>
         </table>
-        {!scoped && (
+        )}
+        {!scoped && !isMobile && (
           <InfiniteScrollSentinel
             rootRef={scrollRef}
             hasMore={!!pageQuery.hasNextPage}

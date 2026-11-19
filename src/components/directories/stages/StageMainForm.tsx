@@ -60,6 +60,7 @@ export function StageMainForm({
   const [responseDays, setResponseDays] = useState(stage?.response_days?.toString() ?? "");
   const [remindDays, setRemindDays] = useState(stage?.remind_days?.toString() ?? "");
   const [critical, setCritical] = useState(stage?.is_critical ?? false);
+  const [needsIdFolder, setNeedsIdFolder] = useState(stage?.requires_id_folder_complete ?? false);
   const [active, setActive] = useState(stage?.is_active ?? true);
 
   // Файлы «От нас» / «Ждём» (правка 2.3): копятся до «Сохранить»
@@ -131,6 +132,7 @@ export function StageMainForm({
         response_days: resp,
         remind_days: rem,
         is_critical: critical,
+        requires_id_folder_complete: needsIdFolder,
         is_active: active,
       };
       let id = stage?.id;
@@ -316,6 +318,20 @@ export function StageMainForm({
               <span className="font-medium">Критичный</span>
               <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
                 Выделяется в списке этапов
+              </span>
+            </span>
+          </label>
+          <label className="flex items-start gap-3 rounded-lg border border-border/70 bg-background/40 px-4 py-3 text-sm">
+            <Switch
+              checked={needsIdFolder}
+              onCheckedChange={setNeedsIdFolder}
+              disabled={readOnly}
+              className="mt-0.5"
+            />
+            <span>
+              <span className="font-medium">Нужна полная папка ИД</span>
+              <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
+                Нельзя на проверку / закрыть, пока по объекту есть неотмеченные позиции ИД
               </span>
             </span>
           </label>

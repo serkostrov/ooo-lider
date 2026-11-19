@@ -36,6 +36,8 @@ export function Toolbar({
   addLabel = "Добавить",
   children,
   className,
+  /** Одна строка: поиск сжимается, кнопки не переносятся. */
+  nowrap = false,
 }: {
   search: string;
   onSearch: (v: string) => void;
@@ -43,21 +45,36 @@ export function Toolbar({
   addLabel?: string;
   children?: ReactNode;
   className?: string;
+  nowrap?: boolean;
 }) {
   return (
-    <div className={cn("mb-4 flex w-full flex-wrap items-center gap-2 sm:gap-3", className)}>
-      <div className="relative min-w-0 flex-1 basis-48">
-        <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+    <div
+      className={cn(
+        "mb-4 flex w-full items-center gap-1.5 sm:gap-3",
+        nowrap ? "flex-nowrap" : "flex-wrap",
+        className,
+      )}
+    >
+      <div
+        className={cn(
+          "relative min-w-0 flex-1",
+          nowrap ? "basis-0" : "basis-48",
+        )}
+      >
+        <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground sm:left-3" />
         <Input
           value={search}
           onChange={(e) => onSearch(e.target.value)}
           placeholder="Поиск"
-          className={cn("h-9 w-full pl-11 text-sm", search ? "pr-9" : undefined)}
+          className={cn(
+            "h-9 w-full pl-9 text-sm sm:pl-11",
+            search ? "pr-8 sm:pr-9" : undefined,
+          )}
         />
         {search ? (
           <button
             type="button"
-            className="absolute right-2 top-1/2 inline-flex size-6 -translate-y-1/2 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:text-foreground"
+            className="absolute right-1.5 top-1/2 inline-flex size-6 -translate-y-1/2 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:text-foreground sm:right-2"
             onClick={() => onSearch("")}
             aria-label="Очистить поиск"
             title="Очистить"

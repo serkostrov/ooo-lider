@@ -43,6 +43,9 @@ function StageCardPage() {
   const readOnly = !is_admin;
   const [tab, setTab] = useState<StageTab>("main");
   useEffect(() => setTab("main"), [id]);
+  useEffect(() => {
+    if (!is_admin) void navigate({ to: "/objects" });
+  }, [is_admin, navigate]);
 
   const back = (
     <Link
@@ -53,6 +56,17 @@ function StageCardPage() {
       <ArrowLeft className="size-4" /> К справочнику
     </Link>
   );
+
+  if (!is_admin) {
+    return (
+      <div className="py-10 text-sm text-muted-foreground">
+        Раздел доступен только администратору и руководителю.{" "}
+        <Link to="/objects" className="text-primary hover:underline">
+          К объектам
+        </Link>
+      </div>
+    );
+  }
 
   if (isLoading) return <div className="text-base text-muted-foreground">Загрузка…</div>;
   if (!isNew && !stage) {
@@ -100,15 +114,15 @@ function StageCardPage() {
         onValueChange={(v) => setTab(v as StageTab)}
         className="flex flex-col gap-6"
       >
-        <TabsList className={cn(tabsListClass, "mb-0 w-fit self-start")}>
+        <TabsList className={cn(tabsListClass, "mb-0")}>
           <TabsTrigger value="main" className={tabTriggerClass}>
             Основное
           </TabsTrigger>
           <TabsTrigger value="conditions" className={tabTriggerClass} disabled={isNew}>
-            Условия закрытия
+            Условия
           </TabsTrigger>
           <TabsTrigger value="predecessors" className={tabTriggerClass} disabled={isNew}>
-            Предшествующие этапы
+            Предшественники
           </TabsTrigger>
           <TabsTrigger value="steps" className={tabTriggerClass} disabled={isNew}>
             Сценарий

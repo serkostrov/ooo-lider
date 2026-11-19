@@ -57,7 +57,7 @@ export function DateField({
           disabled={disabled}
           aria-label={ariaLabel}
           className={cn(
-            "h-9 w-[11.5rem] justify-start gap-2 px-2.5 text-left text-sm font-normal tabular-nums",
+            "h-9 w-[11.5rem] max-w-full justify-start gap-2 px-2.5 text-left text-sm font-normal tabular-nums",
             !value && "text-muted-foreground",
             className,
           )}

@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useEffect } from "react";
 import { ArrowLeft } from "lucide-react";
 import { useProfile } from "@/lib/profile";
 import { tabsListClass, tabTriggerClass } from "@/lib/ui";
@@ -23,6 +24,10 @@ function RequestTypeCardPage() {
   const type = isNew ? null : types.find((t) => t.id === id) ?? null;
   const readOnly = !is_admin;
 
+  useEffect(() => {
+    if (!is_admin) void navigate({ to: "/objects" });
+  }, [is_admin, navigate]);
+
   const back = (
     <Link
       to="/directories"
@@ -32,6 +37,17 @@ function RequestTypeCardPage() {
       <ArrowLeft className="size-4" /> К справочнику
     </Link>
   );
+
+  if (!is_admin) {
+    return (
+      <div className="py-10 text-sm text-muted-foreground">
+        Раздел доступен только администратору и руководителю.{" "}
+        <Link to="/objects" className="text-primary hover:underline">
+          К объектам
+        </Link>
+      </div>
+    );
+  }
 
   if (isLoading) return <div className="text-base text-muted-foreground">Загрузка…</div>;
   if ((!isNew && !type) || (isNew && readOnly)) {

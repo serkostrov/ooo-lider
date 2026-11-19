@@ -1,5 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { AppSettings } from "@/components/directories/AppSettings";
+import { NotificationChannelsSettings } from "@/components/notifications/NotificationChannelsSettings";
 import { PageHeader } from "@/components/PageHeader";
 import { cn } from "@/lib/utils";
 import {
@@ -12,7 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-type TabValue = "login";
+type TabValue = "login" | "notifications";
 
 type TabDef = { v: TabValue; label: string };
 
@@ -20,7 +21,10 @@ const SECTIONS: { id: string; label: string; tabs: TabDef[] }[] = [
   {
     id: "system",
     label: "Система",
-    tabs: [{ v: "login", label: "Вход" }],
+    tabs: [
+      { v: "login", label: "Вход" },
+      { v: "notifications", label: "Уведомления" },
+    ],
   },
 ];
 
@@ -122,6 +126,7 @@ function SettingsPage() {
             {tabLabel(tab)}
           </h2>
           {tab === "login" && <AppSettings />}
+          {tab === "notifications" && <NotificationChannelsSettings />}
         </div>
       </div>
     </div>

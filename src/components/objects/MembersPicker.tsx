@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   MEMBER_ROLES,
+  formatProfileOption,
   useActiveProfiles,
   useRolesForMembers,
   type ProfileShort,
@@ -34,7 +35,7 @@ export function MembersPicker({
       return {
         code: r.code,
         title: meta?.name ?? r.label,
-        people: profiles.filter((p) => p.role_code === r.code),
+        people: profiles.filter((p) => p.role_codes.includes(r.code) || p.role_code === r.code),
         required: !!meta?.required_on_object_create,
       };
     });
@@ -43,7 +44,7 @@ export function MembersPicker({
       .map((r) => ({
         code: r.code,
         title: r.name,
-        people: profiles.filter((p) => p.role_code === r.code),
+        people: profiles.filter((p) => p.role_codes.includes(r.code) || p.role_code === r.code),
         required: r.required_on_object_create,
       }))
       .filter((g) => g.people.length > 0 || g.required);
@@ -166,7 +167,7 @@ function RoleSelect({
                         disabled={disabled}
                         onCheckedChange={(c) => onToggle(p.id, c === true)}
                       />
-                      <span className="min-w-0 flex-1 truncate">{p.full_name}</span>
+                      <span className="min-w-0 flex-1 truncate">{formatProfileOption(p)}</span>
                     </label>
                   ))
                 )}

@@ -12,7 +12,10 @@ import {
   AlertTriangle,
   Building2,
   ClipboardList,
+  FolderOpen,
   History,
+  Layers,
+  LayoutDashboard,
   LogOut,
   BookOpen,
   Settings,
@@ -21,6 +24,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Sun,
+  Users,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -31,8 +35,31 @@ import { BrandMark } from "@/components/BrandMark";
 import { NotificationsBell } from "@/components/notifications/NotificationsBell";
 import { clearOverdueNotificationAck, useOverdueCounts } from "@/components/overdue/data";
 import { OverdueGate, clearOverdueGateAck } from "@/components/overdue/OverdueGate";
+import { useObject } from "@/components/objects/data";
+import { useObjectIdFolderItems } from "@/components/objects/ObjectIdFolderTab";
 import { useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
+
+const OBJECT_TABS = [
+  { tab: "stages", label: "Этапы", icon: Layers },
+  { tab: "requests", label: "Заявки", icon: ClipboardList, badge: "requests" as const },
+  { tab: "id_folder", label: "Папка ИД", icon: FolderOpen, badge: "id_folder" as const },
+  { tab: "members", label: "Участники", icon: Users },
+  { tab: "history", label: "История", icon: History },
+] as const;
+
+type ObjectTab = (typeof OBJECT_TABS)[number]["tab"];
+
+/** /objects/:id или /objects/:id/stages/... — не new/edit */
+function parseObjectNav(path: string): { objectId: string; onStage: boolean } | null {
+  const m = path.match(/^\/objects\/([^/]+)(?:\/(.*))?$/);
+  if (!m) return null;
+  const objectId = m[1]!;
+  if (objectId === "new") return null;
+  const rest = m[2] ?? "";
+  if (rest === "edit" || rest.startsWith("edit/")) return null;
+  return { objectId, onStage: rest.startsWith("stages/") };
+}
 
 export const Route = createFileRoute("/_authenticated")({
   beforeLoad: async () => {
@@ -71,7 +98,7 @@ function AuthLayout() {
     queryFn: async (): Promise<CurrentProfile | null> => {
       const { data, error } = await supabase
         .from("profiles")
-        .select("id, full_name, role_code, roles(name, is_admin)")
+        .select("id, full_name, role_code, roles!profiles_role_code_fkey(name, is_admin)")
         .eq("user_id", userId)
         .eq("is_active", true)
         .is("deleted_at", null)
@@ -79,11 +106,35 @@ function AuthLayout() {
       if (error) throw error;
       if (!data) return null;
       const role = (data as any).roles as { name: string; is_admin: boolean } | null;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: pr, error: prErr } = await (supabase as any)
+        .from("profile_roles")
+        .select("role_code")
+        .eq("profile_id", data.id);
+      if (prErr) throw prErr;
+      const role_codes = [
+        ...new Set(
+          [
+            ...((pr ?? []) as { role_code: string }[]).map((r) => r.role_code),
+            data.role_code as string,
+          ].filter(Boolean),
+        ),
+      ];
+      let role_name = role?.name ?? "";
+      if (role_codes.length > 1) {
+        const { data: roleRows } = await supabase
+          .from("roles")
+          .select("code, name")
+          .in("code", role_codes);
+        const nameByCode = new Map((roleRows ?? []).map((r) => [r.code, r.name]));
+        role_name = role_codes.map((c) => nameByCode.get(c) ?? c).join(", ");
+      }
       return {
         id: data.id,
         full_name: data.full_name,
         role_code: data.role_code,
-        role_name: role?.name ?? "",
+        role_codes,
+        role_name,
         is_admin: !!role?.is_admin,
       };
     },
@@ -139,11 +190,12 @@ function useNewRequestsCount() {
 }
 
 const items = [
+  { to: "/director", label: "Панель управления", icon: LayoutDashboard, adminOnly: true },
   { to: "/objects", label: "Объекты", icon: Building2 },
   { to: "/requests", label: "Заявки", icon: ClipboardList, badge: "requests" },
   { to: "/overdue", label: "Просрочено", icon: AlertTriangle, badge: "overdue" },
   { to: "/history", label: "История", icon: History },
-  { to: "/directories", label: "Справочники", icon: BookOpen, admin: true },
+  { to: "/directories", label: "Справочники", icon: BookOpen, adminOnly: true },
   { to: "/settings", label: "Настройки", icon: Settings },
 ] as const;
 
@@ -185,6 +237,133 @@ function readSidebarCollapsed(): boolean {
   }
 }
 
+/** Дерево разделов текущего объекта под пунктом «Объекты». */
+function ObjectSubnav({
+  objectId,
+  objectName,
+  activeTab,
+  onStage,
+  badges,
+  collapsed,
+  onNavigate,
+}: {
+  objectId: string;
+  objectName: string | null;
+  activeTab: ObjectTab;
+  onStage: boolean;
+  badges: { requests: number; id_folder: number };
+  collapsed: boolean;
+  onNavigate?: () => void;
+}) {
+  if (collapsed) {
+    return (
+      <div className="my-1 flex flex-col items-center gap-0.5 py-1">
+        {OBJECT_TABS.map((sub) => {
+          const subActive = onStage ? sub.tab === "stages" : activeTab === sub.tab;
+          const subBadge = "badge" in sub && sub.badge ? badges[sub.badge] : 0;
+          const tip = subBadge > 0 ? `${sub.label} · ${subBadge}` : `${sub.label} объекта`;
+          return (
+            <Link
+              key={sub.tab}
+              to="/objects/$id"
+              params={{ id: objectId }}
+              search={{ tab: sub.tab }}
+              onClick={onNavigate}
+              title={tip}
+              aria-label={tip}
+              className={cn(
+                "relative inline-flex size-8 items-center justify-center rounded-md transition-colors",
+                subActive
+                  ? "bg-sidebar-accent text-primary"
+                  : "text-sidebar-foreground/70 hover:bg-sidebar-accent/55 hover:text-sidebar-accent-foreground",
+              )}
+            >
+              <sub.icon className="size-3.5" />
+              {subBadge > 0 ? (
+                <NavCount
+                  count={subBadge}
+                  tone={sub.badge === "requests" ? "danger" : "signal"}
+                />
+              ) : null}
+            </Link>
+          );
+        })}
+      </div>
+    );
+  }
+
+  return (
+    <div className="mb-1 ml-2.5 mt-0.5">
+      <div className="relative mb-0.5">
+        <span
+          aria-hidden
+          className="pointer-events-none absolute bottom-0 left-[5px] top-1.5 w-px bg-sidebar-border"
+        />
+        <div
+          className="truncate pl-0.5 text-[11px] leading-snug text-sidebar-foreground/50"
+          title={objectName ?? "Объект"}
+        >
+          {objectName || "Объект"}
+        </div>
+      </div>
+      <ul className="m-0 list-none p-0">
+        {OBJECT_TABS.map((sub, i) => {
+          const subActive = onStage ? sub.tab === "stages" : activeTab === sub.tab;
+          const subBadge = "badge" in sub && sub.badge ? badges[sub.badge] : 0;
+          const last = i === OBJECT_TABS.length - 1;
+          return (
+            <li key={sub.tab} className="relative pl-3">
+              {/* вертикаль: у последнего — только до середины (└) */}
+              <span
+                aria-hidden
+                className={cn(
+                  "pointer-events-none absolute left-[5px] top-0 w-px bg-sidebar-border",
+                  last ? "h-1/2" : "bottom-0",
+                )}
+              />
+              {/* горизонтальный штрих */}
+              <span
+                aria-hidden
+                className="pointer-events-none absolute left-[5px] top-1/2 h-px w-2.5 -translate-y-1/2 bg-sidebar-border"
+              />
+              <Link
+                to="/objects/$id"
+                params={{ id: objectId }}
+                search={{ tab: sub.tab }}
+                onClick={onNavigate}
+                title={sub.label}
+                className={cn(
+                  "relative flex h-7 items-center gap-2 rounded-md px-1.5 text-[12.5px] transition-colors",
+                  subActive
+                    ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground"
+                    : "text-sidebar-foreground/75 hover:bg-sidebar-accent/55 hover:text-sidebar-accent-foreground",
+                )}
+              >
+                <sub.icon
+                  className={cn("size-3.5 shrink-0", subActive ? "text-primary" : "opacity-65")}
+                />
+                <span className="min-w-0 flex-1 truncate">{sub.label}</span>
+                {subBadge > 0 ? (
+                  <span
+                    className={cn(
+                      "shrink-0 rounded-full px-1.5 text-[9px] font-bold tabular-nums leading-4",
+                      sub.badge === "requests"
+                        ? "bg-danger text-danger-foreground"
+                        : "bg-signal text-[oklch(0.18_0.04_55)]",
+                    )}
+                  >
+                    {subBadge > 9 ? "9+" : subBadge}
+                  </span>
+                ) : null}
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
 function Nav({
   profile,
   onSignOut,
@@ -200,6 +379,25 @@ function Nav({
   onToggleCollapsed?: () => void;
 }) {
   const path = useRouterState({ select: (s) => s.location.pathname });
+  const search = useRouterState({ select: (s) => s.location.search as Record<string, unknown> });
+  const objectNav = parseObjectNav(path);
+  const objectId = objectNav?.objectId ?? null;
+  const objectTab: ObjectTab =
+    objectNav?.onStage
+      ? "stages"
+      : OBJECT_TABS.some((t) => t.tab === search.tab)
+        ? (search.tab as ObjectTab)
+        : "stages";
+
+  const { data: objectRow } = useObject(objectId ?? "", { enabled: !!objectId });
+  const { data: idFolderItems = [] } = useObjectIdFolderItems(objectId ?? "", {
+    enabled: !!objectId,
+  });
+  const objectBadges = {
+    requests: objectRow ? objectRow.requests_new + objectRow.requests_overdue : 0,
+    id_folder: idFolderItems.filter((i) => !i.is_done).length,
+  };
+
   const { data: count = 0 } = useNewRequestsCount();
   const { data: overdueCounts } = useOverdueCounts();
   const { theme, toggleTheme } = useTheme();
@@ -250,47 +448,72 @@ function Nav({
 
       <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-2">
         {items
-          .filter((it) => profile.is_admin || !("admin" in it))
+          .filter((it) => !("adminOnly" in it && it.adminOnly) || profile.is_admin)
           .map((it) => {
-            const active = path === it.to || path.startsWith(it.to + "/");
+            const isObjects = it.to === "/objects";
+            const objectsOpen = isObjects && !!objectId;
+            const active = objectsOpen
+              ? path === "/objects"
+              : path === it.to || path.startsWith(it.to + "/");
             const badgeKey = "badge" in it ? it.badge : null;
             const badgeCount = badgeKey ? badges[badgeKey] : 0;
             const badgeTone = badgeKey === "overdue" ? "danger" : "signal";
             const tip = badgeCount > 0 ? `${it.label} · ${badgeCount}` : it.label;
             return (
-              <Link
-                key={it.to}
-                to={it.to}
-                onClick={onNavigate}
-                title={tip}
-                aria-label={tip}
-                className={cn(
-                  "group/item relative flex h-9 items-center rounded-md text-sm transition-colors duration-150",
-                  collapsed ? "justify-center" : "gap-2.5",
-                  active
-                    ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground"
-                    : "text-sidebar-foreground hover:bg-sidebar-accent/55 hover:text-sidebar-accent-foreground",
-                )}
-              >
-                {active && (
-                  <span
-                    aria-hidden
-                    className="absolute inset-y-1.5 left-0 w-0.5 rounded-full bg-sidebar-primary shadow-[0_0_10px_#286cf280]"
-                  />
-                )}
-                <span className="inline-flex w-10 shrink-0 items-center justify-center">
-                  <span className="relative inline-flex size-8 items-center justify-center rounded-md">
-                    <it.icon
+              <div key={it.to} className="flex flex-col gap-0.5">
+                <Link
+                  to={it.to}
+                  onClick={onNavigate}
+                  title={tip}
+                  aria-label={tip}
+                  className={cn(
+                    "group/item relative flex h-9 items-center rounded-md text-sm transition-colors duration-150",
+                    collapsed ? "justify-center" : "gap-2.5",
+                    active
+                      ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground"
+                      : objectsOpen
+                        ? "text-sidebar-accent-foreground/90"
+                        : "text-sidebar-foreground hover:bg-sidebar-accent/55 hover:text-sidebar-accent-foreground",
+                  )}
+                >
+                  {(active || objectsOpen) && (
+                    <span
+                      aria-hidden
                       className={cn(
-                        "size-[1.125rem]",
-                        active ? "text-primary" : "opacity-75 group-hover/item:opacity-100",
+                        "absolute inset-y-1.5 left-0 w-0.5 rounded-full bg-sidebar-primary",
+                        active && "shadow-[0_0_10px_#286cf280]",
+                        objectsOpen && !active && "opacity-40",
                       )}
                     />
-                    {badgeKey && <NavCount count={badgeCount} tone={badgeTone} />}
+                  )}
+                  <span className="inline-flex w-10 shrink-0 items-center justify-center">
+                    <span className="relative inline-flex size-8 items-center justify-center rounded-md">
+                      <it.icon
+                        className={cn(
+                          "size-[1.125rem]",
+                          active || objectsOpen
+                            ? "text-primary"
+                            : "opacity-75 group-hover/item:opacity-100",
+                        )}
+                      />
+                      {badgeKey && <NavCount count={badgeCount} tone={badgeTone} />}
+                    </span>
                   </span>
-                </span>
-                {!collapsed && <span className="min-w-0 flex-1 truncate">{it.label}</span>}
-              </Link>
+                  {!collapsed && <span className="min-w-0 flex-1 truncate">{it.label}</span>}
+                </Link>
+
+                {objectsOpen && objectId ? (
+                  <ObjectSubnav
+                    objectId={objectId}
+                    objectName={objectRow?.name ?? null}
+                    activeTab={objectTab}
+                    onStage={!!objectNav?.onStage}
+                    badges={objectBadges}
+                    collapsed={collapsed}
+                    onNavigate={onNavigate}
+                  />
+                ) : null}
+              </div>
             );
           })}
       </nav>
@@ -423,7 +646,7 @@ function Shell({ profile, onSignOut }: { profile: CurrentProfile; onSignOut: () 
             Длинные карточки сами ставят overflow-y-auto на корень.
           */}
           {/* Без max-width: на 27″/ультравайде таблица тянется на всю ширину, а не «колонка по центру» */}
-          <div className="flex h-full min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden px-5 py-4 lg:px-8 lg:py-5 xl:px-10">
+          <div className="flex h-full min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden px-3 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-5 sm:py-4 lg:px-8 lg:py-5 xl:px-10">
             <Outlet />
           </div>
         </main>

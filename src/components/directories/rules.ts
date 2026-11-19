@@ -192,8 +192,32 @@ export function validateCustomerContact(v: { full_name: string; phone: string; e
   return null;
 }
 
-export function validateEmployee(v: { full_name: string; role_code: string; phone: string; email: string }): RuleError {
-  if (!v.full_name.trim() || !v.role_code) return "Заполните ФИО и роль";
+/** Допустимо: одна роль или только пара сметчик+снабжение. */
+export const COMBINABLE_ROLES = ["estimator", "supply"] as const;
+
+export function isAllowedEmployeeRoles(roles: string[]): boolean {
+  const uniq = [...new Set(roles.filter(Boolean))].sort();
+  if (uniq.length === 0) return false;
+  if (uniq.length === 1) return true;
+  return (
+    uniq.length === 2 &&
+    uniq[0] === "estimator" &&
+    uniq[1] === "supply"
+  );
+}
+
+export function validateEmployee(v: {
+  full_name: string;
+  role_code?: string;
+  role_codes?: string[];
+  phone: string;
+  email: string;
+}): RuleError {
+  const roles = (v.role_codes?.length ? v.role_codes : v.role_code ? [v.role_code] : []).filter(Boolean);
+  if (!v.full_name.trim() || roles.length === 0) return "Заполните ФИО и роль";
+  if (!isAllowedEmployeeRoles(roles)) {
+    return "Несколько ролей можно только у сметчика и снабжения вместе";
+  }
   if (!isOptionalPhone(v.phone)) return VALIDATION_MSG.phone;
   if (!isOptionalEmail(v.email)) return VALIDATION_MSG.email;
   return null;

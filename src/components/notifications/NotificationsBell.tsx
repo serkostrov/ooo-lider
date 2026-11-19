@@ -1,42 +1,36 @@
 import { useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { Bell } from "lucide-react";
+import { Bell, Expand } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { useOverdueNotifications } from "@/components/overdue/data";
+import { useNotifications, type NotificationItem } from "@/components/notifications/data";
+import { NotificationListItem } from "@/components/notifications/NotificationListItem";
+import { notificationNavigateOpts } from "@/components/notifications/navigateToNotification";
 import { cn } from "@/lib/utils";
 
 /**
  * Уведомления в меню: над профилем.
- * «Просмотреть все» помечает текущие как прочитанные — бейдж исчезает.
+ * Прочтение пишется в notification_reads (БД).
  */
 export function NotificationsBell({
   collapsed = false,
   onNavigate,
 }: {
-  /** true — только иконка; false — иконка + подпись */
   collapsed?: boolean;
   onNavigate?: (() => void) | undefined;
 }) {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
-  const { items, unseenCount, isLoading, markAllSeen, markSeen } = useOverdueNotifications();
+  const { items, unseenCount, isLoading, markSeen } = useNotifications(30);
   const count = unseenCount;
   const tip = count > 0 ? `Уведомления · ${count}` : "Уведомления";
   const badge = count > 9 ? "9+" : String(count);
 
-  const openItem = (it: (typeof items)[number]) => {
-    markSeen([it.key]);
+  const openItem = (it: NotificationItem) => {
+    markSeen([it.eventKey]);
     setOpen(false);
     onNavigate?.();
-    if (it.kind === "request") {
-      navigate({ to: "/requests/$requestId", params: { requestId: it.id } });
-    } else {
-      navigate({
-        to: "/objects/$id/stages/$stageId",
-        params: { id: it.objectId, stageId: it.id },
-      });
-    }
+    void navigate(notificationNavigateOpts(it));
   };
 
   return (
@@ -76,10 +70,10 @@ export function NotificationsBell({
       >
         <div className="border-b border-border px-4 py-3">
           <div className="text-sm font-semibold tracking-tight">
-            {count > 0 ? `Просрочено · ${count}` : "Уведомления"}
+            {count > 0 ? `Уведомления · ${count}` : "Уведомления"}
           </div>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            {count > 0 ? "Заявки и этапы, требующие внимания" : "Сейчас всё в сроке"}
+            {count > 0 ? "Сроки, проверка, исполнители и заявки" : "Сейчас всё спокойно"}
           </p>
         </div>
 
@@ -87,45 +81,45 @@ export function NotificationsBell({
           {isLoading ? (
             <p className="px-4 py-8 text-center text-sm text-muted-foreground">Загрузка…</p>
           ) : count === 0 ? (
-            <p className="px-4 py-8 text-center text-sm text-muted-foreground">Нет просроченных</p>
+            <p className="px-4 py-8 text-center text-sm text-muted-foreground">Нет новых уведомлений</p>
           ) : (
-            <ul className="divide-y divide-border/70">
-              {items.map((it) => {
-                const what =
-                  it.kind === "request" ? `${it.title} — не исполнена` : `${it.title} — срок прошёл`;
-                return (
-                  <li key={it.key}>
-                    <button
-                      type="button"
-                      onClick={() => openItem(it)}
-                      className="flex w-full flex-col gap-1 px-4 py-3 text-left outline-none transition-colors hover:bg-danger-soft/40 focus-visible:bg-danger-soft/40"
-                    >
-                      <span className="line-clamp-2 text-sm font-medium leading-snug">{what}</span>
-                      <span className="flex items-center justify-between gap-3">
-                        <span className="min-w-0 truncate text-xs text-muted-foreground">{it.objectName}</span>
-                        <span className="shrink-0 text-xs font-semibold tabular-nums text-danger">
-                          {it.days} дн.
-                        </span>
-                      </span>
-                    </button>
-                  </li>
-                );
-              })}
+            <ul>
+              {items.map((it) => (
+                <li key={it.eventKey}>
+                  <NotificationListItem
+                    dense
+                    item={it}
+                    onOpen={() => openItem(it)}
+                    onMarkRead={() => markSeen([it.eventKey])}
+                  />
+                </li>
+              ))}
             </ul>
           )}
         </div>
 
-        <div className="border-t border-border p-2">
-          <Button type="button" variant="ghost" className="h-9 w-full justify-center text-sm" asChild>
+        <div className="grid grid-cols-1 gap-1 border-t border-border p-2 sm:grid-cols-2">
+          <Button type="button" variant="ghost" className="h-9 justify-center gap-1.5 text-sm" asChild>
             <Link
-              to="/overdue"
+              to="/notifications"
               onClick={() => {
-                markAllSeen();
                 setOpen(false);
                 onNavigate?.();
               }}
             >
-              Просмотреть все
+              <Expand className="size-3.5 shrink-0" />
+              Все уведомления
+            </Link>
+          </Button>
+          <Button type="button" variant="ghost" className="h-9 justify-center text-sm" asChild>
+            <Link
+              to="/overdue"
+              onClick={() => {
+                setOpen(false);
+                onNavigate?.();
+              }}
+            >
+              Просрочка
             </Link>
           </Button>
         </div>

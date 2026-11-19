@@ -1,8 +1,11 @@
 import { useState, type ReactNode } from "react";
+import { Link } from "@tanstack/react-router";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { FolderOpen } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useProfile } from "@/lib/profile";
+import { canChangeStageStatus, canCloseStage } from "@/lib/permissions";
 import { showError } from "@/lib/format";
 import { formatDateTime } from "@/lib/dates";
 import { Button } from "@/components/ui/button";
@@ -40,10 +43,13 @@ export function StageStatusBar({
   stage,
   conditions,
   onChanged,
+  idFolderMissing = 0,
 }: {
   stage: ObjectStage;
   conditions: StageCondition[];
   onChanged: () => void;
+  /** Неотмеченные условия «в папку ИД» по объекту (для критичных этапов). */
+  idFolderMissing?: number;
 }) {
   const me = useProfile();
   const [returning, setReturning] = useState(false);
@@ -103,8 +109,13 @@ export function StageStatusBar({
   const missingText = missing.length
     ? `Не выполнены: ${missing.map((c) => `«${c.title}»`).join(", ")}`
     : "";
-  const canClose = me.is_admin || (stage.confirmer_id !== null && stage.confirmer_id === me.id);
-  const actions = actionsFor(stage.status_code);
+  const idFolderBlocked = !!stage.requires_id_folder_complete && idFolderMissing > 0;
+  const idFolderText = idFolderBlocked
+    ? `Папка ИД неполная: не отмечено позиций ${idFolderMissing}`
+    : "";
+  const canWork = canChangeStageStatus(me, stage);
+  const canClose = canCloseStage(me, stage);
+  const actions = canWork ? actionsFor(stage.status_code) : [];
   const primary = actions.filter((a) => a.primary);
   const secondary = actions.filter((a) => !a.primary);
   const pending = setStatus.isPending;
@@ -131,12 +142,16 @@ export function StageStatusBar({
           )}
 
           {primary.map((a) => {
-            const blocked = a.to === "on_review" && missing.length > 0;
+            const blocked =
+              a.to === "on_review" && (missing.length > 0 || idFolderBlocked);
+            const title = blocked
+              ? [missing.length > 0 ? missingText : null, idFolderText].filter(Boolean).join(". ")
+              : undefined;
             return (
               <Button
                 key={a.to}
                 disabled={blocked || pending}
-                title={blocked ? missingText : undefined}
+                title={title}
                 onClick={() => setStatus.mutate({ to: a.to })}
                 className="h-9 w-full text-sm"
               >
@@ -148,21 +163,53 @@ export function StageStatusBar({
           {stage.status_code === "on_review" && (
             <>
               <Button
-                disabled={!canClose || pending}
-                title={canClose ? undefined : "Закрыть этап может только адресат или администратор"}
+                disabled={!canClose || pending || idFolderBlocked}
+                title={
+                  !canClose
+                    ? "Закрыть этап может только адресат или администратор"
+                    : idFolderBlocked
+                      ? idFolderText
+                      : undefined
+                }
                 onClick={() => setStatus.mutate({ to: "closed" })}
                 className="h-9 w-full bg-success text-sm text-success-foreground hover:bg-success/90"
               >
                 Принять и закрыть
               </Button>
-              <Button
-                variant="ghost"
-                onClick={() => setReturning(true)}
-                className="h-8 w-full text-xs text-warning hover:text-warning"
-              >
-                Вернуть на доработку
-              </Button>
+              {canClose && (
+                <Button
+                  variant="ghost"
+                  onClick={() => setReturning(true)}
+                  className="h-8 w-full text-xs text-warning hover:text-warning"
+                >
+                  Вернуть на доработку
+                </Button>
+              )}
             </>
+          )}
+
+          {!canWork && stage.status_code !== "on_review" && (
+            <p className="text-xs text-muted-foreground">Статус меняет исполнитель или соисполнитель.</p>
+          )}
+          {stage.status_code === "on_review" && !canClose && (
+            <p className="text-xs text-muted-foreground">Принять или вернуть может только адресат.</p>
+          )}
+          {idFolderBlocked && (
+            <div className="space-y-1.5">
+              <p className="text-xs text-warning">
+                Для этого этапа нужна полная папка ИД по объекту ({idFolderMissing} не отмечено).
+              </p>
+              <Button asChild variant="outline" size="sm" className="h-8 w-full gap-1.5 text-xs">
+                <Link
+                  to="/objects/$id"
+                  params={{ id: stage.object_id }}
+                  search={{ tab: "id_folder" }}
+                >
+                  <FolderOpen className="size-3.5" />
+                  Открыть папку ИД
+                </Link>
+              </Button>
+            </div>
           )}
         </div>
       </Bar>

@@ -64,6 +64,10 @@ export type ObjectRow = {
   current_stage_name: string | null;
   requests_new: number;
   requests_overdue: number;
+  emergency: boolean;
+  emergency_note: string | null;
+  emergency_at: string | null;
+  emergency_by: string | null;
 };
 
 const PROBLEM_COL: Record<Exclude<ObjectProblemFilter, "all">, keyof ObjectRow> = {
@@ -159,6 +163,10 @@ function normalize(r: Record<string, unknown>): ObjectRow {
     stages_no_executor: num(r["stages_no_executor"]),
     requests_new: num(r["requests_new"]),
     requests_overdue: num(r["requests_overdue"]),
+    emergency: !!r["emergency"],
+    emergency_note: (r["emergency_note"] as string | null) ?? null,
+    emergency_at: (r["emergency_at"] as string | null) ?? null,
+    emergency_by: (r["emergency_by"] as string | null) ?? null,
   };
 }
 
@@ -290,9 +298,10 @@ export function useObjectProblemSummary(archive: boolean) {
   });
 }
 
-export function useObject(id: string) {
+export function useObject(id: string, opts?: { enabled?: boolean }) {
   return useQuery({
     queryKey: [...OBJECTS_KEY, id],
+    enabled: opts?.enabled ?? !!id,
     queryFn: async () => {
       const { data, error } = await supabase.from("v_objects").select("*").eq("id", id).maybeSingle();
       if (error) throw error;
@@ -301,20 +310,60 @@ export function useObject(id: string) {
   });
 }
 
-export type ProfileShort = { id: string; full_name: string; role_code: string };
+export type ProfileShort = {
+  id: string;
+  full_name: string;
+  role_code: string;
+  role_codes: string[];
+  role_name: string | null;
+};
+
+/** Подпись в селектах: «ФИО (роль)» если роль есть. */
+export function formatProfileOption(p: Pick<ProfileShort, "full_name" | "role_name" | "role_code">) {
+  const role = (p.role_name || "").trim() || "";
+  return role ? `${p.full_name} (${role})` : p.full_name;
+}
+
+export function profileHasRole(p: Pick<ProfileShort, "role_code" | "role_codes">, code: string) {
+  return p.role_codes.includes(code) || p.role_code === code;
+}
 
 export function useActiveProfiles() {
   return useQuery({
-    queryKey: ["profiles-active"],
+    queryKey: ["profiles-active", "with-roles"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("profiles")
-        .select("id, full_name, role_code")
+        .select("id, full_name, role_code, roles!profiles_role_code_fkey(name)")
         .eq("is_active", true)
         .is("deleted_at", null)
         .order("full_name");
       if (error) throw error;
-      return (data ?? []) as ProfileShort[];
+      const ids = (data ?? []).map((r) => r.id as string);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: pr, error: prErr } = ids.length
+        ? await (supabase as any).from("profile_roles").select("profile_id, role_code").in("profile_id", ids)
+        : { data: [], error: null };
+      if (prErr) throw prErr;
+      const rolesByProfile = new Map<string, string[]>();
+      for (const row of (pr ?? []) as { profile_id: string; role_code: string }[]) {
+        const list = rolesByProfile.get(row.profile_id) ?? [];
+        list.push(row.role_code);
+        rolesByProfile.set(row.profile_id, list);
+      }
+      return (data ?? []).map((r) => {
+        const roles = (r as { roles?: { name: string } | { name: string }[] | null }).roles;
+        const role_name = Array.isArray(roles) ? roles[0]?.name ?? null : roles?.name ?? null;
+        const extra = rolesByProfile.get(r.id as string) ?? [];
+        const role_codes = [...new Set([...extra, r.role_code as string].filter(Boolean))];
+        return {
+          id: r.id as string,
+          full_name: r.full_name as string,
+          role_code: r.role_code as string,
+          role_codes,
+          role_name,
+        } satisfies ProfileShort;
+      });
     },
   });
 }

@@ -18,7 +18,9 @@ function executorHint(
   if (!template.executor_role) return "Роль исполнителя не задана";
   const role = roleName(template.executor_role);
   if (!members) return role;
-  const people = members.filter((m) => m.role_code === template.executor_role);
+  const people = members.filter(
+    (m) => m.role_codes.includes(template.executor_role!) || m.role_code === template.executor_role,
+  );
   if (people.length === 0) return `Исполнитель не назначен · ${role}`;
   return `${people.map((p) => p.full_name).join(", ")} · ${role}`;
 }

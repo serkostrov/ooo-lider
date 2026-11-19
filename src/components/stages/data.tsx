@@ -40,8 +40,10 @@ export type ObjectStage = {
   remind_days: number | null;
   note: string | null;
   is_critical: boolean;
+  requires_id_folder_complete: boolean;
   is_excluded: boolean;
   out_of_order: boolean;
+  is_adhoc: boolean;
   return_reason: string | null;
   closed_at: string | null;
   sort: number;
@@ -84,6 +86,8 @@ const normalize = (r: Record<string, unknown>) =>
     is_no_response: !!r["is_no_response"],
     is_no_executor: !!r["is_no_executor"],
     is_closed: !!r["is_closed"],
+    requires_id_folder_complete: !!r["requires_id_folder_complete"],
+    is_adhoc: !!r["is_adhoc"],
   }) as ObjectStage;
 
 export const stagesKey = (objectId: string) => ["object-stages", objectId];
@@ -177,6 +181,7 @@ export function useRefreshStages() {
   return (objectId: string, stageId?: string) => {
     qc.invalidateQueries({ queryKey: stagesKey(objectId) });
     qc.invalidateQueries({ queryKey: conditionsKey(objectId) });
+    qc.invalidateQueries({ queryKey: ["object-id-folder", objectId] });
     qc.invalidateQueries({ queryKey: ["overdue"] });
     qc.invalidateQueries({ queryKey: OBJECTS_KEY });
     qc.invalidateQueries({ queryKey: ["history"] });

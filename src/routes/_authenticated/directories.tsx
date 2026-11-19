@@ -1,4 +1,5 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useEffect } from "react";
 import { DocumentsDirectory } from "@/components/directories/DocumentsDirectory";
 import { RepresentativesDirectory } from "@/components/directories/RepresentativesDirectory";
 import { CustomersDirectory } from "@/components/directories/CustomersDirectory";
@@ -106,13 +107,17 @@ function DirectoriesPage() {
   const navigate = useNavigate({ from: "/directories" });
   const goTab = (next: TabValue) => navigate({ search: { tab: next }, replace: true });
 
+  useEffect(() => {
+    if (!is_admin) void navigate({ to: "/objects" });
+  }, [is_admin, navigate]);
+
   if (!is_admin) {
     return (
-      <div>
-        <PageHeader title="Справочники" />
-        <p className="py-10 text-base text-muted-foreground">
-          Справочники доступны администратору и руководителю
-        </p>
+      <div className="py-10 text-sm text-muted-foreground">
+        Раздел доступен только администратору и руководителю.{" "}
+        <Link to="/objects" className="text-primary hover:underline">
+          К объектам
+        </Link>
       </div>
     );
   }

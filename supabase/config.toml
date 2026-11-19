@@ -1,1 +1,10 @@
 project_id = "ovnmravbyxzbpotatdlk"
+
+[functions.telegram-webhook]
+verify_jwt = false
+
+[functions.notify-dispatch]
+verify_jwt = false
+
+[functions.admin-user-access]
+verify_jwt = false

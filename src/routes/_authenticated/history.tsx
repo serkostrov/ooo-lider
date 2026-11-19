@@ -10,10 +10,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { HistoryFeed } from "@/components/history/HistoryFeed";
+import {
+  HISTORY_ENTITY_TYPES,
+  HISTORY_EVENT_TYPES,
+  historyEventActions,
+} from "@/components/history/eventTypes";
 import { useObjects } from "@/components/objects/data";
 import { PageFrame } from "@/components/PageFrame";
 import { PageHeader } from "@/components/PageHeader";
-import { FilterBar } from "@/components/FilterBar";
 
 export const Route = createFileRoute("/_authenticated/history")({
   component: HistoryPage,
@@ -26,18 +30,19 @@ export const Route = createFileRoute("/_authenticated/history")({
 });
 
 const ALL = "__all";
-const TYPES = [
-  { v: "stage", label: "Этапы" },
-  { v: "request", label: "Заявки" },
-  { v: "object", label: "Объекты" },
-];
 
 function HistoryPage() {
   const { data: objects = [] } = useObjects();
   const [objectId, setObjectId] = useState(ALL);
-  const [type, setType] = useState(ALL);
+  const [entityType, setEntityType] = useState(ALL);
+  const [eventType, setEventType] = useState(ALL);
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
+
+  const eventActions = eventType === ALL ? undefined : historyEventActions(eventType);
+
+  const hasFilters =
+    objectId !== ALL || entityType !== ALL || eventType !== ALL || !!from || !!to;
 
   return (
     <PageFrame
@@ -47,17 +52,15 @@ function HistoryPage() {
             title="История"
             description="Журнал действий по объектам, этапам и заявкам"
             className="mb-3"
-          />
-          <FilterBar
-            className="mb-0"
             actions={
-              objectId !== ALL || type !== ALL || from || to ? (
+              hasFilters ? (
                 <Button
                   variant="ghost"
                   className="h-9 text-sm"
                   onClick={() => {
                     setObjectId(ALL);
-                    setType(ALL);
+                    setEntityType(ALL);
+                    setEventType(ALL);
                     setFrom("");
                     setTo("");
                   }}
@@ -66,10 +69,11 @@ function HistoryPage() {
                 </Button>
               ) : undefined
             }
-          >
+          />
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center sm:gap-3">
             <Select value={objectId} onValueChange={setObjectId}>
-              <SelectTrigger className="h-9 w-60 text-sm">
-                <SelectValue />
+              <SelectTrigger className="h-9 w-full text-sm sm:w-60">
+                <SelectValue placeholder="Объект" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value={ALL} className="text-sm">
@@ -82,32 +86,58 @@ function HistoryPage() {
                 ))}
               </SelectContent>
             </Select>
-            <Select value={type} onValueChange={setType}>
-              <SelectTrigger className="h-9 w-48 text-sm">
-                <SelectValue />
+            <Select value={entityType} onValueChange={setEntityType}>
+              <SelectTrigger className="h-9 w-full text-sm sm:w-44">
+                <SelectValue placeholder="Сущность" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value={ALL} className="text-sm">
-                  Всё
+                  Все сущности
                 </SelectItem>
-                {TYPES.map((t) => (
+                {HISTORY_ENTITY_TYPES.map((t) => (
                   <SelectItem key={t.v} value={t.v} className="text-sm">
                     {t.label}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            <label className="flex items-center gap-2 text-sm">
-              с <DateField value={from} onChange={setFrom} aria-label="Дата с" />
-              по{" "}
-              <DateField
-                value={to}
-                onChange={setTo}
-                aria-label="Дата по"
-                {...(from ? { min: from } : {})}
-              />
-            </label>
-          </FilterBar>
+            <Select value={eventType} onValueChange={setEventType}>
+              <SelectTrigger className="h-9 w-full text-sm sm:w-52">
+                <SelectValue placeholder="Событие" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL} className="text-sm">
+                  Все события
+                </SelectItem>
+                {HISTORY_EVENT_TYPES.map((t) => (
+                  <SelectItem key={t.v} value={t.v} className="text-sm">
+                    {t.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <div className="col-span-2 grid grid-cols-2 gap-2 sm:flex sm:w-auto sm:items-center sm:gap-2">
+              <label className="flex min-w-0 items-center gap-1.5 text-sm text-muted-foreground">
+                <span className="shrink-0">с</span>
+                <DateField
+                  value={from}
+                  onChange={setFrom}
+                  aria-label="Дата с"
+                  className="h-9 w-full min-w-0 flex-1 sm:w-[11.5rem] sm:flex-none"
+                />
+              </label>
+              <label className="flex min-w-0 items-center gap-1.5 text-sm text-muted-foreground">
+                <span className="shrink-0">по</span>
+                <DateField
+                  value={to}
+                  onChange={setTo}
+                  aria-label="Дата по"
+                  className="h-9 w-full min-w-0 flex-1 sm:w-[11.5rem] sm:flex-none"
+                  {...(from ? { min: from } : {})}
+                />
+              </label>
+            </div>
+          </div>
         </>
       }
     >
@@ -116,7 +146,8 @@ function HistoryPage() {
         showObject={objectId === ALL}
         filter={{
           ...(objectId !== ALL ? { objectId } : {}),
-          ...(type !== ALL ? { entityType: type } : {}),
+          ...(entityType !== ALL ? { entityType } : {}),
+          ...(eventActions ? { actions: [...eventActions] } : {}),
           ...(from ? { from } : {}),
           ...(to ? { to } : {}),
         }}

@@ -1,10 +1,13 @@
 import { useMemo, useRef, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { LayoutGrid, LayoutList, ListFilter, Plus, X } from "lucide-react";
+import { ObjectEmergencyIcon } from "@/components/objects/ObjectEmergency";
 import { useProfile } from "@/lib/profile";
+import { canManageObjects } from "@/lib/permissions";
 import { formatDate } from "@/lib/format";
 import { useSortedRows, useTableSort } from "@/lib/table-sort";
 import { useDebouncedValue } from "@/lib/useDebouncedValue";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { fieldLabelClass, fieldStackClass } from "@/lib/ui";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -128,7 +131,9 @@ export const Route = createFileRoute("/_authenticated/objects")({
 });
 
 function ObjectsPage() {
-  const { is_admin } = useProfile();
+  const me = useProfile();
+  const is_admin = me.is_admin;
+  const allowManageObjects = canManageObjects(me);
   const navigate = useNavigate();
   const scrollRef = useRef<HTMLDivElement>(null);
   const [search, setSearch] = useState("");
@@ -139,6 +144,9 @@ function ObjectsPage() {
   const [archive, setArchive] = useState(false);
   const [problem, setProblem] = useState<ObjectProblemFilter>("all");
   const [view, setView] = useObjectsView();
+  const isMobile = useIsMobile();
+  /** На телефоне всегда карточки — таблица нечитаема. */
+  const effectiveView: ViewMode = isMobile ? "cards" : view;
   const { widths: colWidths, totalWidth: colsTotal, resizeProps } = useTableColumnWidths(
     "objects",
     OBJECT_COLUMNS,
@@ -199,10 +207,10 @@ function ObjectsPage() {
         }
         className="mb-3"
         actions={
-          is_admin ? (
+          allowManageObjects ? (
             <Button
               onClick={() => navigate({ to: "/objects/new" })}
-              className="h-9 gap-2 px-3 text-sm"
+              className="h-10 w-full gap-2 px-3 text-sm sm:h-9 sm:w-auto"
             >
               <Plus className="size-4" />
               Создать объект
@@ -212,11 +220,11 @@ function ObjectsPage() {
       />
 
       {!archive && (
-        <div className="mb-3 overflow-hidden rounded-xl border border-border/70 bg-card shadow-[var(--surface-glow)]">
+        <div className="mb-2 overflow-hidden rounded-lg border border-border/70 bg-card shadow-[var(--surface-glow)] sm:mb-3 sm:rounded-xl">
           {summaryLoading ? (
             <ProblemsSkeleton />
           ) : (
-            <div className="grid divide-y divide-border/60 lg:grid-cols-2 lg:divide-x lg:divide-y-0">
+            <div className="grid divide-y divide-border/60 sm:divide-y-0 lg:grid-cols-2 lg:divide-x">
               <ProblemGroup
                 label="Этапы"
                 problem={problem}
@@ -244,7 +252,7 @@ function ObjectsPage() {
 
       <Toolbar search={search} onSearch={setSearch} className="mb-0">
         <div
-          className="inline-flex h-9 shrink-0 items-stretch overflow-hidden rounded-md border border-border"
+          className="hidden h-9 shrink-0 items-stretch overflow-hidden rounded-md border border-border md:inline-flex"
           role="group"
           aria-label="Вид списка"
         >
@@ -376,7 +384,7 @@ function ObjectsPage() {
         </>
       }
     >
-      {view === "table" ? (
+      {effectiveView === "table" ? (
         <div
           ref={scrollRef}
           className="max-h-full min-h-0 overflow-auto rounded-xl border border-border/70 bg-card shadow-[var(--surface-glow)] backdrop-blur-[2px]"
@@ -499,20 +507,23 @@ const td = "max-w-0 px-5 py-3";
 
 function ProblemsSkeleton() {
   return (
-    <div className="grid divide-y divide-border/60 lg:grid-cols-2 lg:divide-x lg:divide-y-0">
+    <div className="grid divide-y divide-border/60 sm:divide-y-0 lg:grid-cols-2 lg:divide-x">
       {[4, 2].map((count, gi) => (
-        <div key={gi} className="min-w-0 p-2.5 sm:p-3">
-          <Skeleton height={12} width={56} className="mb-2 ml-1" />
+        <div key={gi} className="flex min-w-0 items-center gap-2 px-2 py-1.5 sm:block sm:p-3">
+          <Skeleton height={10} width={40} className="shrink-0 sm:mb-2 sm:ml-1" />
           <div
             className={cn(
-              "grid gap-1",
-              count <= 2 ? "grid-cols-2" : "grid-cols-2 sm:grid-cols-4",
+              "flex min-w-0 flex-1 flex-wrap gap-1 sm:grid sm:gap-1",
+              count <= 2 ? "sm:grid-cols-2" : "sm:grid-cols-4",
             )}
           >
             {Array.from({ length: count }, (_, i) => (
-              <div key={i} className="flex flex-col gap-1.5 rounded-lg px-2.5 py-2">
-                <Skeleton height={24} width={32} />
-                <Skeleton height={12} width={64} />
+              <div
+                key={i}
+                className="inline-flex h-7 items-center gap-1.5 rounded-md px-1.5 sm:h-auto sm:flex-col sm:items-start sm:gap-1.5 sm:px-2.5 sm:py-2"
+              >
+                <Skeleton height={14} width={20} />
+                <Skeleton height={10} width={48} />
               </div>
             ))}
           </div>
@@ -656,14 +667,14 @@ function ProblemGroup({
   onSelect: (v: ObjectProblemFilter) => void;
 }) {
   return (
-    <div className="min-w-0 p-2.5 sm:p-3">
-      <div className="mb-2 px-1 text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+    <div className="flex min-w-0 items-center gap-2 px-2 py-1.5 sm:block sm:p-3">
+      <div className="shrink-0 text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground sm:mb-2 sm:px-1 sm:text-[11px]">
         {label}
       </div>
       <div
         className={cn(
-          "grid gap-1",
-          items.length <= 2 ? "grid-cols-2" : "grid-cols-2 sm:grid-cols-4",
+          "flex min-w-0 flex-1 flex-wrap gap-1 sm:grid sm:gap-1",
+          items.length <= 2 ? "sm:grid-cols-2" : "sm:grid-cols-4",
         )}
       >
         {items.map(([key, itemLabel, value, tone]) => {
@@ -675,7 +686,7 @@ function ProblemGroup({
               type="button"
               onClick={() => onSelect(active ? "all" : key)}
               className={cn(
-                "flex min-w-0 flex-col items-start gap-0.5 rounded-lg px-2.5 py-2 text-left transition-colors",
+                "inline-flex min-w-0 items-baseline gap-1 rounded-md px-1.5 py-1 text-left transition-colors sm:flex-col sm:items-start sm:gap-0.5 sm:rounded-lg sm:px-2.5 sm:py-2",
                 active
                   ? "bg-primary/12 ring-1 ring-primary/30"
                   : "hover:bg-elevated/80",
@@ -683,7 +694,7 @@ function ProblemGroup({
             >
               <span
                 className={cn(
-                  "font-[family-name:var(--font-display)] text-xl font-semibold tabular-nums leading-none tracking-tight",
+                  "font-[family-name:var(--font-display)] text-sm font-semibold tabular-nums leading-none tracking-tight sm:text-xl",
                   hot && tone === "danger" && "text-danger",
                   hot && tone === "warn" && "text-warning",
                   hot && tone === "signal" && "text-info",
@@ -695,7 +706,7 @@ function ProblemGroup({
               </span>
               <span
                 className={cn(
-                  "truncate text-[12px] leading-tight",
+                  "truncate text-[11px] leading-tight sm:text-[12px]",
                   active ? "text-foreground" : "text-muted-foreground",
                 )}
               >
@@ -734,23 +745,30 @@ function ObjectCard({
     <button
       type="button"
       onClick={onOpen}
-      className="group relative flex flex-col overflow-hidden rounded-xl border border-border/70 bg-card p-4 text-left shadow-[var(--surface-glow)] backdrop-blur-[2px] transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/35 hover:shadow-[var(--surface-glow-hover)]"
+      className={cn(
+        "group relative flex flex-col overflow-hidden rounded-xl border bg-card p-4 text-left shadow-[var(--surface-glow)] backdrop-blur-[2px] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[var(--surface-glow-hover)]",
+        o.emergency
+          ? "border-danger/50 hover:border-danger/70"
+          : "border-border/70 hover:border-primary/35",
+      )}
     >
       <span
         aria-hidden
         className={cn(
           "absolute inset-y-0 left-0 w-[3px] transition-colors",
-          problem !== "all"
-            ? PROBLEM_META[problem].tone === "danger"
-              ? "bg-danger"
-              : PROBLEM_META[problem].tone === "warn"
-                ? "bg-warning"
-                : "bg-info"
-            : tone === "bad"
-              ? "bg-danger"
-              : tone === "warn"
-                ? "bg-warning"
-                : "bg-primary/55 group-hover:bg-primary",
+          o.emergency
+            ? "bg-danger"
+            : problem !== "all"
+              ? PROBLEM_META[problem].tone === "danger"
+                ? "bg-danger"
+                : PROBLEM_META[problem].tone === "warn"
+                  ? "bg-warning"
+                  : "bg-info"
+              : tone === "bad"
+                ? "bg-danger"
+                : tone === "warn"
+                  ? "bg-warning"
+                  : "bg-primary/55 group-hover:bg-primary",
         )}
       />
       <div className="flex flex-1 flex-col gap-3.5 pl-1">
@@ -765,6 +783,7 @@ function ObjectCard({
             <span className="rounded-md bg-info-soft px-1.5 py-0.5 text-[11px] font-medium text-info">
               {typeLabel(o.object_type)}
             </span>
+            {o.emergency ? <ObjectEmergencyIcon /> : null}
             {o.status !== "in_work" && (
               <span className="rounded-md bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">
                 {statusLabel(o.status)}
@@ -783,12 +802,12 @@ function ObjectCard({
             <dt className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Ответственный</dt>
             <dd className="truncate font-medium">{o.responsible_name || "—"}</dd>
           </div>
-          <div className="min-w-0 col-span-2">
+          <div className="min-w-0 col-span-2 rounded-lg bg-muted/35 px-2.5 py-2">
             <dt className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Текущий этап</dt>
-            <dd className="truncate">
+            <dd className="mt-0.5 truncate text-[0.95rem] font-medium leading-snug">
               {o.current_stage_number != null ? (
                 <>
-                  <span className="font-[family-name:var(--font-display)] font-semibold tabular-nums text-primary">
+                  <span className="font-[family-name:var(--font-display)] text-base font-semibold tabular-nums text-primary">
                     {o.current_stage_number}.
                   </span>{" "}
                   {o.current_stage_name}
@@ -880,10 +899,19 @@ function ObjectTableRow({
     .join(" · ");
 
   return (
-    <TableRow className="cursor-pointer transition-colors hover:bg-elevated/60" onClick={onOpen}>
+    <TableRow
+      className={cn(
+        "cursor-pointer transition-colors hover:bg-elevated/60",
+        o.emergency && "bg-danger-soft/35 hover:bg-danger-soft/50",
+      )}
+      onClick={onOpen}
+    >
       <TableCell className={td} title={o.name}>
-        <div className="truncate font-[family-name:var(--font-display)] font-semibold leading-snug tracking-tight">
-          {o.name}
+        <div className="flex min-w-0 items-center gap-2">
+          <div className="truncate font-[family-name:var(--font-display)] font-semibold leading-snug tracking-tight">
+            {o.name}
+          </div>
+          {o.emergency ? <ObjectEmergencyIcon /> : null}
         </div>
         {problem !== "all" ? (
           <div className="mt-1">
