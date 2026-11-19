@@ -49,6 +49,11 @@ const OBJECT_TABS = [
 ] as const;
 
 type ObjectTab = (typeof OBJECT_TABS)[number]["tab"];
+type ObjectTabBadge = "requests" | "id_folder";
+
+function objectTabBadge(sub: (typeof OBJECT_TABS)[number]): ObjectTabBadge | null {
+  return "badge" in sub ? sub.badge : null;
+}
 
 /** /objects/:id или /objects/:id/stages/... — не new/edit */
 function parseObjectNav(path: string): { objectId: string; onStage: boolean } | null {
@@ -253,14 +258,15 @@ function ObjectSubnav({
   onStage: boolean;
   badges: { requests: number; id_folder: number };
   collapsed: boolean;
-  onNavigate?: () => void;
+  onNavigate?: (() => void) | undefined;
 }) {
   if (collapsed) {
     return (
       <div className="my-1 flex flex-col items-center gap-0.5 py-1">
         {OBJECT_TABS.map((sub) => {
           const subActive = onStage ? sub.tab === "stages" : activeTab === sub.tab;
-          const subBadge = "badge" in sub && sub.badge ? badges[sub.badge] : 0;
+          const badgeKey = objectTabBadge(sub);
+          const subBadge = badgeKey ? badges[badgeKey] : 0;
           const tip = subBadge > 0 ? `${sub.label} · ${subBadge}` : `${sub.label} объекта`;
           return (
             <Link
@@ -282,7 +288,7 @@ function ObjectSubnav({
               {subBadge > 0 ? (
                 <NavCount
                   count={subBadge}
-                  tone={sub.badge === "requests" ? "danger" : "signal"}
+                  tone={badgeKey === "requests" ? "danger" : "signal"}
                 />
               ) : null}
             </Link>
@@ -309,7 +315,8 @@ function ObjectSubnav({
       <ul className="m-0 list-none p-0">
         {OBJECT_TABS.map((sub, i) => {
           const subActive = onStage ? sub.tab === "stages" : activeTab === sub.tab;
-          const subBadge = "badge" in sub && sub.badge ? badges[sub.badge] : 0;
+          const badgeKey = objectTabBadge(sub);
+          const subBadge = badgeKey ? badges[badgeKey] : 0;
           const last = i === OBJECT_TABS.length - 1;
           return (
             <li key={sub.tab} className="relative pl-3">
@@ -347,7 +354,7 @@ function ObjectSubnav({
                   <span
                     className={cn(
                       "shrink-0 rounded-full px-1.5 text-[9px] font-bold tabular-nums leading-4",
-                      sub.badge === "requests"
+                      badgeKey === "requests"
                         ? "bg-danger text-danger-foreground"
                         : "bg-signal text-[oklch(0.18_0.04_55)]",
                     )}
@@ -382,11 +389,12 @@ function Nav({
   const search = useRouterState({ select: (s) => s.location.search as Record<string, unknown> });
   const objectNav = parseObjectNav(path);
   const objectId = objectNav?.objectId ?? null;
+  const searchTab = search["tab"];
   const objectTab: ObjectTab =
     objectNav?.onStage
       ? "stages"
-      : OBJECT_TABS.some((t) => t.tab === search.tab)
-        ? (search.tab as ObjectTab)
+      : OBJECT_TABS.some((t) => t.tab === searchTab)
+        ? (searchTab as ObjectTab)
         : "stages";
 
   const { data: objectRow } = useObject(objectId ?? "", { enabled: !!objectId });

@@ -507,7 +507,7 @@ begin
 
   perform public.log_history(st.object_id, 'stage', st.stage_id, 'step_done',
     format('Этап %s: шаг %s «%s» выполнен', st.stage_label, st.step_no, st.action));
-end $function$
+end $function$;
 
 
 CREATE OR REPLACE FUNCTION public.request_create(p_object_id uuid, p_request_type_id uuid, p_call_date date, p_values jsonb DEFAULT '[]'::jsonb, p_representative_id uuid DEFAULT NULL::uuid, p_stage_id uuid DEFAULT NULL::uuid)
@@ -541,7 +541,7 @@ begin
   perform public.log_history(p_object_id, 'request', v_id, 'created',
     format('Заявка №%s «%s» создана, вызов на %s', v_number, t.name, to_char(p_call_date, 'DD.MM.YYYY')));
   return v_id;
-end $function$
+end $function$;
 
 
 CREATE OR REPLACE FUNCTION public.request_set_status(p_request_id uuid, p_status text, p_comment text DEFAULT NULL::text)
@@ -775,5 +775,5 @@ begin
   perform public.log_history(r.object_id, 'request', r.id, 'status_changed',
     format('Заявка №%s «%s»: %s', r.number, r.type_name, v_name),
     jsonb_build_object('from', r.status, 'to', p_status));
-end $function$
+end $function$;
 
