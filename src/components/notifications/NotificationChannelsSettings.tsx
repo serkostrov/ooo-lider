@@ -23,17 +23,17 @@ function botUsername() {
 }
 
 export function NotificationChannelsSettings() {
-  const me = useProfile();
+  const { id: profileId } = useProfile();
   const qc = useQueryClient();
   const bot = botUsername();
 
   const q = useQuery({
-    queryKey: [...CHANNELS_KEY, me.id],
+    queryKey: [...CHANNELS_KEY, profileId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("profiles")
         .select("email, telegram_chat_id, telegram_username, notify_telegram, notify_email")
-        .eq("id", me.id)
+        .eq("id", profileId)
         .maybeSingle();
       if (error) throw error;
       return data as ChannelsRow | null;
@@ -86,32 +86,6 @@ export function NotificationChannelsSettings() {
     onError: showError,
   });
 
-  const dispatch = useMutation({
-    mutationFn: async () => {
-      const base = (import.meta.env.VITE_SUPABASE_URL as string | undefined)?.replace(/\/$/, "");
-      if (!base) throw new Error("Нет VITE_SUPABASE_URL");
-      const { data: session } = await supabase.auth.getSession();
-      const token = session.session?.access_token;
-      if (!token) throw new Error("Нужен вход");
-      const res = await fetch(`${base}/functions/v1/notify-dispatch`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string,
-        },
-      });
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(body.error ?? res.statusText);
-      return body as { sent?: number; failed?: number; pending?: number };
-    },
-    onSuccess: (body) => {
-      toast.success(
-        `Рассылка: отправлено ${body.sent ?? 0}, ошибок ${body.failed ?? 0} (в очереди было ${body.pending ?? 0})`,
-      );
-    },
-    onError: showError,
-  });
-
   if (q.isLoading) {
     return <Skeleton className="h-48 max-w-xl rounded-xl" />;
   }
@@ -124,8 +98,8 @@ export function NotificationChannelsSettings() {
       <div className="rounded-xl border border-border/70 bg-card p-5 shadow-[var(--surface-glow)]">
         <h3 className="text-sm font-semibold text-foreground">Telegram</h3>
         <p className="mt-1 text-sm leading-snug text-muted-foreground">
-          Нажмите «Привязать» → откроется бот → Start. Ключи бота лежат в .env / secrets, потом просто
-          замените.
+          Нажмите «Привязать» → откроется бот → Start. Уведомления уходят сами (нужен воркер
+          рассылки).
         </p>
         <div className="mt-4 flex flex-wrap items-center gap-2">
           {linked ? (
@@ -178,8 +152,7 @@ export function NotificationChannelsSettings() {
       <div className="rounded-xl border border-border/70 bg-card p-5 shadow-[var(--surface-glow)]">
         <h3 className="text-sm font-semibold text-foreground">Email</h3>
         <p className="mt-1 text-sm leading-snug text-muted-foreground">
-          Письма уходят на email из карточки сотрудника. SMTP — в .env (SMTP_HOST / USER / PASS), потом
-          подмените на почту заказчика.
+          Письма уходят на email из карточки сотрудника.
         </p>
         <p className="mt-3 text-sm tabular-nums text-foreground">
           {row?.email?.trim() ? row.email : "Email в профиле не указан — письма слать некуда"}
@@ -193,25 +166,6 @@ export function NotificationChannelsSettings() {
           />
         </label>
       </div>
-
-      {me.is_admin ? (
-        <div className="rounded-xl border border-border/70 bg-card p-5 shadow-[var(--surface-glow)]">
-          <h3 className="text-sm font-semibold text-foreground">Рассылка сейчас</h3>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Админ: отправить накопившиеся события в Telegram/email (edge function notify-dispatch).
-          </p>
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            className="mt-3 h-8"
-            disabled={dispatch.isPending}
-            onClick={() => dispatch.mutate()}
-          >
-            {dispatch.isPending ? "Отправка…" : "Разослать очередь"}
-          </Button>
-        </div>
-      ) : null}
     </div>
   );
 }

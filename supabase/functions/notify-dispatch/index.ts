@@ -62,9 +62,17 @@ Deno.serve(async (req) => {
     try {
       if (row.channel === "telegram") {
         if (!row.telegram_chat_id) throw new Error("нет chat_id");
-        await sendTelegram(row.telegram_chat_id, msg.text);
+        if (!cfg.telegramToken) throw new Error("TELEGRAM_BOT_TOKEN не задан");
+        await sendTelegram(row.telegram_chat_id, msg.text, {
+          buttonUrl: msg.link,
+          buttonText: "Открыть",
+        });
       } else {
         if (!row.email) throw new Error("нет email");
+        // Без SMTP не считаем ошибкой и не помечаем delivered — иначе очередь забивается.
+        if (!cfg.smtpHost || !cfg.smtpUser || !cfg.smtpPass) {
+          continue;
+        }
         await sendEmail(row.email, msg.subject, msg.text);
       }
       await supabase.rpc("notification_mark_delivered", {

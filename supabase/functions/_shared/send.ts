@@ -1,18 +1,60 @@
 import nodemailer from "npm:nodemailer@6.9.16";
 import { notifyConfig } from "./env.ts";
 
-export async function sendTelegram(chatId: string, text: string): Promise<void> {
+/** Telegram не принимает localhost/private IP в url-кнопках — только публичный http(s). */
+function isPublicHttpUrl(link: string): boolean {
+  try {
+    const u = new URL(link);
+    if (u.protocol !== "http:" && u.protocol !== "https:") return false;
+    const host = u.hostname.toLowerCase();
+    if (host === "localhost" || host === "127.0.0.1" || host === "::1") return false;
+    if (/^10\./.test(host) || /^192\.168\./.test(host) || /^172\.(1[6-9]|2\d|3[0-1])\./.test(host)) {
+      return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function sendTelegram(
+  chatId: string,
+  text: string,
+  opts?: { buttonUrl?: string; buttonText?: string },
+): Promise<void> {
   const { telegramToken } = notifyConfig();
   if (!telegramToken) throw new Error("TELEGRAM_BOT_TOKEN не задан");
   const url = `https://api.telegram.org/bot${telegramToken}/sendMessage`;
+
+  const buttonUrl = opts?.buttonUrl?.trim() || "";
+  const useButton = !!buttonUrl && isPublicHttpUrl(buttonUrl);
+
+  let finalText = text;
+  let parseMode: string | undefined;
+  if (buttonUrl && !useButton) {
+    // Локально: кликабельная HTML-ссылка (кнопку Telegram отклонит).
+    finalText = `${text}\n\n<a href="${buttonUrl.replace(/&/g, "&amp;").replace(/"/g, "&quot;")}">${
+      opts?.buttonText ?? "Открыть"
+    }</a>`;
+    parseMode = "HTML";
+  }
+
+  const payload: Record<string, unknown> = {
+    chat_id: chatId,
+    text: finalText,
+    disable_web_page_preview: true,
+  };
+  if (parseMode) payload.parse_mode = parseMode;
+  if (useButton) {
+    payload.reply_markup = {
+      inline_keyboard: [[{ text: opts?.buttonText ?? "Открыть", url: buttonUrl }]],
+    };
+  }
+
   const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      chat_id: chatId,
-      text,
-      disable_web_page_preview: true,
-    }),
+    body: JSON.stringify(payload),
   });
   const body = await res.json().catch(() => ({}));
   if (!res.ok || !body.ok) {
@@ -53,7 +95,7 @@ export function formatMessage(row: {
     const link = `${appUrl}/directories?tab=employees`;
     return {
       subject: `[Лидер] ${row.title}`,
-      text: [row.title, "", `Открыть: ${link}`].join("\n"),
+      text: row.title,
       link,
     };
   }
@@ -68,12 +110,6 @@ export function formatMessage(row: {
         ? "сегодня"
         : `через ${row.days} дн.`;
   const subject = `[Лидер] ${row.title}`;
-  const text = [
-    row.title,
-    `Объект: ${row.object_name}`,
-    `Срок: ${daysLabel}`,
-    "",
-    `Открыть: ${link}`,
-  ].join("\n");
+  const text = [row.title, `Объект: ${row.object_name}`, `Срок: ${daysLabel}`].join("\n");
   return { subject, text, link };
 }
