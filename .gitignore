@@ -24,6 +24,9 @@ playwright/.cache
 # Локальный кэш Supabase CLI
 supabase/.temp/
 
+# Временные артефакты деплоя/отладки (base64, cdp payloads)
+.tmp-upload/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

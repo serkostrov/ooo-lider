@@ -16,6 +16,8 @@ export type NotificationKind =
   | "stage_message_reply"
   | "stage_status_reply"
   | "stage_message_mention"
+  | "request_comment_mention"
+  | "request_comment_reply"
   | "password_reset";
 
 export type NotificationItem = {
@@ -59,6 +61,8 @@ const KIND_LABEL: Record<NotificationKind, string> = {
   stage_message_reply: "Ответ в переписке",
   stage_status_reply: "Статус по этапу",
   stage_message_mention: "Вас упомянули",
+  request_comment_mention: "Вас упомянули",
+  request_comment_reply: "Ответ в заявке",
   password_reset: "Сброс пароля",
 };
 
@@ -71,7 +75,9 @@ export function notificationOpensMessages(kind: NotificationKind) {
     kind === "status_ask" ||
     kind === "stage_message_reply" ||
     kind === "stage_status_reply" ||
-    kind === "stage_message_mention"
+    kind === "stage_message_mention" ||
+    kind === "request_comment_mention" ||
+    kind === "request_comment_reply"
   );
 }
 
@@ -120,7 +126,12 @@ export function useNotifications(limit = 40) {
         .order("days", { ascending: false })
         .limit(Math.max(limit * 3, 120));
 
-      if (!me.is_admin) {
+      // Личные события — только адресату. Админ раньше видел всю ленту,
+      // поэтому чужие status_ask/mention «выскакивали» у него.
+      // password_reset: recipient null, показывается только админам.
+      if (me.is_admin) {
+        eq = eq.or(`recipient_profile_id.eq.${me.id},kind.eq.password_reset`);
+      } else {
         eq = eq.eq("recipient_profile_id", me.id);
       }
 
@@ -145,12 +156,16 @@ export function useNotifications(limit = 40) {
           a.kind === "stage_message_reply" ||
           a.kind === "stage_status_reply" ||
           a.kind === "stage_message_mention" ||
+          a.kind === "request_comment_mention" ||
+          a.kind === "request_comment_reply" ||
           a.kind === "password_reset";
         const bMsg =
           b.kind === "status_ask" ||
           b.kind === "stage_message_reply" ||
           b.kind === "stage_status_reply" ||
           b.kind === "stage_message_mention" ||
+          b.kind === "request_comment_mention" ||
+          b.kind === "request_comment_reply" ||
           b.kind === "password_reset";
         if (aMsg !== bMsg) return aMsg ? -1 : 1;
         return Math.abs(b.days) - Math.abs(a.days);

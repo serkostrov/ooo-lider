@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { CornerDownRight, MessageSquare, MoreHorizontal, Send } from "lucide-react";
@@ -19,6 +19,12 @@ import {
 import { NOTIFICATIONS_KEY } from "@/components/notifications/data";
 import { formatProfileOption, useActiveProfiles, type ProfileShort } from "@/components/objects/data";
 import type { ObjectStage } from "@/components/stages/data";
+import {
+  detectMention,
+  highlightComposer,
+  renderMentionBody,
+  type MentionQuery,
+} from "@/components/chat/mention";
 
 export type StageMessage = {
   id: string;
@@ -36,17 +42,6 @@ export type StageMessage = {
 };
 
 export const stageMessagesKey = (stageId: string) => ["stage-messages", stageId] as const;
-
-type MentionQuery = { start: number; query: string } | null;
-
-function detectMention(text: string, caret: number): MentionQuery {
-  const before = text.slice(0, caret);
-  const m = before.match(/(^|[\s\n])@([^\s@]*)$/);
-  if (!m) return null;
-  const query = m[2] ?? "";
-  const start = before.length - query.length - 1;
-  return { start, query };
-}
 
 export function useStageMessages(stageId: string) {
   return useQuery({
@@ -143,48 +138,6 @@ function MessageActions({
       </DropdownMenuContent>
     </DropdownMenu>
   );
-}
-
-function renderBody(body: string, mentionName: string | null) {
-  if (!mentionName) return body;
-  const tag = `@${mentionName}`;
-  const idx = body.indexOf(tag);
-  if (idx < 0) return body;
-  return (
-    <>
-      {body.slice(0, idx)}
-      <span className="rounded bg-primary/15 px-1 font-medium text-primary">{tag}</span>
-      {body.slice(idx + tag.length)}
-    </>
-  );
-}
-
-/** Подсветка @тега синим в поле ввода (поверх прозрачного textarea). */
-function highlightComposer(text: string, mentionName: string | null): ReactNode {
-  if (!text) return "\u00a0";
-  const tag = mentionName ? `@${mentionName}` : null;
-  if (!tag || !text.includes(tag)) {
-    return text.endsWith("\n") ? `${text}\u00a0` : text;
-  }
-  const parts: ReactNode[] = [];
-  let rest = text;
-  let key = 0;
-  while (rest.length) {
-    const idx = rest.indexOf(tag);
-    if (idx < 0) {
-      parts.push(<span key={key++}>{rest}</span>);
-      break;
-    }
-    if (idx > 0) parts.push(<span key={key++}>{rest.slice(0, idx)}</span>);
-    parts.push(
-      <span key={key++} className="rounded-sm bg-primary/15 font-medium text-primary">
-        {tag}
-      </span>,
-    );
-    rest = rest.slice(idx + tag.length);
-  }
-  if (text.endsWith("\n")) parts.push("\u00a0");
-  return parts;
 }
 
 /** Переписка этапа: сообщения, ответы, @теги. */
@@ -438,7 +391,7 @@ export function StageMessagesTab({ stage }: { stage: ObjectStage }) {
                       mine && "text-foreground",
                     )}
                   >
-                    {renderBody(m.body, m.mention_name)}
+                    {renderMentionBody(m.body, m.mention_name)}
                   </p>
                 </article>
               </div>

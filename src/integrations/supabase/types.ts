@@ -1058,6 +1058,7 @@ export type Database = {
           author_id: string | null
           created_at: string
           id: string
+          mention_profile_id: string | null
           parent_id: string | null
           request_id: string
           text: string
@@ -1066,6 +1067,7 @@ export type Database = {
           author_id?: string | null
           created_at?: string
           id?: string
+          mention_profile_id?: string | null
           parent_id?: string | null
           request_id: string
           text: string
@@ -1074,6 +1076,7 @@ export type Database = {
           author_id?: string | null
           created_at?: string
           id?: string
+          mention_profile_id?: string | null
           parent_id?: string | null
           request_id?: string
           text?: string
@@ -1082,6 +1085,13 @@ export type Database = {
           {
             foreignKeyName: "request_comments_author_id_fkey"
             columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "request_comments_mention_profile_id_fkey"
+            columns: ["mention_profile_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -2211,6 +2221,15 @@ export type Database = {
       }
       request_stage_status: {
         Args: { p_stage_id: string; p_note?: string | null }
+        Returns: string
+      }
+      request_comment_post: {
+        Args: {
+          p_request_id: string
+          p_text: string
+          p_parent_id?: string | null
+          p_mention_profile_id?: string | null
+        }
         Returns: string
       }
       stage_message_post: {

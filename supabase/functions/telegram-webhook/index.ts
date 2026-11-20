@@ -30,21 +30,25 @@ Deno.serve(async (req) => {
   const username = update.message?.from?.username ?? null;
   if (!chatId) return json({ ok: true });
 
+  const reply = (msg: string) =>
+    sendTelegram(String(chatId), msg).catch((e) => {
+      console.error("telegram reply failed:", e instanceof Error ? e.message : e);
+    });
+
   const start = text.match(/^\/start(?:\s+(.+))?$/i);
   if (!start) {
-    await sendTelegram(
-      String(chatId),
+    // не ждём Telegram API — с VPS он может быть недоступен
+    void reply(
       "Бот «Лидер». Чтобы привязать аккаунт, нажмите «Привязать Telegram» в настройках системы.",
-    ).catch(() => undefined);
+    );
     return json({ ok: true });
   }
 
   const code = (start[1] ?? "").trim();
   if (!code) {
-    await sendTelegram(
-      String(chatId),
+    void reply(
       "Откройте настройки в «Лидер» → Уведомления → Привязать Telegram — там будет ссылка с кодом.",
-    ).catch(() => undefined);
+    );
     return json({ ok: true });
   }
 
@@ -60,17 +64,13 @@ Deno.serve(async (req) => {
   });
 
   if (error) {
-    await sendTelegram(
-      String(chatId),
+    void reply(
       `Не удалось привязать: ${error.message}. Запросите новую ссылку в настройках.`,
-    ).catch(() => undefined);
+    );
     return json({ ok: true, linked: false });
   }
 
-  await sendTelegram(
-    String(chatId),
-    "Готово: Telegram привязан к аккаунту в «Лидер». Сюда будут приходить уведомления.",
-  ).catch(() => undefined);
+  void reply("Готово: Telegram привязан к аккаунту в «Лидер». Сюда будут приходить уведомления.");
 
   return json({ ok: true, linked: true, profile_id: data });
 });

@@ -24,7 +24,6 @@ export async function sendTelegram(
 ): Promise<void> {
   const { telegramToken } = notifyConfig();
   if (!telegramToken) throw new Error("TELEGRAM_BOT_TOKEN не задан");
-  const url = `https://api.telegram.org/bot${telegramToken}/sendMessage`;
 
   const buttonUrl = opts?.buttonUrl?.trim() || "";
   const useButton = !!buttonUrl && isPublicHttpUrl(buttonUrl);
@@ -51,10 +50,12 @@ export async function sendTelegram(
     };
   }
 
-  const res = await fetch(url, {
+  const apiBase = (Deno.env.get("TELEGRAM_API_BASE") ?? "https://api.telegram.org").replace(/\/$/, "");
+  const res = await fetch(`${apiBase}/bot${telegramToken}/sendMessage`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(8_000),
   });
   const body = await res.json().catch(() => ({}));
   if (!res.ok || !body.ok) {

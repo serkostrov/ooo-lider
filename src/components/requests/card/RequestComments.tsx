@@ -1,13 +1,23 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CornerDownRight, Reply, Send, X } from "lucide-react";
+import { CornerDownRight, MessageSquare, MoreHorizontal } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useProfile } from "@/lib/profile";
 import { showError } from "@/lib/format";
 import { formatDateTime } from "@/lib/dates";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { ChatComposer } from "@/components/chat/ChatComposer";
+import { renderMentionBody } from "@/components/chat/mention";
+import { useActiveProfiles } from "@/components/objects/data";
+import { NOTIFICATIONS_KEY } from "@/components/notifications/data";
 
 type Comment = {
   id: string;
@@ -15,62 +25,82 @@ type Comment = {
   created_at: string;
   author_id: string;
   parent_id: string | null;
-  author: { full_name: string } | null;
+  mention_profile_id: string | null;
+  author_name: string | null;
+  mention_name: string | null;
 };
 
 /** Запрос переписки — общий для блока и счётчика на вкладке (правка 2.12). */
 export function commentsQuery(requestId: string) {
   return {
     queryKey: ["request-comments", requestId],
-    queryFn: async () => {
+    queryFn: async (): Promise<Comment[]> => {
       const { data, error } = await supabase
         .from("request_comments")
-        .select(
-          "id, text, created_at, author_id, parent_id, author:profiles!request_comments_author_id_fkey(full_name)",
-        )
+        .select("id, text, created_at, author_id, parent_id, mention_profile_id")
         .eq("request_id", requestId)
         .order("created_at");
       if (error) throw error;
-      return (data ?? []) as unknown as Comment[];
+      const rows = data ?? [];
+      const ids = [
+        ...new Set(
+          rows.flatMap((r) =>
+            [r.author_id, r.mention_profile_id].filter((x): x is string => !!x),
+          ),
+        ),
+      ];
+      const nameById = new Map<string, string>();
+      if (ids.length) {
+        const { data: profiles, error: pErr } = await supabase
+          .from("profiles")
+          .select("id, full_name")
+          .in("id", ids);
+        if (pErr) throw pErr;
+        for (const p of profiles ?? []) {
+          nameById.set(p.id, p.full_name || "—");
+        }
+      }
+      return rows.map((r) => ({
+        id: r.id,
+        text: r.text,
+        created_at: r.created_at,
+        author_id: r.author_id as string,
+        parent_id: r.parent_id,
+        mention_profile_id: r.mention_profile_id,
+        author_name: nameById.get(r.author_id as string) ?? null,
+        mention_name: r.mention_profile_id
+          ? nameById.get(r.mention_profile_id) ?? null
+          : null,
+      }));
     },
   };
 }
 
-function initials(name: string) {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return "?";
-  if (parts.length === 1) return parts[0]!.slice(0, 2).toUpperCase();
-  return `${parts[0]!.slice(0, 1)}${parts[1]!.slice(0, 1)}`.toUpperCase();
-}
-
-/** Переписка по заявке: «технадзор связался, они на связи» и т. п. (ТЗ 7.7). */
+/** Переписка по заявке: ответы и @теги — как на этапах. */
 export function RequestComments({ requestId }: { requestId: string }) {
   const me = useProfile();
   const qc = useQueryClient();
   const key = ["request-comments", requestId];
-  const [text, setText] = useState("");
   const [replyTo, setReplyTo] = useState<Comment | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLTextAreaElement>(null);
-  const { data = [] } = useQuery(commentsQuery(requestId));
+  const { data = [], isLoading } = useQuery(commentsQuery(requestId));
+  const { data: profiles = [] } = useActiveProfiles();
   const byId = useMemo(() => new Map(data.map((c) => [c.id, c])), [data]);
 
   const send = useMutation({
-    mutationFn: async () => {
-      const t = text.trim();
-      if (!t) throw new Error("Напишите сообщение");
-      const { error } = await supabase.from("request_comments").insert({
-        request_id: requestId,
-        author_id: me.id,
-        text: t,
-        parent_id: replyTo?.id ?? null,
+    mutationFn: async ({ text, mentionId }: { text: string; mentionId: string | null }) => {
+      const { error } = await supabase.rpc("request_comment_post", {
+        p_request_id: requestId,
+        p_text: text,
+        p_parent_id: replyTo?.id ?? null,
+        p_mention_profile_id: mentionId,
       });
       if (error) throw error;
     },
     onSuccess: () => {
-      setText("");
       setReplyTo(null);
-      qc.invalidateQueries({ queryKey: key });
+      void qc.invalidateQueries({ queryKey: key });
+      void qc.invalidateQueries({ queryKey: NOTIFICATIONS_KEY });
     },
     onError: showError,
   });
@@ -81,165 +111,118 @@ export function RequestComments({ requestId }: { requestId: string }) {
     el.scrollTop = el.scrollHeight;
   }, [data.length]);
 
-  const startReply = (c: Comment) => {
-    setReplyTo(c);
-    requestAnimationFrame(() => inputRef.current?.focus());
-  };
+  if (isLoading) {
+    return (
+      <section className="flex min-h-[28rem] flex-col gap-3 overflow-hidden rounded-md border border-border bg-card p-4">
+        <Skeleton className="h-16 w-full rounded-md" />
+        <Skeleton className="h-16 w-full rounded-md" />
+      </section>
+    );
+  }
 
   return (
     <section className="flex min-h-[28rem] flex-col overflow-hidden rounded-md border border-border bg-card">
       <header className="shrink-0 border-b border-border px-4 py-3">
         <h2 className="text-base font-semibold tracking-tight">Сообщения</h2>
         <p className="mt-0.5 text-xs text-muted-foreground">
-          Короткие заметки по выезду — видно всем участникам заявки
+          Ответы и @теги — как в переписке этапов
         </p>
       </header>
 
-      <div ref={listRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4">
+      <div ref={listRef} className="min-h-0 flex-1 space-y-2.5 overflow-y-auto px-3 py-3">
         {data.length === 0 ? (
-          <div className="flex h-full min-h-40 flex-col items-center justify-center gap-1 text-center">
-            <p className="text-sm text-muted-foreground">Сообщений пока нет</p>
-            <p className="text-xs text-muted-foreground/80">
-              Напишите, если технадзор на связи или есть уточнения
-            </p>
+          <div className="flex h-full min-h-40 flex-col items-center justify-center gap-2 text-center text-sm text-muted-foreground">
+            <MessageSquare className="size-5 opacity-60" />
+            <p>Сообщений пока нет</p>
+            <p className="text-xs">Напишите коллегам или тегните @ФИО</p>
           </div>
         ) : (
           data.map((c) => {
             const mine = c.author_id === me.id;
-            const name = c.author?.full_name ?? "Сотрудник";
             const parent = c.parent_id ? byId.get(c.parent_id) : null;
             return (
               <div
                 key={c.id}
-                className={cn(
-                  "group flex items-end gap-1.5",
-                  mine ? "flex-row-reverse" : "flex-row",
-                )}
+                className={cn("flex w-full gap-1", mine ? "justify-end" : "justify-start")}
               >
-                <div
-                  className={cn(
-                    "mb-0.5 flex size-8 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold tabular-nums",
-                    mine ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground",
-                  )}
-                  aria-hidden
-                >
-                  {initials(name)}
-                </div>
-                <div className={cn("max-w-[min(100%,28rem)] min-w-0", mine ? "items-end" : "items-start")}>
-                  <div
-                    className={cn(
-                      "mb-1 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-[11px]",
-                      mine ? "justify-end" : "justify-start",
-                    )}
-                  >
-                    <span className="font-medium text-foreground/90">{mine ? "Вы" : name}</span>
-                    <time className="text-muted-foreground" dateTime={c.created_at}>
-                      {formatDateTime(c.created_at)}
-                    </time>
-                  </div>
-                  <div
-                    className={cn(
-                      "rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-line",
-                      mine
-                        ? "rounded-tr-md bg-primary/15 text-foreground"
-                        : "rounded-tl-md bg-muted/70 text-foreground",
-                    )}
-                  >
-                    {parent ? (
-                      <div className="mb-1.5 rounded-md border border-border/50 bg-background/40 px-2 py-1 text-xs text-muted-foreground">
-                        <span className="font-medium text-foreground/80">
-                          {parent.author?.full_name ?? "Сотрудник"}:
-                        </span>{" "}
-                        <span className="line-clamp-2">{parent.text}</span>
-                      </div>
-                    ) : null}
-                    {c.text}
-                  </div>
-                </div>
                 {!mine ? (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    title="Ответить"
-                    aria-label="Ответить"
-                    className={cn(
-                      "mb-0.5 size-7 shrink-0 px-0 text-muted-foreground",
-                      "opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100",
-                    )}
-                    onClick={() => startReply(c)}
-                  >
-                    <Reply className="size-3.5" />
-                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="size-7 shrink-0 self-center px-0 text-muted-foreground opacity-60 hover:opacity-100"
+                        title="Действия"
+                        aria-label="Действия"
+                      >
+                        <MoreHorizontal className="size-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start" className="w-44">
+                      <DropdownMenuItem onSelect={() => setReplyTo(c)}>
+                        <CornerDownRight className="size-3.5" />
+                        Ответить
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 ) : null}
+                <article
+                  className={cn(
+                    "max-w-[min(100%,22rem)] rounded-2xl border px-3 py-2 shadow-sm sm:max-w-[28rem]",
+                    mine
+                      ? "rounded-br-md border-primary/25 bg-primary/10"
+                      : "rounded-bl-md border-border/70 bg-muted/35",
+                  )}
+                >
+                  <div
+                    className={cn(
+                      "flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-muted-foreground",
+                      mine && "justify-end",
+                    )}
+                  >
+                    {!mine ? (
+                      <span className="font-medium text-foreground">{c.author_name || "—"}</span>
+                    ) : (
+                      <span className="font-medium text-primary">Вы</span>
+                    )}
+                    <span className="tabular-nums">{formatDateTime(c.created_at)}</span>
+                  </div>
+                  {parent ? (
+                    <div className="mt-1 rounded-md border border-border/50 bg-background/40 px-2 py-1 text-xs text-muted-foreground">
+                      <span className="font-medium text-foreground/80">
+                        {parent.author_name || "—"}:
+                      </span>{" "}
+                      <span className="line-clamp-2">{parent.text}</span>
+                    </div>
+                  ) : null}
+                  <p className="mt-1 whitespace-pre-wrap text-sm leading-snug">
+                    {renderMentionBody(c.text, c.mention_name)}
+                  </p>
+                </article>
               </div>
             );
           })
         )}
       </div>
 
-      <form
-        className="shrink-0 border-t border-border bg-muted/20 p-3"
-        onSubmit={(e) => {
-          e.preventDefault();
-          send.mutate();
-        }}
-      >
-        {replyTo ? (
-          <div className="mb-2 flex items-start justify-between gap-2 rounded-md border border-border/70 bg-card px-2.5 py-1.5 text-xs">
-            <div className="min-w-0">
-              <div className="flex items-center gap-1 font-medium text-foreground">
-                <CornerDownRight className="size-3" />
-                Ответ → {replyTo.author?.full_name ?? "Сотрудник"}
-              </div>
-              <div className="mt-0.5 line-clamp-2 text-muted-foreground">{replyTo.text}</div>
-            </div>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="size-7 shrink-0 px-0"
-              title="Снять ответ"
-              aria-label="Снять ответ"
-              onClick={() => setReplyTo(null)}
-            >
-              <X className="size-3.5" />
-            </Button>
-          </div>
-        ) : null}
-        <div className="flex items-end gap-2">
-          <Textarea
-            ref={inputRef}
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            placeholder={
-              replyTo
-                ? "Напишите ответ…"
-                : "Например: технадзор связался, они на связи"
-            }
-            rows={2}
-            className="min-h-[2.75rem] flex-1 resize-none text-sm"
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                if (!send.isPending && text.trim()) send.mutate();
-              }
-            }}
-          />
-          <Button
-            type="submit"
-            disabled={send.isPending || !text.trim()}
-            className="h-10 shrink-0 gap-1.5 px-3 text-sm"
-            title="Отправить · Enter"
-          >
-            <Send className="size-4" />
-            <span className="hidden sm:inline">Отправить</span>
-          </Button>
-        </div>
-        <p className="mt-1.5 text-[11px] text-muted-foreground">
-          Enter — отправить, Shift+Enter — новая строка
-        </p>
-      </form>
+      <div className="shrink-0 border-t border-border p-3">
+        <ChatComposer
+          profiles={profiles}
+          meId={me.id}
+          pending={send.isPending}
+          replyTo={
+            replyTo
+              ? {
+                  authorName: replyTo.author_name || "—",
+                  body: replyTo.text,
+                }
+              : null
+          }
+          onClearReply={() => setReplyTo(null)}
+          onSubmit={(payload) => send.mutateAsync(payload)}
+        />
+      </div>
     </section>
   );
 }
