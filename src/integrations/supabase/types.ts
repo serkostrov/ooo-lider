@@ -1488,6 +1488,7 @@ export type Database = {
           is_admin: boolean
           name: string
           required_on_object_create: boolean
+          see_only_own_tasks: boolean
           sort: number
         }
         Insert: {
@@ -1495,6 +1496,7 @@ export type Database = {
           is_admin?: boolean
           name: string
           required_on_object_create?: boolean
+          see_only_own_tasks?: boolean
           sort?: number
         }
         Update: {
@@ -1502,6 +1504,7 @@ export type Database = {
           is_admin?: boolean
           name?: string
           required_on_object_create?: boolean
+          see_only_own_tasks?: boolean
           sort?: number
         }
         Relationships: []

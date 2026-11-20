@@ -22,6 +22,7 @@ type Role = {
   name: string;
   is_admin: boolean;
   required_on_object_create: boolean;
+  see_only_own_tasks: boolean;
   sort: number;
 };
 
@@ -37,7 +38,7 @@ export function RolesDirectory() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("roles")
-        .select("code, name, is_admin, required_on_object_create, sort")
+        .select("code, name, is_admin, required_on_object_create, see_only_own_tasks, sort")
         .order("sort");
       if (error) throw error;
       return data as Role[];
@@ -71,7 +72,8 @@ export function RolesDirectory() {
   return (
     <div className="w-full">
       <p className="mb-3 text-sm text-muted-foreground">
-        Можно править название, полный доступ и обязательность при создании объекта. Системные роли удалить нельзя.
+        Можно править название, доступ, видимость этапов и обязательность при создании объекта. Системные роли
+        удалить нельзя.
         {is_admin && search.trim() ? " Сбросьте поиск, чтобы менять порядок." : null}
       </p>
       <Toolbar search={search} onSearch={setSearch} onAdd={is_admin ? () => setEditing("new") : undefined}>
@@ -89,6 +91,7 @@ export function RolesDirectory() {
             <TableRow>
               <TableHead>Название</TableHead>
               <TableHead>Полный доступ</TableHead>
+              <TableHead>Только свои этапы</TableHead>
               <TableHead>Обязательна при создании объекта</TableHead>
               {handles && <TableHead className={REORDER_ACTIONS_W} />}
             </TableRow>
@@ -99,9 +102,9 @@ export function RolesDirectory() {
             onReorder={applyOrder}
           >
             {isLoading ? (
-              <DirectoryTableSkeleton cols={3} withActions={handles} />
+              <DirectoryTableSkeleton cols={4} withActions={handles} />
             ) : filtered.length === 0 ? (
-              <EmptyRow cols={handles ? 4 : 3} />
+              <EmptyRow cols={handles ? 5 : 4} />
             ) : (
               filtered.map((r) => (
                 <SortableTableRow
@@ -120,6 +123,7 @@ export function RolesDirectory() {
                     ) : null}
                   </TableCell>
                   <TableCell>{r.is_admin ? "Да" : "Нет"}</TableCell>
+                  <TableCell>{r.see_only_own_tasks ? "Да" : "Нет"}</TableCell>
                   <TableCell>{r.required_on_object_create ? "Да" : "Нет"}</TableCell>
                 </SortableTableRow>
               ))
@@ -158,6 +162,7 @@ function RoleForm({
   const [name, setName] = useState(role?.name ?? "");
   const [isAdmin, setIsAdmin] = useState(role?.is_admin ?? false);
   const [requiredOnCreate, setRequiredOnCreate] = useState(role?.required_on_object_create ?? false);
+  const [seeOnlyOwn, setSeeOnlyOwn] = useState(role?.see_only_own_tasks ?? false);
 
   const m = useMutation({
     mutationFn: async () => {
@@ -171,6 +176,7 @@ function RoleForm({
             name: n,
             is_admin: isAdmin,
             required_on_object_create: requiredOnCreate,
+            see_only_own_tasks: seeOnlyOwn,
           })
           .eq("code", role.code);
         if (error) throw error;
@@ -184,6 +190,7 @@ function RoleForm({
           name: n,
           is_admin: isAdmin,
           required_on_object_create: requiredOnCreate,
+          see_only_own_tasks: seeOnlyOwn,
           sort: nextSort(existing),
         });
         if (error) throw error;
@@ -212,6 +219,16 @@ function RoleForm({
       <label className="flex items-center gap-3 text-sm">
         <Switch checked={isAdmin} onCheckedChange={setIsAdmin} />
         Полный доступ (как администратор / руководитель)
+      </label>
+      <label className="flex items-start gap-3 text-sm">
+        <Switch checked={seeOnlyOwn} onCheckedChange={setSeeOnlyOwn} className="mt-0.5" />
+        <span>
+          Только свои этапы и заявки
+          <span className="mt-0.5 block text-xs text-muted-foreground">
+            В объекте видны только этапы/заявки, где эта роль в сценарии или человек назначен исполнителем.
+            Без галки — все этапы объекта. Менять статусы по-прежнему можно только по своим шагам.
+          </span>
+        </span>
       </label>
       <label className="flex items-start gap-3 text-sm">
         <Switch
