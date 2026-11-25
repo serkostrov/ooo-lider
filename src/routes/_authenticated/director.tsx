@@ -7,9 +7,15 @@ import { useDirectorDashboard } from "@/components/director/data";
 import { DirectorKpiCards } from "@/components/director/DirectorKpi";
 import { DirectorCharts } from "@/components/director/DirectorCharts";
 import { DirectorLists } from "@/components/director/DirectorLists";
+import { DirectorObjectFocus } from "@/components/director/DirectorObjectFocus";
 
 export const Route = createFileRoute("/_authenticated/director")({
   component: DirectorPage,
+  validateSearch: (search: Record<string, unknown>): { object?: string } => {
+    const raw = search["object"];
+    if (typeof raw === "string" && raw) return { object: raw };
+    return {};
+  },
   head: () => ({
     meta: [
       { title: "Панель управления — Лидер" },
@@ -21,6 +27,7 @@ export const Route = createFileRoute("/_authenticated/director")({
 function DirectorPage() {
   const { is_admin } = useProfile();
   const navigate = useNavigate();
+  const { object: selectedObjectId } = Route.useSearch();
   const { data, isLoading, isError, error } = useDirectorDashboard();
 
   useEffect(() => {
@@ -56,12 +63,30 @@ function DirectorPage() {
           </p>
         ) : null}
         <DirectorKpiCards kpi={data?.kpi} problems={data?.problems} loading={isLoading} />
+        <DirectorObjectFocus
+          objects={data?.objectProgress}
+          problems={data?.problems}
+          loading={isLoading}
+          selectedObjectId={selectedObjectId ?? null}
+        />
         <DirectorCharts
           workTypeReadiness={data?.workTypeReadiness}
           executorLoad={data?.executorLoad}
           objectProgress={data?.objectProgress}
           attentionMix={data?.attentionMix}
           loading={isLoading}
+          onSelectObject={(id) => {
+            void navigate({
+              to: "/director",
+              search: (prev) => ({ ...prev, object: id }),
+            });
+            requestAnimationFrame(() => {
+              document.getElementById("director-object-focus")?.scrollIntoView({
+                behavior: "smooth",
+                block: "start",
+              });
+            });
+          }}
         />
         <DirectorLists overdue={data?.overdue} dueSoon={data?.dueSoon} loading={isLoading} />
       </div>

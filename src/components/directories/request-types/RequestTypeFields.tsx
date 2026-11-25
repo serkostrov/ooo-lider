@@ -35,6 +35,7 @@ type Draft = {
   is_required: boolean;
   is_active: boolean;
   options: string;
+  default_value: string;
 };
 
 const emptyDraft = (): Draft => ({
@@ -44,7 +45,15 @@ const emptyDraft = (): Draft => ({
   is_required: false,
   is_active: true,
   options: "",
+  default_value: "",
 });
+
+function defaultToText(v: unknown): string {
+  if (v == null) return "";
+  if (typeof v === "string") return v;
+  if (typeof v === "number" || typeof v === "boolean") return String(v);
+  return "";
+}
 
 const typeLabel = (v: string) => FIELD_TYPES.find((t) => t.v === v)?.label ?? v;
 const filledLabel = (v: string) => FILLED_BY.find((t) => t.v === v)?.label ?? v;
@@ -189,6 +198,7 @@ function FieldForm({
           is_required: field.is_required,
           is_active: field.is_active,
           options: field.options.join("\n"),
+          default_value: defaultToText(field.default_value),
         }
       : emptyDraft(),
   );
@@ -205,6 +215,7 @@ function FieldForm({
       if (err) throw new Error(err);
       const label = draft.label.trim();
       const opts = parseFieldOptions(draft.options);
+      const def = draft.default_value.trim();
       const payload = {
         label,
         field_type: draft.field_type,
@@ -212,6 +223,7 @@ function FieldForm({
         is_required: draft.is_required,
         is_active: draft.is_active,
         options: draft.field_type === "select" ? opts : [],
+        default_value: def === "" ? null : def,
       };
       if (field) {
         const { error } = await supabase.from("request_type_fields").update(payload).eq("id", field.id);
@@ -310,6 +322,27 @@ function FieldForm({
             rows={4}
             className="text-sm"
           />
+        </Field>
+      )}
+
+      {(draft.field_type === "text" || draft.field_type === "textarea" || draft.field_type === "number") && (
+        <Field label="Значение по умолчанию">
+          {draft.field_type === "textarea" ? (
+            <Textarea
+              value={draft.default_value}
+              onChange={(e) => set("default_value", e.target.value)}
+              rows={2}
+              className="text-sm"
+              placeholder="Подставится в новую заявку, можно изменить"
+            />
+          ) : (
+            <Input
+              value={draft.default_value}
+              onChange={(e) => set("default_value", e.target.value)}
+              className="h-10 text-sm"
+              placeholder="Подставится в новую заявку, можно изменить"
+            />
+          )}
         </Field>
       )}
 

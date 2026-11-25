@@ -18,7 +18,9 @@
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "functions": "supabase functions serve --env-file supabase/functions/.env",
-    "telegram:poll": "node scripts/telegram-poll.mjs"
+    "telegram:poll": "node scripts/telegram-poll.mjs",
+    "telegram:prod-worker": "node scripts/telegram-prod-worker.mjs",
+    "telegram:api-proxy": "node scripts/telegram-api-proxy.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -60,8 +62,12 @@
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
     "date-fns": "^4.1.0",
+    "docx": "^9.16.0",
     "embla-carousel-react": "^8.6.0",
+    "exceljs": "^4.4.0",
+    "html2canvas": "^1.4.1",
     "input-otp": "^1.4.2",
+    "jspdf": "^4.2.1",
     "libphonenumber-js": "^1.13.16",
     "lucide-react": "^0.575.0",
     "react": "^19.2.0",

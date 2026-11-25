@@ -12,6 +12,9 @@ const base: ObjectDraft = {
   curator_contact_id: "",
   technadzor_contact_id: "",
   technadzor_ehz_contact_id: "",
+  project_number: "",
+  utn_number: "",
+  utn_date: "",
   status: "in_work",
   notes: "",
 };

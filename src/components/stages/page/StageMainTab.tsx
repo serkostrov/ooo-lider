@@ -17,6 +17,7 @@ import { toIntOrNull } from "@/components/directories/stages/data";
 import { formatProfileOption, useActiveProfiles } from "@/components/objects/data";
 import { useProfile } from "@/lib/profile";
 import { StatusBadge, useObjectStages, type ObjectStage } from "../data";
+import { StageExternalContacts } from "./StageExternalContacts";
 
 const NONE = "__none";
 
@@ -141,6 +142,7 @@ export const StageMainTab = forwardRef<
 
   const assignOn = editing && canAssign;
   const workOn = editing && canWork;
+  const canEditContacts = editing && (canWork || canAssign || is_admin);
 
   const person = (k: "executor_id" | "coexecutor_id" | "confirmer_id", placeholder: string) => (
     <Select value={v[k] || NONE} onValueChange={(x) => set(k, x === NONE ? "" : x)}>
@@ -225,6 +227,17 @@ export const StageMainTab = forwardRef<
               )}
             </div>
           </div>
+        </Section>
+      </Block>
+
+      <Block>
+        <Section
+          title="Внешние контакты"
+          {...(canEditContacts
+            ? { hint: "ФИО / должность / почта / телефон — из справочника или новый" }
+            : {})}
+        >
+          <StageExternalContacts stageId={stage.id} canEdit={canEditContacts} />
         </Section>
       </Block>
 

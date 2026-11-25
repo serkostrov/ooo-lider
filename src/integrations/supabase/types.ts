@@ -263,6 +263,59 @@ export type Database = {
           },
         ]
       }
+      external_contacts: {
+        Row: {
+          id: string
+          kind: string
+          full_name: string
+          position: string | null
+          phone: string | null
+          email: string | null
+          comment: string | null
+          customer_id: string | null
+          is_active: boolean
+          sort: number
+          created_at: string
+          deleted_at: string | null
+        }
+        Insert: {
+          id?: string
+          kind?: string
+          full_name: string
+          position?: string | null
+          phone?: string | null
+          email?: string | null
+          comment?: string | null
+          customer_id?: string | null
+          is_active?: boolean
+          sort?: number
+          created_at?: string
+          deleted_at?: string | null
+        }
+        Update: {
+          id?: string
+          kind?: string
+          full_name?: string
+          position?: string | null
+          phone?: string | null
+          email?: string | null
+          comment?: string | null
+          customer_id?: string | null
+          is_active?: boolean
+          sort?: number
+          created_at?: string
+          deleted_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "external_contacts_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       files: {
         Row: {
           created_at: string
@@ -424,6 +477,49 @@ export type Database = {
             columns: ["profile_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      object_stage_external_contacts: {
+        Row: {
+          id: string
+          stage_id: string
+          contact_id: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          stage_id: string
+          contact_id: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          stage_id?: string
+          contact_id?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "object_stage_external_contacts_stage_id_fkey"
+            columns: ["stage_id"]
+            isOneToOne: false
+            referencedRelation: "object_stages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "object_stage_external_contacts_stage_id_fkey"
+            columns: ["stage_id"]
+            isOneToOne: false
+            referencedRelation: "v_object_stages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "object_stage_external_contacts_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "external_contacts"
             referencedColumns: ["id"]
           },
         ]
@@ -862,11 +958,14 @@ export type Database = {
           name: string
           notes: string | null
           object_type: string
+          project_number: string | null
           responsible_id: string | null
           status: string
           technadzor_contact_id: string | null
           technadzor_ehz_contact_id: string | null
           updated_at: string
+          utn_date: string | null
+          utn_number: string | null
         }
         Insert: {
           address?: string | null
@@ -886,11 +985,14 @@ export type Database = {
           name: string
           notes?: string | null
           object_type?: string
+          project_number?: string | null
           responsible_id?: string | null
           status?: string
           technadzor_contact_id?: string | null
           technadzor_ehz_contact_id?: string | null
           updated_at?: string
+          utn_date?: string | null
+          utn_number?: string | null
         }
         Update: {
           address?: string | null
@@ -910,11 +1012,14 @@ export type Database = {
           name?: string
           notes?: string | null
           object_type?: string
+          project_number?: string | null
           responsible_id?: string | null
           status?: string
           technadzor_contact_id?: string | null
           technadzor_ehz_contact_id?: string | null
           updated_at?: string
+          utn_date?: string | null
+          utn_number?: string | null
         }
         Relationships: [
           {
@@ -1197,6 +1302,7 @@ export type Database = {
       }
       request_type_fields: {
         Row: {
+          default_value: Json | null
           deleted_at: string | null
           field_type: string
           filled_by: string
@@ -1209,6 +1315,7 @@ export type Database = {
           sort: number
         }
         Insert: {
+          default_value?: Json | null
           deleted_at?: string | null
           field_type: string
           filled_by?: string
@@ -1221,6 +1328,7 @@ export type Database = {
           sort?: number
         }
         Update: {
+          default_value?: Json | null
           deleted_at?: string | null
           field_type?: string
           filled_by?: string
@@ -1323,38 +1431,97 @@ export type Database = {
           },
         ]
       }
-      request_types: {
+      request_blank_templates: {
         Row: {
+          config: Json
           created_at: string
           deleted_at: string | null
+          engine: string | null
+          format: string | null
+          id: string
+          is_active: boolean
+          is_draft: boolean
+          name: string
+          sort: number
+          updated_at: string
+        }
+        Insert: {
+          config?: Json
+          created_at?: string
+          deleted_at?: string | null
+          engine?: string | null
+          format?: string | null
+          id?: string
+          is_active?: boolean
+          is_draft?: boolean
+          name: string
+          sort?: number
+          updated_at?: string
+        }
+        Update: {
+          config?: Json
+          created_at?: string
+          deleted_at?: string | null
+          engine?: string | null
+          format?: string | null
+          id?: string
+          is_active?: boolean
+          is_draft?: boolean
+          name?: string
+          sort?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      request_types: {
+        Row: {
+          blank_template_id: string | null
+          created_at: string
+          deleted_at: string | null
+          doc_template: string | null
           id: string
           is_active: boolean
           name: string
+          send_by_email: boolean
           send_to_email: string | null
           sort: number
           uses_representatives: boolean
         }
         Insert: {
+          blank_template_id?: string | null
           created_at?: string
           deleted_at?: string | null
+          doc_template?: string | null
           id?: string
           is_active?: boolean
           name: string
+          send_by_email?: boolean
           send_to_email?: string | null
           sort?: number
           uses_representatives?: boolean
         }
         Update: {
+          blank_template_id?: string | null
           created_at?: string
           deleted_at?: string | null
+          doc_template?: string | null
           id?: string
           is_active?: boolean
           name?: string
+          send_by_email?: boolean
           send_to_email?: string | null
           sort?: number
           uses_representatives?: boolean
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "request_types_blank_template_id_fkey"
+            columns: ["blank_template_id"]
+            isOneToOne: false
+            referencedRelation: "request_blank_templates"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       requests: {
         Row: {
@@ -1994,6 +2161,7 @@ export type Database = {
           notes: string | null
           object_type: string | null
           progress_pct: number | null
+          project_number: string | null
           requests_new: number | null
           requests_overdue: number | null
           responsible_id: string | null
@@ -2010,6 +2178,8 @@ export type Database = {
           technadzor_ehz_name: string | null
           technadzor_name: string | null
           updated_at: string | null
+          utn_date: string | null
+          utn_number: string | null
         }
         Relationships: [
           {
@@ -2263,6 +2433,10 @@ export type Database = {
           p_values?: Json
         }
         Returns: string
+      }
+      request_soft_delete: {
+        Args: { p_request_id: string; p_reason?: string | null }
+        Returns: undefined
       }
       request_mark_seen: {
         Args: { p_request_id: string }

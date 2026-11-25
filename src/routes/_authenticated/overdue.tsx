@@ -80,8 +80,10 @@ function OverduePage() {
   const stagesCount = counts?.stages ?? 0;
   const requestsCount = counts?.requests ?? 0;
 
-  const { sort, toggle } = useTableSort<OverdueSort>({ key: "days", dir: "desc" });
-  const rows = useSortedRows(items, sort, OVERDUE_GETTERS);
+  const { sort, toggle } = useTableSort<OverdueSort>(
+    { key: "days", dir: "desc" },
+    { storageKey: "lider.table_sort.overdue" },
+  );  const rows = useSortedRows(items, sort, OVERDUE_GETTERS);
 
   const open = (it: OverdueItem) =>
     it.kind === "request"

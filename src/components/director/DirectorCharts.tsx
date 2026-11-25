@@ -179,12 +179,14 @@ export function DirectorCharts({
   objectProgress,
   attentionMix,
   loading,
+  onSelectObject,
 }: {
   workTypeReadiness: WorkTypeReadiness[] | undefined;
   executorLoad: ExecutorLoad[] | undefined;
   objectProgress: ObjectProgress[] | undefined;
   attentionMix: AttentionSlice[] | undefined;
   loading: boolean;
+  onSelectObject?: (objectId: string) => void;
 }) {
   const [roleFilter, setRoleFilter] = useState(ALL_ROLES);
 
@@ -376,7 +378,7 @@ export function DirectorCharts({
 
       <ChartPanel
         title="Готовность объектов"
-        description="Активные объекты, сначала с меньшей готовностью"
+        description="Активные объекты, сначала с меньшей готовностью. Клик — статистика и трасса выше."
       >
         {objects.length === 0 ? (
           <Empty text="Нет объектов" />
@@ -388,6 +390,15 @@ export function DirectorCharts({
                 layout="vertical"
                 margin={{ left: 8, right: 28, top: 4, bottom: 4 }}
                 barCategoryGap={10}
+                {...(onSelectObject
+                  ? {
+                      className: "cursor-pointer",
+                      onClick: (state: { activePayload?: Array<{ payload?: ObjectProgress }> }) => {
+                        const row = state?.activePayload?.[0]?.payload;
+                        if (row?.id) onSelectObject(row.id);
+                      },
+                    }
+                  : {})}
               >
                 <CartesianGrid horizontal={false} strokeDasharray="3 3" />
                 <YAxis

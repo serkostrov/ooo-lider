@@ -32,11 +32,17 @@ import {
 import { RequestHeader } from "@/components/requests/card/RequestHeader";
 import { RequestStatusActions, RequestStatusStepper } from "@/components/requests/card/RequestProgress";
 import { RequestComments, commentsQuery } from "@/components/requests/card/RequestComments";
+import { RequestDocPreviewButton } from "@/components/requests/card/RequestDocPreview";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { fieldLabelClass, fieldStackClass, panelClass, tabsListClass, tabTriggerClass } from "@/lib/ui";
 import { useProfile } from "@/lib/profile";
-import { isRequestInitiatorRole, isRequestOfficeRole } from "@/lib/permissions";
+import {
+  canDeleteRequest,
+  isRequestInitiatorRole,
+  isRequestOfficeRole,
+} from "@/lib/permissions";
+import { DeleteRequestButton } from "@/components/requests/card/DeleteRequestButton";
 
 /** Основная работа + вторичные вкладки. Старые tab=initiator|office|files → work. */
 const TABS = ["work", "comments", "history"] as const;
@@ -213,7 +219,7 @@ function RequestCard() {
   const missingRequired = requiredNow.filter(isMissing).map((f) => f.label);
   const orphan = values.filter((v) => !activeIds.has(v.field_id) && v.field_type !== "file");
   const doneByName = r.done_by ? profiles.find((p) => p.id === r.done_by)?.full_name ?? null : null;
-  // Прораб/ПТО (и админ) — initiator на «Новая»/доработке; офис (и админ) — office только на «Готова».
+  // Прораб/ПТО — «Новая»/доработка; офис на «Готова» — свои поля. Текст бланка правится в превью, не в заявке.
   const statusAllowsInitiator = r.status === "new" || r.status === "rework";
   const statusAllowsOffice = r.status === "ready";
   const canEditInitiator = isRequestInitiatorRole(me) && statusAllowsInitiator;
@@ -237,21 +243,21 @@ function RequestCard() {
   const editButtonLabel = hasFilledData ? "Редактировать" : "Заполнить";
   const EditIcon = hasFilledData ? Pencil : ClipboardPen;
   const initiatorHint = !statusAllowsInitiator
-    ? "Зафиксированы после «Готова к отправке»."
+    ? "Зафиксированы после «Готова к отправке». Правка текста бланка — в «Просмотреть бланк»."
     : !canEditInitiator
       ? "Заполняет прораб или ПТО."
       : r.status === "rework"
         ? "Исправьте замечания и снова отправьте заявку."
         : "Заполните и переведите заявку дальше.";
   const officeHint = r.status === "rework"
-    ? "На доработке меняются только данные прораба."
+    ? "На доработке меняются данные прораба."
     : r.status === "new"
       ? "Заполняет офис-менеджер после «Готова к отправке»."
       : !statusAllowsOffice
         ? "Зафиксированы после отправки заявки."
         : !canEditOffice
           ? "Заполняет офис-менеджер перед отправкой."
-          : "Заполняются перед отправкой заявки.";
+          : "Свои поля здесь; текст исходящего бланка — в «Просмотреть бланк».";
   /** Результат всегда в форме (как блок офиса); править — только на «Принята» перед «Исполнена». */
   const resultEditable = r.status === "accepted";
   const count = (n: number) =>
@@ -271,7 +277,17 @@ function RequestCard() {
         <BackLink objectId={backObjectId} />
 
         <div className="mt-4">
-          <RequestHeader r={r} onChanged={refresh} />
+          <RequestHeader
+            r={r}
+            onChanged={refresh}
+            docPreview={
+              <RequestDocPreviewButton
+                r={r}
+                values={values}
+                className="h-full shrink-0 gap-1.5 self-stretch px-3.5 text-xs"
+              />
+            }
+          />
         </div>
 
         <Tabs
@@ -420,48 +436,63 @@ function RequestCard() {
 
       {showBar && (
         <div className="shrink-0 border-t border-border bg-background px-0 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-          <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end sm:gap-3">
-            {canEditAnything && !editing && (
-              <Button
-                className="h-10 w-full gap-1.5 px-4 text-sm sm:h-9 sm:w-auto sm:shrink-0"
-                onClick={() => setEditing(true)}
-              >
-                <EditIcon className="size-3.5" />
-                {editButtonLabel}
-              </Button>
+          <div
+            className={cn(
+              "flex min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3",
+              canDeleteRequest(me) ? "sm:justify-between" : "sm:justify-end",
             )}
-            {canEditAnything && editing && (
-              <div className="flex w-full gap-2 sm:w-auto">
+          >
+            {canDeleteRequest(me) ? (
+              <DeleteRequestButton
+                r={r}
+                className="h-10 w-full sm:h-9 sm:w-auto sm:shrink-0"
+                {...(backObjectId ? { backObjectId } : {})}
+              />
+            ) : null}
+            <div className="flex min-w-0 flex-col gap-2 sm:ml-auto sm:flex-row sm:flex-wrap sm:items-center sm:justify-end sm:gap-3">
+              {canEditAnything && !editing && (
                 <Button
-                  variant="outline"
-                  className="h-10 flex-1 text-sm sm:h-9 sm:flex-none sm:shrink-0"
-                  disabled={saving}
-                  onClick={exitEditing}
+                  className="h-10 w-full gap-1.5 px-4 text-sm sm:h-9 sm:w-auto sm:shrink-0"
+                  onClick={() => setEditing(true)}
                 >
-                  Отмена
+                  <EditIcon className="size-3.5" />
+                  {editButtonLabel}
                 </Button>
-                <Button
-                  onClick={() => void saveAll().catch(() => undefined)}
-                  disabled={!dirty || saving}
-                  className="h-10 flex-1 px-4 text-sm sm:h-9 sm:flex-none sm:shrink-0"
-                >
-                  {saving ? "Сохранение…" : "Сохранить"}
-                </Button>
-              </div>
-            )}
-            <RequestStatusActions
-              r={r}
-              missingRequired={missingRequired}
-              resultText={resultText}
-              beforeChange={() =>
-                editing ? saveAll({ silent: true, keepEditing: true }) : Promise.resolve()
-              }
-              onChanged={() => {
-                setEditing(false);
-                refresh();
-              }}
-              className="min-w-0 sm:shrink-0"
-            />
+              )}
+              {canEditAnything && editing && (
+                <div className="flex w-full gap-2 sm:w-auto">
+                  <Button
+                    variant="outline"
+                    className="h-10 flex-1 text-sm sm:h-9 sm:flex-none sm:shrink-0"
+                    disabled={saving}
+                    onClick={exitEditing}
+                  >
+                    Отмена
+                  </Button>
+                  <Button
+                    onClick={() => void saveAll().catch(() => undefined)}
+                    disabled={!dirty || saving}
+                    className="h-10 flex-1 px-4 text-sm sm:h-9 sm:flex-none sm:shrink-0"
+                  >
+                    {saving ? "Сохранение…" : "Сохранить"}
+                  </Button>
+                </div>
+              )}
+              <RequestStatusActions
+                r={r}
+                missingRequired={missingRequired}
+                resultText={resultText}
+                fieldValues={values}
+                beforeChange={() =>
+                  editing ? saveAll({ silent: true, keepEditing: true }) : Promise.resolve()
+                }
+                onChanged={() => {
+                  setEditing(false);
+                  refresh();
+                }}
+                className="min-w-0 sm:shrink-0"
+              />
+            </div>
           </div>
         </div>
       )}

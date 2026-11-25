@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 export type SortDir = "asc" | "desc";
 
@@ -25,17 +25,66 @@ export function sortRows<T, K extends string>(
   return [...rows].sort((a, b) => compareValues(get(a), get(b)) * dir);
 }
 
-/** Клик по колонке: ↑ → ↓ → сброс. */
-export function useTableSort<K extends string>(initial: SortState<K> | null = null) {
-  const [sort, setSort] = useState<SortState<K> | null>(initial);
+function readStoredSort<K extends string>(storageKey: string): SortState<K> | null {
+  try {
+    const raw = localStorage.getItem(storageKey);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { key?: unknown; dir?: unknown };
+    if (typeof parsed?.key !== "string") return null;
+    if (parsed.dir !== "asc" && parsed.dir !== "desc") return null;
+    return { key: parsed.key as K, dir: parsed.dir };
+  } catch {
+    return null;
+  }
+}
 
-  const toggle = (key: K) => {
-    setSort((s) => {
-      if (!s || s.key !== key) return { key, dir: "asc" };
-      if (s.dir === "asc") return { key, dir: "desc" };
-      return null;
-    });
-  };
+function writeStoredSort<K extends string>(storageKey: string, sort: SortState<K> | null) {
+  try {
+    if (!sort) localStorage.removeItem(storageKey);
+    else localStorage.setItem(storageKey, JSON.stringify(sort));
+  } catch {
+    /* private mode / quota */
+  }
+}
+
+/**
+ * Клик по колонке: ↑ → ↓ → сброс.
+ * `storageKey` — сохранить сортировку в localStorage (не сбивается при уходе со страницы).
+ */
+export function useTableSort<K extends string>(
+  initial: SortState<K> | null = null,
+  opts?: { storageKey?: string },
+) {
+  const storageKey = opts?.storageKey;
+  const [sort, setSortState] = useState<SortState<K> | null>(() => {
+    if (storageKey) {
+      const saved = readStoredSort<K>(storageKey);
+      if (saved) return saved;
+    }
+    return initial;
+  });
+
+  const setSort = useCallback(
+    (next: SortState<K> | null | ((prev: SortState<K> | null) => SortState<K> | null)) => {
+      setSortState((prev) => {
+        const value = typeof next === "function" ? next(prev) : next;
+        if (storageKey) writeStoredSort(storageKey, value);
+        return value;
+      });
+    },
+    [storageKey],
+  );
+
+  const toggle = useCallback(
+    (key: K) => {
+      setSort((s) => {
+        if (!s || s.key !== key) return { key, dir: "asc" };
+        if (s.dir === "asc") return { key, dir: "desc" };
+        return null;
+      });
+    },
+    [setSort],
+  );
 
   return { sort, toggle, setSort };
 }

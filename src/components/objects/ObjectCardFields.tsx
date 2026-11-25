@@ -30,6 +30,9 @@ export type ObjectDraft = {
   curator_contact_id: string;
   technadzor_contact_id: string;
   technadzor_ehz_contact_id: string;
+  project_number: string;
+  utn_number: string;
+  utn_date: string;
   status: "planned" | "in_work" | "completed";
   notes: string;
 };
@@ -45,6 +48,9 @@ export const EMPTY_DRAFT: ObjectDraft = {
   curator_contact_id: "",
   technadzor_contact_id: "",
   technadzor_ehz_contact_id: "",
+  project_number: "",
+  utn_number: "",
+  utn_date: "",
   status: "in_work",
   notes: "",
 };
@@ -81,6 +87,9 @@ export function draftToPayload(d: ObjectDraft) {
     curator_contact_id: d.curator_contact_id || null,
     technadzor_contact_id: d.technadzor_contact_id || null,
     technadzor_ehz_contact_id: d.technadzor_ehz_contact_id || null,
+    project_number: t(d.project_number),
+    utn_number: t(d.utn_number),
+    utn_date: d.utn_date || null,
     status: d.status,
     notes: t(d.notes),
   };
@@ -193,6 +202,28 @@ export function ObjectCardFields({
         </Field>
         <Field label="Адрес">
           <Input value={value.address} onChange={(e) => set("address", e.target.value)} className="h-9 text-sm" />
+        </Field>
+      </div>
+
+      <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+        <Field label="№ проекта">
+          <Input
+            value={value.project_number}
+            onChange={(e) => set("project_number", e.target.value)}
+            placeholder="№МГ-3161-с/24."
+            className="h-9 text-sm"
+          />
+        </Field>
+        <Field label="Регистрация УТН — №">
+          <Input
+            value={value.utn_number}
+            onChange={(e) => set("utn_number", e.target.value)}
+            placeholder="259"
+            className="h-9 text-sm"
+          />
+        </Field>
+        <Field label="Регистрация УТН — дата">
+          <DateField value={value.utn_date} onChange={(v) => set("utn_date", v)} />
         </Field>
       </div>
 

@@ -3,12 +3,15 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { showError } from "@/lib/format";
-import { normalizePhone } from "@/lib/validation";
 import { Input } from "@/components/ui/input";
-import { PhoneInput } from "@/components/ui/PhoneInput";
 import { Textarea } from "@/components/ui/textarea";
-import { DeleteButton, Field, FormActions, emptyToNull } from "./common";
-import { CONTACT_POSITIONS, validateCustomerContact } from "./rules";
+import { DeleteButton, Field, FormActions, MultiValueInputs, emptyToNull } from "./common";
+import {
+  CONTACT_POSITIONS,
+  joinMultiContacts,
+  splitMultiContacts,
+  validateCustomerContact,
+} from "./rules";
 
 export { CONTACT_POSITIONS };
 
@@ -48,19 +51,20 @@ export function CustomerContactForm({
   const [v, setV] = useState({
     full_name: contact?.full_name ?? "",
     position: contact?.position ?? defaultPosition,
-    phone: contact?.phone ?? "",
-    email: contact?.email ?? "",
+    phones: splitMultiContacts(contact?.phone),
+    emails: splitMultiContacts(contact?.email),
     comment: contact?.comment ?? "",
   });
-  const set = (k: keyof typeof v) => (e: { target: { value: string } }) => setV((s) => ({ ...s, [k]: e.target.value }));
+  const set = (k: "full_name" | "position" | "comment") => (e: { target: { value: string } }) =>
+    setV((s) => ({ ...s, [k]: e.target.value }));
 
   const m = useMutation({
     mutationFn: async () => {
       const payload = {
         full_name: v.full_name.trim(),
         position: emptyToNull(v.position),
-        phone: normalizePhone(v.phone),
-        email: emptyToNull(v.email),
+        phone: joinMultiContacts(v.phones),
+        email: joinMultiContacts(v.emails),
         comment: emptyToNull(v.comment),
       };
       if (contact) {
@@ -102,7 +106,11 @@ export function CustomerContactForm({
       className="space-y-4"
       onSubmit={(e) => {
         e.preventDefault();
-        const err = validateCustomerContact(v);
+        const err = validateCustomerContact({
+          full_name: v.full_name,
+          phone: joinMultiContacts(v.phones) ?? "",
+          email: joinMultiContacts(v.emails) ?? "",
+        });
         if (err) {
           toast.error(err);
           return;
@@ -127,14 +135,24 @@ export function CustomerContactForm({
           ))}
         </datalist>
       </Field>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Телефон">
-          <PhoneInput value={v.phone} onChange={(phone) => setV((s) => ({ ...s, phone }))} className={cls} />
-        </Field>
-        <Field label="Email">
-          <Input type="email" value={v.email} onChange={set("email")} className={cls} />
-        </Field>
-      </div>
+      <Field label="Телефон">
+        <MultiValueInputs
+          values={v.phones}
+          onChange={(phones) => setV((s) => ({ ...s, phones }))}
+          type="tel"
+          placeholder="8(495)123-45-67"
+          addLabel="Добавить телефон"
+        />
+      </Field>
+      <Field label="Email">
+        <MultiValueInputs
+          values={v.emails}
+          onChange={(emails) => setV((s) => ({ ...s, emails }))}
+          type="email"
+          placeholder="name@company.ru"
+          addLabel="Добавить email"
+        />
+      </Field>
       <Field label="Комментарий">
         <Textarea value={v.comment} onChange={set("comment")} className="text-sm" />
       </Field>

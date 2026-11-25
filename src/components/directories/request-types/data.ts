@@ -11,6 +11,11 @@ export type RequestType = {
   is_active: boolean;
   uses_representatives: boolean;
   send_to_email: string | null;
+  /** Отправлять заявки на send_to_email. По умолчанию true. */
+  send_by_email: boolean;
+  doc_template: string | null;
+  /** Шаблон из справочника «Шаблоны бланков». */
+  blank_template_id: string | null;
 };
 
 export type FieldType = (typeof FIELD_TYPES_SRC)[number]["v"];
@@ -25,6 +30,7 @@ export type RequestField = {
   filled_by: "initiator" | "office";
   sort: number;
   is_active: boolean;
+  default_value: unknown;
 };
 
 export const FIELD_TYPES: { v: FieldType; label: string }[] = [...FIELD_TYPES_SRC];
@@ -36,11 +42,14 @@ export function useRequestTypes() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("request_types")
-        .select("id, name, sort, is_active, uses_representatives, send_to_email")
+        .select("*")
         .is("deleted_at", null)
         .order("sort");
       if (error) throw error;
-      return (data ?? []) as RequestType[];
+      return ((data ?? []) as unknown as RequestType[]).map((t) => ({
+        ...t,
+        send_by_email: t.send_by_email !== false,
+      }));
     },
   });
 }
@@ -52,7 +61,9 @@ export function useRequestFields(typeId?: string) {
     queryFn: async () => {
       let q = supabase
         .from("request_type_fields")
-        .select("id, request_type_id, label, field_type, options, is_required, filled_by, sort, is_active")
+        .select(
+          "id, request_type_id, label, field_type, options, is_required, filled_by, sort, is_active, default_value",
+        )
         .is("deleted_at", null)
         .order("sort");
       if (typeId) q = q.eq("request_type_id", typeId);
@@ -61,6 +72,7 @@ export function useRequestFields(typeId?: string) {
       return (data ?? []).map((f) => ({
         ...f,
         options: Array.isArray(f.options) ? (f.options as unknown[]).map(String) : [],
+        default_value: f.default_value ?? null,
       })) as RequestField[];
     },
   });

@@ -15,8 +15,15 @@ export type RequestFieldsHandle = {
   getValue: (fieldId: string) => unknown;
 };
 
-function valuesMap(values: FieldValue[]) {
-  return Object.fromEntries(values.map((v) => [v.field_id, v.value]));
+function valuesMap(values: FieldValue[], fields: RequestField[] = []) {
+  const map = Object.fromEntries(values.map((v) => [v.field_id, v.value]));
+  for (const f of fields) {
+    if (f.field_type === "file") continue;
+    if (!isEmptyValue(map[f.id])) continue;
+    if (f.default_value == null || f.default_value === "") continue;
+    map[f.id] = f.default_value;
+  }
+  return map;
 }
 
 function colSpan(t: string) {
@@ -60,12 +67,14 @@ export const RequestFieldsBlock = forwardRef<
   ref,
 ) {
   const editable = fields.filter((f) => f.field_type !== "file");
-  const initial = valuesMap(values);
+  const initial = valuesMap(values, fields);
   const [draft, setDraft] = useState<Record<string, unknown>>(initial);
   const draftRef = useRef(draft);
   draftRef.current = draft;
-  const initialRef = useRef(initial);
-  initialRef.current = initial;
+  /** С чем сравниваем dirty: только реально сохранённые значения (без дефолтов). */
+  const savedMap = valuesMap(values);
+  const initialRef = useRef(savedMap);
+  initialRef.current = savedMap;
 
   const isDirty = () =>
     !readOnly &&
@@ -79,9 +88,9 @@ export const RequestFieldsBlock = forwardRef<
 
   useEffect(() => {
     if (isDirty()) return;
-    setDraft(valuesMap(values));
+    setDraft(valuesMap(values, fields));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [values, readOnly]);
+  }, [values, fields, readOnly]);
 
   useEffect(() => {
     onDirtyChange?.(dirty);

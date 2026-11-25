@@ -131,7 +131,7 @@ export function EmployeesDirectory() {
   const roleNames = (e: Emp) =>
     (e.role_codes.length ? e.role_codes : [e.role_code]).map(roleName).join(", ");
   const filtered = data.filter((e) => matches(search, e.full_name, e.phone, e.email, roleNames(e)));
-  const { sort, toggle } = useTableSort<EmpSort>();
+  const { sort, toggle } = useTableSort<EmpSort>(null, { storageKey: "lider.table_sort.employees" });
   const getters = useMemo(
     () =>
       ({

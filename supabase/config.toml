@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.admin-user-access]
 verify_jwt = false
+
+[functions.send-request-doc]
+verify_jwt = false

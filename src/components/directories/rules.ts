@@ -37,6 +37,7 @@ export const FIELD_TYPES = [
   { v: "textarea" as const, label: "Многострочный текст" },
   { v: "number" as const, label: "Число" },
   { v: "date" as const, label: "Дата" },
+  { v: "time" as const, label: "Время" },
   { v: "select" as const, label: "Выпадающий список" },
   { v: "checkbox" as const, label: "Галочка" },
   { v: "file" as const, label: "Файл (фото, видео, PDF)" },
@@ -185,10 +186,72 @@ export function validateCustomer(v: { name: string; inn: string; kpp: string; og
   return null;
 }
 
+/**
+ * Несколько телефонов/email — через «; ».
+ * Склеитые через пробел номера вида `8(… ) 8(…)` тоже разделяем.
+ */
+export function normalizeMultiContacts(s: string): string | null {
+  const prepared = s
+    .replace(/\r\n/g, "\n")
+    .replace(/\s+(?=(?:\+7|8)\s*\()/g, "; ")
+    .replace(/\s+(?=(?:\+7|8)\d)/g, "; ");
+  const parts = prepared
+    .split(/[;\n,]+/)
+    .map((x) => x.trim().replace(/\s+/g, " "))
+    .filter(Boolean);
+  return parts.length ? parts.join("; ") : null;
+}
+
+/** Разбить сохранённую строку на поля формы (всегда ≥1 элемент). */
+export function splitMultiContacts(s: string | null | undefined): string[] {
+  if (!s?.trim()) return [""];
+  return normalizeMultiContacts(s)?.split("; ") ?? [""];
+}
+
+/** Склеить поля формы обратно в строку для БД. */
+export function joinMultiContacts(parts: string[]): string | null {
+  return normalizeMultiContacts(parts.join("; "));
+}
+
+/** Несколько телефонов/email через ; , или перевод строки (и «склеенные» через пробел 8…). */
+function splitContactParts(s: string): string[] {
+  return (
+    normalizeMultiContacts(s)
+      ?.split("; ")
+      .map((x) => x.trim())
+      .filter(Boolean) ?? []
+  );
+}
+
+/** Добавочный в скобках в конце: `8(495)… (42-43)` — не ломает проверку номера. */
+function phoneCoreForValidation(p: string): string {
+  return p.replace(/\s*\(\d[\d\-–—]*\d\)\s*$/u, "").trim();
+}
+
 export function validateCustomerContact(v: { full_name: string; phone: string; email: string }): RuleError {
   if (!v.full_name.trim()) return "Заполните ФИО";
-  if (!isOptionalPhone(v.phone)) return VALIDATION_MSG.phone;
-  if (!isOptionalEmail(v.email)) return VALIDATION_MSG.email;
+  for (const p of splitContactParts(v.phone)) {
+    if (!isOptionalPhone(phoneCoreForValidation(p))) return VALIDATION_MSG.phone;
+  }
+  for (const e of splitContactParts(v.email)) {
+    if (!isOptionalEmail(e)) return VALIDATION_MSG.email;
+  }
+  return null;
+}
+
+/** Внешний контакт: ФИО/название обязательно; телефон и почта — один или несколько. */
+export function validateExternalContact(v: {
+  full_name: string;
+  phone: string;
+  email: string;
+}): RuleError {
+  if (!v.full_name.trim()) return "Заполните ФИО или название";
+  for (const p of splitContactParts(v.phone)) {
+    if (!isOptionalPhone(phoneCoreForValidation(p))) return VALIDATION_MSG.phone;
+  }
+  for (const e of splitContactParts(v.email)) {
+    if (!isOptionalEmail(e)) return VALIDATION_MSG.email;
+  }
   return null;
 }
 

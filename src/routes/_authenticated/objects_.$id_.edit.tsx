@@ -43,7 +43,9 @@ function EditObjectPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("objects")
-        .select("id, name, address, customer_id, object_type, contract_start, contract_end, responsible_id, status, notes, curator_contact_id, technadzor_contact_id, technadzor_ehz_contact_id")
+        .select(
+          "id, name, address, customer_id, object_type, contract_start, contract_end, responsible_id, status, notes, curator_contact_id, technadzor_contact_id, technadzor_ehz_contact_id, project_number, utn_number, utn_date",
+        )
         .eq("id", id)
         .is("deleted_at", null)
         .maybeSingle();
@@ -81,6 +83,9 @@ function EditObjectPage() {
     curator_contact_id: obj.curator_contact_id ?? "",
     technadzor_contact_id: obj.technadzor_contact_id ?? "",
     technadzor_ehz_contact_id: obj.technadzor_ehz_contact_id ?? "",
+    project_number: obj.project_number ?? "",
+    utn_number: obj.utn_number ?? "",
+    utn_date: obj.utn_date ?? "",
     status: obj.status as ObjectDraft["status"],
     notes: obj.notes ?? "",
   };

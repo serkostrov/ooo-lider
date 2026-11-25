@@ -141,6 +141,7 @@ function Contacts({ customerId }: { customerId: string }) {
       <div className="flex items-start justify-between gap-3">
         <p className="min-w-0 text-xs text-muted-foreground">
           Технадзор, куратор, ГИП и другие. На объекте выбираются из этого списка.
+          Людей из «Внешних контактов» с этим заказчиком можно сюда подтянуть автоматически.
         </p>
         {is_admin && (
           <Button
@@ -171,8 +172,8 @@ function Contacts({ customerId }: { customerId: string }) {
                 </div>
                 {(c.phone || c.email || c.comment) && (
                   <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-muted-foreground">
-                    {c.phone && <span>{c.phone}</span>}
-                    {c.email && <span className="truncate">{c.email}</span>}
+                    {c.phone && <span className="whitespace-nowrap">{c.phone}</span>}
+                    {c.email && <span className="truncate whitespace-nowrap">{c.email}</span>}
                     {c.comment && <span className="truncate">{c.comment}</span>}
                   </div>
                 )}

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -14,13 +14,16 @@ import { Field } from "@/components/directories/common";
 import { RequestStatusBadge, overdueDays, stageCallLabel, useRequests, type RequestRow } from "../data";
 import { useObjectStages } from "@/components/stages/data";
 
-/** Шапка карточки заявки: кто/что слева, срок вызова справа. */
+/** Шапка карточки заявки: кто/что слева, бланк + срок вызова справа. */
 export function RequestHeader({
   r,
   onChanged,
+  docPreview,
 }: {
   r: RequestRow;
   onChanged: () => void;
+  /** Кнопка «Просмотреть бланк» — справа, над датой вызова. */
+  docPreview?: ReactNode;
 }) {
   const { data: objectRequests = [] } = useRequests(r.object_id);
   const { data: stages = [] } = useObjectStages(r.object_id);
@@ -44,6 +47,14 @@ export function RequestHeader({
           ) : (
             <RequestStatusBadge status={r.status} />
           )}
+          {r.doc_draft_edited ? (
+            <span
+              className="rounded-md border border-amber-500/40 bg-amber-500/15 px-2 py-0.5 text-xs font-semibold text-amber-800 dark:text-amber-200"
+              title="Бланк правили в конструкторе, не из формы заявки"
+            >
+              Бланк изменён
+            </span>
+          ) : null}
         </div>
 
         <Link
@@ -59,7 +70,14 @@ export function RequestHeader({
         {r.stage_id && <StageLink objectId={r.object_id} stageId={r.stage_id} />}
       </div>
 
-      <CallDateCard r={r} onChanged={onChanged} />
+      <div className="flex w-full shrink-0 flex-row flex-wrap items-stretch gap-2 sm:w-auto">
+        {docPreview ? (
+          <div className="flex shrink-0 self-stretch [&_button]:h-full [&_button]:min-h-[3.25rem]">
+            {docPreview}
+          </div>
+        ) : null}
+        <CallDateCard r={r} onChanged={onChanged} />
+      </div>
     </header>
   );
 }

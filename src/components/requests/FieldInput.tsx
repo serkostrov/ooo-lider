@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { ArrowRight } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { DateField } from "@/components/ui/DateField";
+import { TimeField } from "@/components/ui/TimeField";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -50,6 +51,15 @@ export function FieldInput({
         <DateField
           value={typeof value === "string" ? value : ""}
           onChange={(ymd) => onChange(ymd || null)}
+          className="w-full max-w-[11.5rem]"
+          {...(disabled ? { disabled: true } : {})}
+        />
+      );
+    case "time":
+      return (
+        <TimeField
+          value={typeof value === "string" ? value : ""}
+          onChange={(hm) => onChange(hm || null)}
           className="w-full max-w-[11.5rem]"
           {...(disabled ? { disabled: true } : {})}
         />

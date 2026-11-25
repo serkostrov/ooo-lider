@@ -47,8 +47,8 @@ import {
 const ALL = "__all";
 
 const REQUEST_COLUMNS_CORE: ColumnWidthDef[] = [
-  /** № + плашка «Новая» должны быть видны одновременно. */
-  { id: "number", defaultWidth: 128, minWidth: 112, maxWidth: 180 },
+  /** Узкая колонка: номер; плашка «Новая» при необходимости вылезает/сжимается. */
+  { id: "number", defaultWidth: 72, minWidth: 52, maxWidth: 160 },
   /** Дата + padding; заголовок «Сформирована» не должен обрезаться. */
   { id: "created", defaultWidth: 148, minWidth: 136, maxWidth: 220 },
   { id: "call", defaultWidth: 140, minWidth: 128, maxWidth: 220 },
@@ -301,7 +301,7 @@ export function RequestsList({
     );
   }, [scoped, rows, f, effectiveType, debouncedSearch, valuesByRequest, stageCodeById, stageById]);
 
-  const { sort, toggle } = useTableSort<ReqSort>();
+  const { sort, toggle } = useTableSort<ReqSort>(null, { storageKey: "lider.table_sort.requests" });
   const getters = useMemo(
     () =>
       ({
@@ -698,7 +698,13 @@ export function RequestsList({
           <TableColgroup columns={tableCols} widths={colWidths} />
           <thead className="sticky top-0 z-10 border-b border-border bg-card shadow-[0_1px_0_0_var(--border)]">
             <tr>
-              <SortableTh column="number" sort={sort} onToggle={toggle} resize={resizeProps("number")}>
+              <SortableTh
+                column="number"
+                sort={sort}
+                onToggle={toggle}
+                resize={resizeProps("number")}
+                className="px-2.5"
+              >
                 №
               </SortableTh>
               <SortableTh column="created" sort={sort} onToggle={toggle} resize={resizeProps("created")}>
@@ -785,8 +791,8 @@ export function RequestsList({
                     className={`h-12 cursor-pointer border-t transition-colors hover:bg-elevated/50 ${tone}`}
                     title={[r.type_name, r.object_name, dataLine].filter(Boolean).join("\n")}
                   >
-                    <td className="px-5 py-2.5 align-middle">
-                      <div className="flex items-center gap-1.5 whitespace-nowrap">
+                    <td className="overflow-hidden px-2.5 py-2.5 align-middle">
+                      <div className="flex min-w-0 items-center gap-1 whitespace-nowrap">
                         <span
                           className="shrink-0 font-semibold tabular-nums"
                           title={callLabel(r) ? `Сквозной №${r.number}` : undefined}

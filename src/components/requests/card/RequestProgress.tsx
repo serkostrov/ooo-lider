@@ -1,12 +1,14 @@
-import { useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMemo, useState } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Check, RotateCcw, Undo2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { showError } from "@/lib/format";
 import { formatDateTime } from "@/lib/dates";
 import { cn } from "@/lib/utils";
+import { isValidEmail, looksLikeEmailField } from "@/lib/validation";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useProfile } from "@/lib/profile";
@@ -23,9 +25,11 @@ import {
   RequestStatusBadge,
   useRequestFlowStatuses,
   useRequestStatuses,
+  type FieldValue,
   type RequestRow,
   type RequestStatusDef,
 } from "../data";
+import { sendRequestDocEmail } from "@/lib/request-docs/sendRequestDocEmail";
 
 function useStatusFlow(r: RequestRow) {
   const flow = useRequestFlowStatuses();
@@ -134,6 +138,17 @@ export function RequestStatusStepper({
   );
 }
 
+/** Email из поля заявки «Адрес отправки (email)» / похожих. */
+function emailFromFieldValues(values: FieldValue[] | undefined): string {
+  if (!values?.length) return "";
+  for (const v of values) {
+    if (!looksLikeEmailField(v)) continue;
+    const raw = typeof v.value === "string" ? v.value.trim() : "";
+    if (raw && isValidEmail(raw)) return raw;
+  }
+  return "";
+}
+
 /** Действия смены статуса для sticky-бара. Результат/протокол — в форме, не здесь. */
 export function RequestStatusActions({
   r,
@@ -141,6 +156,7 @@ export function RequestStatusActions({
   onChanged,
   beforeChange,
   resultText,
+  fieldValues,
   className,
 }: {
   r: RequestRow;
@@ -150,6 +166,8 @@ export function RequestStatusActions({
   beforeChange?: () => Promise<void>;
   /** Черновик результата с формы (пишется в result_text при «Исполнено»). */
   resultText?: string;
+  /** Значения полей заявки — чтобы взять «Адрес отправки (email)». */
+  fieldValues?: FieldValue[];
   className?: string;
 }) {
   const me = useProfile();
@@ -158,6 +176,8 @@ export function RequestStatusActions({
   const scenarioRole = next ? scenarioRoleForTransition(scenario, next.v) : null;
   const [back, setBack] = useState(false);
   const [reworkOpen, setReworkOpen] = useState(false);
+  const [sendOpen, setSendOpen] = useState(false);
+  const [sendByEmail, setSendByEmail] = useState(r.send_by_email !== false);
   const [reason, setReason] = useState("");
   // Обязательные поля шага (сценарий) — блокируют следующий переход.
   const blockedByFields = missingRequired.length > 0 && !!next;
@@ -165,9 +185,45 @@ export function RequestStatusActions({
   const canBack = !!prev && !onRework && canRequestStatusBack(me);
   const canRework = canSendToRework && canSendRequestToRework(me);
 
+  const { data: typeMail } = useQuery({
+    queryKey: ["request-type-mail", r.request_type_id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("request_types")
+        .select("*")
+        .eq("id", r.request_type_id)
+        .maybeSingle();
+      if (error) throw error;
+      const row = data as unknown as { send_to_email?: string | null; send_by_email?: boolean } | null;
+      return {
+        email: (row?.send_to_email ?? "").trim(),
+        enabled: row?.send_by_email !== false,
+      };
+    },
+  });
+  const fieldEmail = useMemo(() => emailFromFieldValues(fieldValues), [fieldValues]);
+  /** Сначала поле заявки, иначе email вида из справочника. */
+  const recipientEmail = fieldEmail || typeMail?.email || "";
+  const mailAvailable = !!recipientEmail;
+
   const m = useMutation({
-    mutationFn: async ({ to, comment }: { to: string; comment?: string }) => {
+    mutationFn: async ({
+      to,
+      comment,
+      emailFlag,
+    }: {
+      to: string;
+      comment?: string;
+      emailFlag?: boolean;
+    }) => {
       await beforeChange?.();
+      if (to === "sent" && emailFlag !== undefined) {
+        const { error: upErr } = await supabase
+          .from("requests")
+          .update({ send_by_email: emailFlag } as never)
+          .eq("id", r.id);
+        if (upErr) throw upErr;
+      }
       const args: { p_request_id: string; p_status: string; p_comment?: string } = {
         p_request_id: r.id,
         p_status: to,
@@ -175,19 +231,71 @@ export function RequestStatusActions({
       if (comment) args.p_comment = comment;
       const { error } = await supabase.rpc("request_set_status", args);
       if (error) throw error;
-      return to;
+
+      let mailResult: { sent: true; to: string } | { sent: false; error?: string } | null = null;
+      if (to === "sent" && emailFlag && recipientEmail) {
+        const res = await sendRequestDocEmail({
+          r,
+          values: fieldValues ?? [],
+          to: recipientEmail,
+        });
+        mailResult = res.ok
+          ? { sent: true, to: res.to }
+          : { sent: false, error: res.error };
+      } else if (to === "sent") {
+        mailResult = { sent: false };
+      }
+
+      return { to, emailFlag, mailResult };
     },
-    onSuccess: (to) => {
-      toast.success(
-        to === "done" ? "Заявка исполнена" : to === "rework" ? "Отправлена на доработку" : "Статус изменён",
-      );
+    onSuccess: ({ to, emailFlag, mailResult }) => {
+      if (to === "sent") {
+        if (emailFlag && mailResult?.sent) {
+          toast.success(`Заявка отправлена · письмо на ${mailResult.to}`);
+        } else if (emailFlag && mailResult && !mailResult.sent) {
+          toast.warning(
+            `Заявка отправлена, но письмо не ушло: ${mailResult.error || "ошибка SMTP"}`,
+            { duration: 12_000 },
+          );
+        } else if (mailAvailable) {
+          toast.success("Заявка отправлена без письма на почту");
+        } else {
+          toast.success("Заявка отправлена");
+        }
+      } else {
+        toast.success(
+          to === "done" ? "Заявка исполнена" : to === "rework" ? "Отправлена на доработку" : "Статус изменён",
+        );
+      }
       setBack(false);
       setReworkOpen(false);
+      setSendOpen(false);
       setReason("");
       onChanged();
     },
     onError: showError,
   });
+
+  const doneComment = (resultText ?? r.result_text ?? "").trim();
+
+  const onNextClick = () => {
+    if (!next) return;
+    // «Отправить»: диалог с почтой — только если у вида включена отправка писем
+    // (у Геотреста send_by_email=false → сразу статус, без почты).
+    if (next.v === "sent") {
+      if (typeMail?.enabled === false) {
+        m.mutate({ to: "sent", emailFlag: false });
+        return;
+      }
+      setSendByEmail(mailAvailable && r.send_by_email !== false && typeMail?.enabled !== false);
+      setSendOpen(true);
+      return;
+    }
+    m.mutate({
+      to: next.v,
+      ...(next.v === "done" && doneComment ? { comment: doneComment } : {}),
+    });
+  };
 
   if (r.status === "done") {
     return (
@@ -200,8 +308,6 @@ export function RequestStatusActions({
   }
 
   if (!canNext && !canBack && !canRework) return null;
-
-  const doneComment = (resultText ?? r.result_text ?? "").trim();
 
   const secondary = (
     <>
@@ -248,12 +354,7 @@ export function RequestStatusActions({
       )}
       {canNext && next && (
         <Button
-          onClick={() =>
-            m.mutate({
-              to: next.v,
-              ...(next.v === "done" && doneComment ? { comment: doneComment } : {}),
-            })
-          }
+          onClick={onNextClick}
           disabled={m.isPending || blockedByFields}
           title={blockedByFields ? `Сначала заполните: ${missingRequired.join(", ")}` : undefined}
           className="order-1 h-9 w-full bg-success px-3 text-sm text-success-foreground shadow-none hover:bg-success/90 sm:order-2 sm:w-auto sm:shrink-0"
@@ -261,6 +362,52 @@ export function RequestStatusActions({
           {onRework ? "Готова к отправке" : next.next || next.label}
         </Button>
       )}
+
+      <Dialog open={sendOpen} onOpenChange={setSendOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="text-base">Отправить заявку</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <label className="flex items-start gap-3 rounded-md border border-border bg-muted/20 p-3 text-sm">
+              <Switch
+                checked={sendByEmail && mailAvailable}
+                onCheckedChange={setSendByEmail}
+                disabled={!mailAvailable}
+                className="mt-0.5"
+              />
+              <span>
+                <span className="font-medium">Отправить на почту</span>
+                <span className="mt-0.5 block text-xs text-muted-foreground">
+                  {mailAvailable
+                    ? `${recipientEmail} · можно выключить`
+                    : "Email не указан — заявка уйдёт без письма (поле «Адрес отправки» или email вида в справочнике)"}
+                </span>
+              </span>
+            </label>
+            <div className="flex gap-3">
+              <Button
+                type="button"
+                disabled={m.isPending}
+                onClick={() =>
+                  m.mutate({ to: "sent", emailFlag: mailAvailable && sendByEmail })
+                }
+                className="h-9 flex-1 bg-success text-sm text-success-foreground hover:bg-success/90"
+              >
+                {m.isPending ? "Отправка…" : "Отправить"}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setSendOpen(false)}
+                className="h-9 flex-1 text-sm"
+              >
+                Отмена
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={back} onOpenChange={setBack}>
         <DialogContent>

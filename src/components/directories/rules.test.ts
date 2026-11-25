@@ -90,7 +90,7 @@ describe("каталоги констант справочников", () => {
 
   it("поля заявок и кто заполняет", () => {
     expect(FIELD_TYPES.map((t) => t.v)).toEqual(
-      expect.arrayContaining(["text", "select", "picket_range", "file"]),
+      expect.arrayContaining(["text", "time", "select", "picket_range", "file"]),
     );
     expect(FILLED_BY.map((t) => t.v)).toEqual(["initiator", "office"]);
   });

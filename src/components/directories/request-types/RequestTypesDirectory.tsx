@@ -100,7 +100,11 @@ export function RequestTypesDirectory() {
                 {countFields(t.id)}
               </span>
               <span className="w-52 shrink-0 truncate text-xs text-muted-foreground">
-                {t.send_to_email || "не указан"}
+                {!t.send_to_email
+                  ? "не указан"
+                  : t.send_by_email === false
+                    ? `${t.send_to_email} · выкл.`
+                    : t.send_to_email}
               </span>
             </>
           )}

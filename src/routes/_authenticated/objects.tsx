@@ -189,7 +189,7 @@ function ObjectsPage() {
   const problemTotal =
     problem === "all" ? 0 : objects.reduce((s, o) => s + PROBLEM_META[problem].count(o), 0);
 
-  const { sort, toggle } = useTableSort<ObjSort>();
+  const { sort, toggle } = useTableSort<ObjSort>(null, { storageKey: "lider.table_sort.objects" });
   const rows = useSortedRows(objects, sort, OBJ_GETTERS);
 
   return (

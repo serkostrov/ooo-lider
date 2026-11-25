@@ -184,7 +184,7 @@ export function StagesTable({
     showExcluded: false,
   });
   const [closedOpen, setClosedOpen] = useState(false);
-  const { sort, toggle } = useTableSort<StageSort>();
+  const { sort, toggle } = useTableSort<StageSort>(null, { storageKey: "lider.table_sort.stages" });
 
   const workTypes = useMemo(() => {
     const m = new Map<string, string>();

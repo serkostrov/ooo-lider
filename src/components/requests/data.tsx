@@ -84,9 +84,13 @@ export type RequestRow = {
   done_at: string | null;
   done_by: string | null;
   result_text: string | null;
+  /** Отправлять на email вида. По умолчанию true. */
+  send_by_email?: boolean;
   created_at: string;
   is_new: boolean;
   is_overdue: boolean;
+  /** Бланк правили в конструкторе (есть doc_draft), не только из формы. */
+  doc_draft_edited?: boolean;
 };
 
 export type FieldValue = {
@@ -173,6 +177,7 @@ function mapRequestRow(r: Record<string, unknown>): RequestRow {
     ...(r as unknown as RequestRow),
     is_new: !!r["is_new"],
     is_overdue: !!r["is_overdue"],
+    doc_draft_edited: !!r["doc_draft_edited"] || r["doc_draft"] != null,
   };
 }
 
@@ -304,6 +309,7 @@ export function formatValue(fieldType: string, value: unknown): string {
   if (value === null || value === undefined || value === "") return "";
   if (fieldType === "checkbox") return value === true ? "Да" : "Нет";
   if (fieldType === "date" && typeof value === "string") return formatDate(value);
+  if (fieldType === "time" && typeof value === "string") return value.replace("-", ":");
   return String(value);
 }
 
@@ -333,6 +339,15 @@ export function useRefreshRequests() {
 /** Открытие карточки снимает «Новая» со счётчика и списка. */
 export async function markRequestSeen(requestId: string) {
   const { error } = await supabase.rpc("request_mark_seen", { p_request_id: requestId });
+  if (error) throw error;
+}
+
+/** Мягкое удаление заявки (админ / руководитель). */
+export async function softDeleteRequest(requestId: string, reason?: string) {
+  const { error } = await supabase.rpc("request_soft_delete", {
+    p_request_id: requestId,
+    p_reason: reason?.trim() || null,
+  });
   if (error) throw error;
 }
 

@@ -63,7 +63,18 @@ export async function sendTelegram(
   }
 }
 
-export async function sendEmail(to: string, subject: string, text: string): Promise<void> {
+export type EmailAttachment = {
+  filename: string;
+  content: Uint8Array;
+  contentType?: string;
+};
+
+export async function sendEmail(
+  to: string,
+  subject: string,
+  text: string,
+  opts?: { attachments?: EmailAttachment[] },
+): Promise<void> {
   const cfg = notifyConfig();
   if (!cfg.smtpHost || !cfg.smtpUser || !cfg.smtpPass) {
     throw new Error("SMTP_HOST / SMTP_USER / SMTP_PASS не заданы");
@@ -72,14 +83,31 @@ export async function sendEmail(to: string, subject: string, text: string): Prom
     host: cfg.smtpHost,
     port: cfg.smtpPort,
     secure: cfg.smtpPort === 465,
+    requireTLS: cfg.smtpPort === 587,
     auth: { user: cfg.smtpUser, pass: cfg.smtpPass },
   });
-  await transporter.sendMail({
-    from: cfg.smtpFrom || cfg.smtpUser,
-    to,
-    subject,
-    text,
-  });
+  try {
+    await transporter.sendMail({
+      from: cfg.smtpFrom || cfg.smtpUser,
+      to,
+      subject,
+      text,
+      attachments: opts?.attachments?.map((a) => ({
+        filename: a.filename,
+        content: a.content,
+        contentType: a.contentType,
+      })),
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (/not verified|550.*[Dd]omain/i.test(msg)) {
+      throw new Error(
+        `SMTP: домен в From не подтверждён в smtp.bz (${cfg.smtpFrom || cfg.smtpUser}). ` +
+          `Подтверди домен на https://smtp.bz/panel/domain или укажи SMTP_FROM с уже verified-адресом.`,
+      );
+    }
+    throw new Error(`SMTP: ${msg}`);
+  }
 }
 
 export function formatMessage(row: {

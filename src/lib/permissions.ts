@@ -25,6 +25,11 @@ export function canCreateRequest(me: CurrentProfile): boolean {
   return hasAnyRole(me, REQUEST_INITIATOR_ROLES);
 }
 
+/** Удалить заявку — админ и руководитель (roles.is_admin). */
+export function canDeleteRequest(me: CurrentProfile): boolean {
+  return me.is_admin;
+}
+
 /** Работа вне регламента: админ / прораб / ПТО. */
 export function canCreateAdhocStage(me: CurrentProfile): boolean {
   if (me.is_admin) return true;

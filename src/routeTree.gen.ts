@@ -20,10 +20,12 @@ import { Route as AuthenticatedObjectsRouteImport } from './routes/_authenticate
 import { Route as AuthenticatedOverdueRouteImport } from './routes/_authenticated/overdue'
 import { Route as AuthenticatedRequestsRouteImport } from './routes/_authenticated/requests'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
+import { Route as AuthenticatedDirectoriesBlankConstructorRouteImport } from './routes/_authenticated/directories_.blank-constructor'
 import { Route as AuthenticatedObjectsIdRouteImport } from './routes/_authenticated/objects_.$id'
 import { Route as AuthenticatedObjectsNewRouteImport } from './routes/_authenticated/objects_.new'
 import { Route as AuthenticatedRequestsRequestIdRouteImport } from './routes/_authenticated/requests_.$requestId'
 import { Route as AuthenticatedRequestsNewRouteImport } from './routes/_authenticated/requests_.new'
+import { Route as AuthenticatedDirectoriesBlankTemplatesIdRouteImport } from './routes/_authenticated/directories_.blank-templates.$id'
 import { Route as AuthenticatedDirectoriesCustomersIdRouteImport } from './routes/_authenticated/directories_.customers.$id'
 import { Route as AuthenticatedDirectoriesRequestTypesIdRouteImport } from './routes/_authenticated/directories_.request-types.$id'
 import { Route as AuthenticatedDirectoriesStagesIdRouteImport } from './routes/_authenticated/directories_.stages.$id'
@@ -86,6 +88,12 @@ const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedDirectoriesBlankConstructorRoute =
+  AuthenticatedDirectoriesBlankConstructorRouteImport.update({
+    id: '/directories_/blank-constructor',
+    path: '/directories/blank-constructor',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedObjectsIdRoute = AuthenticatedObjectsIdRouteImport.update({
   id: '/objects_/$id',
   path: '/objects/$id',
@@ -106,6 +114,12 @@ const AuthenticatedRequestsNewRoute =
   AuthenticatedRequestsNewRouteImport.update({
     id: '/requests_/new',
     path: '/requests/new',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedDirectoriesBlankTemplatesIdRoute =
+  AuthenticatedDirectoriesBlankTemplatesIdRouteImport.update({
+    id: '/directories_/blank-templates/$id',
+    path: '/directories/blank-templates/$id',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedDirectoriesCustomersIdRoute =
@@ -150,10 +164,12 @@ export interface FileRoutesByFullPath {
   '/overdue': typeof AuthenticatedOverdueRoute
   '/requests': typeof AuthenticatedRequestsRoute
   '/settings': typeof AuthenticatedSettingsRoute
+  '/directories/blank-constructor': typeof AuthenticatedDirectoriesBlankConstructorRoute
   '/objects/$id': typeof AuthenticatedObjectsIdRoute
   '/objects/new': typeof AuthenticatedObjectsNewRoute
   '/requests/$requestId': typeof AuthenticatedRequestsRequestIdRoute
   '/requests/new': typeof AuthenticatedRequestsNewRoute
+  '/directories/blank-templates/$id': typeof AuthenticatedDirectoriesBlankTemplatesIdRoute
   '/directories/customers/$id': typeof AuthenticatedDirectoriesCustomersIdRoute
   '/directories/request-types/$id': typeof AuthenticatedDirectoriesRequestTypesIdRoute
   '/directories/stages/$id': typeof AuthenticatedDirectoriesStagesIdRoute
@@ -171,10 +187,12 @@ export interface FileRoutesByTo {
   '/overdue': typeof AuthenticatedOverdueRoute
   '/requests': typeof AuthenticatedRequestsRoute
   '/settings': typeof AuthenticatedSettingsRoute
+  '/directories/blank-constructor': typeof AuthenticatedDirectoriesBlankConstructorRoute
   '/objects/$id': typeof AuthenticatedObjectsIdRoute
   '/objects/new': typeof AuthenticatedObjectsNewRoute
   '/requests/$requestId': typeof AuthenticatedRequestsRequestIdRoute
   '/requests/new': typeof AuthenticatedRequestsNewRoute
+  '/directories/blank-templates/$id': typeof AuthenticatedDirectoriesBlankTemplatesIdRoute
   '/directories/customers/$id': typeof AuthenticatedDirectoriesCustomersIdRoute
   '/directories/request-types/$id': typeof AuthenticatedDirectoriesRequestTypesIdRoute
   '/directories/stages/$id': typeof AuthenticatedDirectoriesStagesIdRoute
@@ -194,10 +212,12 @@ export interface FileRoutesById {
   '/_authenticated/overdue': typeof AuthenticatedOverdueRoute
   '/_authenticated/requests': typeof AuthenticatedRequestsRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
+  '/_authenticated/directories_/blank-constructor': typeof AuthenticatedDirectoriesBlankConstructorRoute
   '/_authenticated/objects_/$id': typeof AuthenticatedObjectsIdRoute
   '/_authenticated/objects_/new': typeof AuthenticatedObjectsNewRoute
   '/_authenticated/requests_/$requestId': typeof AuthenticatedRequestsRequestIdRoute
   '/_authenticated/requests_/new': typeof AuthenticatedRequestsNewRoute
+  '/_authenticated/directories_/blank-templates/$id': typeof AuthenticatedDirectoriesBlankTemplatesIdRoute
   '/_authenticated/directories_/customers/$id': typeof AuthenticatedDirectoriesCustomersIdRoute
   '/_authenticated/directories_/request-types/$id': typeof AuthenticatedDirectoriesRequestTypesIdRoute
   '/_authenticated/directories_/stages/$id': typeof AuthenticatedDirectoriesStagesIdRoute
@@ -217,10 +237,12 @@ export interface FileRouteTypes {
     | '/overdue'
     | '/requests'
     | '/settings'
+    | '/directories/blank-constructor'
     | '/objects/$id'
     | '/objects/new'
     | '/requests/$requestId'
     | '/requests/new'
+    | '/directories/blank-templates/$id'
     | '/directories/customers/$id'
     | '/directories/request-types/$id'
     | '/directories/stages/$id'
@@ -238,10 +260,12 @@ export interface FileRouteTypes {
     | '/overdue'
     | '/requests'
     | '/settings'
+    | '/directories/blank-constructor'
     | '/objects/$id'
     | '/objects/new'
     | '/requests/$requestId'
     | '/requests/new'
+    | '/directories/blank-templates/$id'
     | '/directories/customers/$id'
     | '/directories/request-types/$id'
     | '/directories/stages/$id'
@@ -260,10 +284,12 @@ export interface FileRouteTypes {
     | '/_authenticated/overdue'
     | '/_authenticated/requests'
     | '/_authenticated/settings'
+    | '/_authenticated/directories_/blank-constructor'
     | '/_authenticated/objects_/$id'
     | '/_authenticated/objects_/new'
     | '/_authenticated/requests_/$requestId'
     | '/_authenticated/requests_/new'
+    | '/_authenticated/directories_/blank-templates/$id'
     | '/_authenticated/directories_/customers/$id'
     | '/_authenticated/directories_/request-types/$id'
     | '/_authenticated/directories_/stages/$id'
@@ -356,6 +382,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSettingsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/directories_/blank-constructor': {
+      id: '/_authenticated/directories_/blank-constructor'
+      path: '/directories/blank-constructor'
+      fullPath: '/directories/blank-constructor'
+      preLoaderRoute: typeof AuthenticatedDirectoriesBlankConstructorRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/objects_/$id': {
       id: '/_authenticated/objects_/$id'
       path: '/objects/$id'
@@ -382,6 +415,13 @@ declare module '@tanstack/react-router' {
       path: '/requests/new'
       fullPath: '/requests/new'
       preLoaderRoute: typeof AuthenticatedRequestsNewRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/directories_/blank-templates/$id': {
+      id: '/_authenticated/directories_/blank-templates/$id'
+      path: '/directories/blank-templates/$id'
+      fullPath: '/directories/blank-templates/$id'
+      preLoaderRoute: typeof AuthenticatedDirectoriesBlankTemplatesIdRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/directories_/customers/$id': {
@@ -431,10 +471,12 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedOverdueRoute: typeof AuthenticatedOverdueRoute
   AuthenticatedRequestsRoute: typeof AuthenticatedRequestsRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
+  AuthenticatedDirectoriesBlankConstructorRoute: typeof AuthenticatedDirectoriesBlankConstructorRoute
   AuthenticatedObjectsIdRoute: typeof AuthenticatedObjectsIdRoute
   AuthenticatedObjectsNewRoute: typeof AuthenticatedObjectsNewRoute
   AuthenticatedRequestsRequestIdRoute: typeof AuthenticatedRequestsRequestIdRoute
   AuthenticatedRequestsNewRoute: typeof AuthenticatedRequestsNewRoute
+  AuthenticatedDirectoriesBlankTemplatesIdRoute: typeof AuthenticatedDirectoriesBlankTemplatesIdRoute
   AuthenticatedDirectoriesCustomersIdRoute: typeof AuthenticatedDirectoriesCustomersIdRoute
   AuthenticatedDirectoriesRequestTypesIdRoute: typeof AuthenticatedDirectoriesRequestTypesIdRoute
   AuthenticatedDirectoriesStagesIdRoute: typeof AuthenticatedDirectoriesStagesIdRoute
@@ -451,10 +493,14 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedOverdueRoute: AuthenticatedOverdueRoute,
   AuthenticatedRequestsRoute: AuthenticatedRequestsRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
+  AuthenticatedDirectoriesBlankConstructorRoute:
+    AuthenticatedDirectoriesBlankConstructorRoute,
   AuthenticatedObjectsIdRoute: AuthenticatedObjectsIdRoute,
   AuthenticatedObjectsNewRoute: AuthenticatedObjectsNewRoute,
   AuthenticatedRequestsRequestIdRoute: AuthenticatedRequestsRequestIdRoute,
   AuthenticatedRequestsNewRoute: AuthenticatedRequestsNewRoute,
+  AuthenticatedDirectoriesBlankTemplatesIdRoute:
+    AuthenticatedDirectoriesBlankTemplatesIdRoute,
   AuthenticatedDirectoriesCustomersIdRoute:
     AuthenticatedDirectoriesCustomersIdRoute,
   AuthenticatedDirectoriesRequestTypesIdRoute:

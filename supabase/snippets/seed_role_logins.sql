@@ -62,13 +62,28 @@ begin
       where id = v_uid;
     end if;
 
-    -- профиль: сначала привязать существующий без логина по роли, иначе создать
+    -- профиль: любой (в т.ч. soft-deleted), уже привязанный к этому auth.user
     select id into v_pid
     from public.profiles
-    where user_id = v_uid and deleted_at is null
+    where user_id = v_uid
+    order by (deleted_at is null) desc, created_at
     limit 1;
 
-    if v_pid is null then
+    if v_pid is not null then
+      update public.profiles
+      set deleted_at = null,
+          is_active = true,
+          role_code = r.role_code,
+          email = r.email,
+          full_name = coalesce(nullif(full_name, ''), r.full_name)
+      where id = v_pid;
+    else
+      -- освободить user_id у чужих soft-deleted (иначе UNIQUE profiles_user_id_key)
+      update public.profiles
+      set user_id = null
+      where user_id = v_uid
+        and deleted_at is not null;
+
       select id into v_pid
       from public.profiles
       where role_code = r.role_code
@@ -81,17 +96,13 @@ begin
         update public.profiles
         set user_id = v_uid,
             email = r.email,
-            full_name = coalesce(nullif(full_name, ''), r.full_name)
+            full_name = coalesce(nullif(full_name, ''), r.full_name),
+            is_active = true
         where id = v_pid;
       else
-        insert into public.profiles(user_id, full_name, role_code, email)
-        values (v_uid, r.full_name, r.role_code, r.email);
+        insert into public.profiles(user_id, full_name, role_code, email, is_active)
+        values (v_uid, r.full_name, r.role_code, r.email, true);
       end if;
-    else
-      update public.profiles
-      set role_code = r.role_code,
-          email = r.email
-      where id = v_pid;
     end if;
   end loop;
 end $$;

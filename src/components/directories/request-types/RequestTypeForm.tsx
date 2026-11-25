@@ -1,14 +1,19 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { showError } from "@/lib/format";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Field, emptyToNull } from "../common";
 import { validateRequestType } from "../rules";
+import { useBlankTemplates } from "../blank-templates/data";
 import { REQUEST_TYPES_KEY, type RequestType } from "./data";
+
+const NONE = "__none";
 
 export function RequestTypeForm({
   type,
@@ -22,30 +27,50 @@ export function RequestTypeForm({
   onCreated: (id: string) => void;
 }) {
   const qc = useQueryClient();
+  const { data: templates = [] } = useBlankTemplates();
+  const activeTemplates = templates.filter(
+    (t) =>
+      (!t.is_draft && t.is_active) ||
+      t.id === type?.blank_template_id,
+  );
+
   const [name, setName] = useState(type?.name ?? "");
   const [email, setEmail] = useState(type?.send_to_email ?? "");
+  const [sendByEmail, setSendByEmail] = useState(type?.send_by_email !== false);
+  const [blankTemplateId, setBlankTemplateId] = useState(type?.blank_template_id ?? "");
   const [usesReps, setUsesReps] = useState(type?.uses_representatives ?? false);
   const [active, setActive] = useState(type?.is_active ?? true);
+
+  const selectedTemplate = templates.find((t) => t.id === blankTemplateId) ?? null;
+  const isGeotrest = selectedTemplate?.engine === "geotrest_message";
 
   const m = useMutation({
     mutationFn: async () => {
       const err = validateRequestType({ name, send_to_email: email });
       if (err) throw new Error(err);
+      const engine = selectedTemplate?.engine ?? null;
+      const geotrest = engine === "geotrest_message";
       const payload = {
         name: name.trim(),
-        send_to_email: emptyToNull(email),
+        send_to_email: geotrest ? null : emptyToNull(email),
+        send_by_email: geotrest ? false : sendByEmail,
+        blank_template_id: emptyToNull(blankTemplateId),
+        doc_template: engine,
         uses_representatives: usesReps,
         is_active: active,
       };
       if (type) {
-        const { error } = await supabase.from("request_types").update(payload).eq("id", type.id);
+        const { error } = await supabase
+          .from("request_types")
+          .update(payload as never)
+          .eq("id", type.id);
         if (error) throw error;
         return type.id;
       }
       const sort = allTypes.reduce((mx, t) => Math.max(mx, t.sort), 0) + 1;
       const { data, error } = await supabase
         .from("request_types")
-        .insert({ ...payload, sort })
+        .insert({ ...payload, sort } as never)
         .select("id")
         .single();
       if (error) throw error;
@@ -54,6 +79,7 @@ export function RequestTypeForm({
     onSuccess: async (id) => {
       toast.success("Сохранено");
       await qc.invalidateQueries({ queryKey: REQUEST_TYPES_KEY });
+      await qc.invalidateQueries({ queryKey: ["dir-blank-templates"] });
       if (!type) onCreated(id);
     },
     onError: showError,
@@ -70,16 +96,79 @@ export function RequestTypeForm({
       <Field label="Название (надпись на кнопке)" required>
         <Input value={name} onChange={(e) => setName(e.target.value)} disabled={readOnly} className="h-9 text-sm" />
       </Field>
-      <Field label="Адрес отправки (email)">
-        <Input
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
+      <Field label="Шаблон бланка">
+        <Select
+          value={blankTemplateId || NONE}
+          onValueChange={(v) => {
+            const next = v === NONE ? "" : v;
+            setBlankTemplateId(next);
+            const tpl = templates.find((t) => t.id === next);
+            if (tpl?.engine === "geotrest_message") {
+              setSendByEmail(false);
+              setEmail("");
+            }
+          }}
           disabled={readOnly}
-          type="email"
-          placeholder="Куда офис-менеджер отправляет заявку"
-          className="h-9 text-sm"
-        />
+        >
+          <SelectTrigger className="h-9 text-sm">
+            <SelectValue placeholder="Без бланка" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={NONE} className="text-sm">
+              Без бланка
+            </SelectItem>
+            {activeTemplates.map((t) => (
+              <SelectItem key={t.id} value={t.id} className="text-sm">
+                {t.name}
+                {!t.is_active ? " (неакт.)" : ""}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <p className="mt-1.5 text-xs text-muted-foreground">
+          Шаблоны настраиваются в справочнике{" "}
+          <Link
+            to="/directories"
+            search={{ tab: "blank-templates" }}
+            className="text-primary hover:underline"
+          >
+            Шаблоны бланков
+          </Link>
+          .
+        </p>
       </Field>
+      {isGeotrest ? (
+        <p className="rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+          Геотрест уходит сообщением в Max — отправка на почту для этого вида отключена.
+        </p>
+      ) : (
+        <>
+          <Field label="Адрес отправки (email)">
+            <Input
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              disabled={readOnly}
+              type="email"
+              placeholder="Куда офис-менеджер отправляет заявку"
+              className="h-9 text-sm"
+            />
+          </Field>
+          <label className="flex items-start gap-3 text-sm">
+            <Switch
+              checked={sendByEmail}
+              onCheckedChange={setSendByEmail}
+              disabled={readOnly || !email.trim()}
+              className="mt-0.5"
+            />
+            <span>
+              <span className="font-medium">Отправлять на эту почту</span>
+              <span className="mt-0.5 block text-xs text-muted-foreground">
+                По умолчанию включено. Выключите, если заявки этого вида уходят без письма.
+              </span>
+            </span>
+          </label>
+        </>
+      )}
       <label className="flex items-center gap-3 text-sm">
         <Switch checked={usesReps} onCheckedChange={setUsesReps} disabled={readOnly} />
         Выбор «кого вызываем» из справочника представителей

@@ -39,7 +39,12 @@ export type ObjectProgress = {
   name: string;
   shortName: string;
   progressPct: number;
+  stagesTotal: number;
+  stagesClosed: number;
   stagesOverdue: number;
+  stagesNoResponse: number;
+  stagesOnReview: number;
+  stagesNoExecutor: number;
   requestsOverdue: number;
 };
 
@@ -102,6 +107,8 @@ type ActiveObject = {
   id: string;
   name: string | null;
   progress_pct: number | null;
+  stages_total: number | null;
+  stages_closed: number | null;
   stages_overdue: number | null;
   stages_no_response: number | null;
   stages_on_review: number | null;
@@ -185,7 +192,7 @@ export function useDirectorDashboard() {
         supabase
           .from("v_objects")
           .select(
-            "id, name, progress_pct, stages_overdue, stages_no_response, stages_on_review, stages_no_executor, requests_overdue",
+            "id, name, progress_pct, stages_total, stages_closed, stages_overdue, stages_no_response, stages_on_review, stages_no_executor, requests_overdue",
           )
           .neq("status", "completed"),
         supabase
@@ -310,7 +317,12 @@ export function useDirectorDashboard() {
             name,
             shortName: shortLabel(name, 28),
             progressPct: Math.round(num(o.progress_pct)),
+            stagesTotal: num(o.stages_total),
+            stagesClosed: num(o.stages_closed),
             stagesOverdue: num(o.stages_overdue),
+            stagesNoResponse: num(o.stages_no_response),
+            stagesOnReview: num(o.stages_on_review),
+            stagesNoExecutor: num(o.stages_no_executor),
             requestsOverdue: num(o.requests_overdue),
           };
         })

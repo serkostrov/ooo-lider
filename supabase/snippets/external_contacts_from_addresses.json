@@ -1,0 +1,412 @@
+[
+  {
+    "sort": 1,
+    "kind": "person",
+    "full_name": "Вдовин Михаил Иванович",
+    "position": "Генеральный директор Мосгаз",
+    "phone": null,
+    "email": null,
+    "comment": null,
+    "customer_key": "mosgaz"
+  },
+  {
+    "sort": 2,
+    "kind": "person",
+    "full_name": "Свиридова Елена Владимировна",
+    "position": "Главному инженеру проекта Мастерской №2 УРПСД Мосгаз",
+    "phone": "8(495)660-27-60 (42-43)",
+    "email": null,
+    "comment": null,
+    "customer_key": "mosgaz"
+  },
+  {
+    "sort": 3,
+    "kind": "person",
+    "full_name": "Скорикова Ольга Анатольевна",
+    "position": "Начальник УКС Мосгаз",
+    "phone": null,
+    "email": null,
+    "comment": null,
+    "customer_key": "mosgaz"
+  },
+  {
+    "sort": 4,
+    "kind": "person",
+    "full_name": "Сафронов Станислав Александрович",
+    "position": "Куратор объекта \"Бараново\" Мосгаз",
+    "phone": "8(926)396-03-99",
+    "email": "safronovsa@mos-gaz.ru",
+    "comment": null,
+    "customer_key": "mosgaz"
+  },
+  {
+    "sort": 5,
+    "kind": "person",
+    "full_name": "Чистова Кабанова Анастасия",
+    "position": "Секретарь УКС Мосгаз",
+    "phone": "8(495)660-60-83 (20-13)",
+    "email": "s205@mos-gaz.ru",
+    "comment": null,
+    "customer_key": "mosgaz"
+  },
+  {
+    "sort": 6,
+    "kind": "person",
+    "full_name": "Торопцев",
+    "position": "Начальниик УРИП Мосгаз",
+    "phone": null,
+    "email": "toroptcevas@mos-gaz.ru",
+    "comment": null,
+    "customer_key": "mosgaz"
+  },
+  {
+    "sort": 7,
+    "kind": "person",
+    "full_name": "Ольга Мудрая Викторовна",
+    "position": "Секретарь УРИП Мосгаз",
+    "phone": null,
+    "email": "MudrayaOV@mos-gaz.ru",
+    "comment": null,
+    "customer_key": "mosgaz"
+  },
+  {
+    "sort": 8,
+    "kind": "person",
+    "full_name": "Хмелева Наталья Владимировна",
+    "position": "ПТО УКС Мосгаз",
+    "phone": "8(495)287-79-83 (22-14)",
+    "email": null,
+    "comment": "запрос РД",
+    "customer_key": "mosgaz"
+  },
+  {
+    "sort": 9,
+    "kind": "person",
+    "full_name": "Ермачкова Татьяна",
+    "position": "Ведущий инженер ОПП УКС Мосгаз",
+    "phone": "8(985)443-43-38 8(495)660-29-77 (52-69)",
+    "email": "ermachkovatg@mos-gaz.ru",
+    "comment": "ордер",
+    "customer_key": "mosgaz"
+  },
+  {
+    "sort": 10,
+    "kind": "person",
+    "full_name": "Чинаев",
+    "position": "инспектор по защите Мосгаз",
+    "phone": null,
+    "email": "chinaevum@mos-gaz.ru",
+    "comment": null,
+    "customer_key": "mosgaz"
+  },
+  {
+    "sort": 11,
+    "kind": "person",
+    "full_name": "Созанская Елена",
+    "position": "Зам. Начальник УКС Мосгаз",
+    "phone": "8(926)382-96-16 (22-47)",
+    "email": "sozanskayea@mos-gaz.ru",
+    "comment": "ордер",
+    "customer_key": "mosgaz"
+  },
+  {
+    "sort": 12,
+    "kind": "person",
+    "full_name": "Кабанова Наталья Юрьевна",
+    "position": "Инженер ПТО УТН Мосгаз",
+    "phone": "8(495)287-79-87 (20-53)",
+    "email": "kabanovanu@mos-gaz.ru",
+    "comment": null,
+    "customer_key": "mosgaz"
+  },
+  {
+    "sort": 13,
+    "kind": "person",
+    "full_name": "Еремина Виктория Олеговна",
+    "position": "Начальник УТН",
+    "phone": null,
+    "email": null,
+    "comment": null,
+    "customer_key": null
+  },
+  {
+    "sort": 14,
+    "kind": "person",
+    "full_name": "Ракова Екатерина Сергеевна",
+    "position": null,
+    "phone": null,
+    "email": "rakovaes@mos-gaz.ru",
+    "comment": null,
+    "customer_key": "mosgaz"
+  },
+  {
+    "sort": 15,
+    "kind": "person",
+    "full_name": "Гусарова Олеся Викторовна",
+    "position": null,
+    "phone": "8(495)287-96-44",
+    "email": null,
+    "comment": "рег. проекта РД Мосгаз технадзор",
+    "customer_key": "mosgaz"
+  },
+  {
+    "sort": 16,
+    "kind": "person",
+    "full_name": "Титова Наталья Владимировна",
+    "position": null,
+    "phone": "8(499)267-90-16",
+    "email": null,
+    "comment": null,
+    "customer_key": null
+  },
+  {
+    "sort": 17,
+    "kind": "person",
+    "full_name": "Семченко Наталья Вячеславна",
+    "position": "Зам. Начальник управления Мосгаз",
+    "phone": "8(499)263-07-58",
+    "email": null,
+    "comment": "технадзор",
+    "customer_key": "mosgaz"
+  },
+  {
+    "sort": 18,
+    "kind": "person",
+    "full_name": "Глаголева Нина Михайловна",
+    "position": "Ведущий инженер ОПП УКС Мосгаз",
+    "phone": "8(925)328-08-41 8(495)916-59-00 (24-37)",
+    "email": null,
+    "comment": "порубочный талон",
+    "customer_key": "mosgaz"
+  },
+  {
+    "sort": 19,
+    "kind": "person",
+    "full_name": "Самсонова Оксана Сергеевна",
+    "position": "Зам. Начальник лаборатории мех. Испытания",
+    "phone": "8(499)218-13-58",
+    "email": null,
+    "comment": null,
+    "customer_key": null
+  },
+  {
+    "sort": 20,
+    "kind": "person",
+    "full_name": "Татьяна",
+    "position": null,
+    "phone": "8(910)674-41-89",
+    "email": null,
+    "comment": "спец. Сафронов",
+    "customer_key": null
+  },
+  {
+    "sort": 21,
+    "kind": "person",
+    "full_name": "Нестерова Елизавета",
+    "position": "ИК ТЭС ПТО",
+    "phone": "8(999)772-91-60",
+    "email": "e.nesterovovich@iktes.ru",
+    "comment": null,
+    "customer_key": null
+  },
+  {
+    "sort": 22,
+    "kind": "person",
+    "full_name": "Елена Гончарова",
+    "position": "ИК ТЭС",
+    "phone": "8(925)022-96-61",
+    "email": "e.goncharova@iktes.ru",
+    "comment": null,
+    "customer_key": null
+  },
+  {
+    "sort": 23,
+    "kind": "person",
+    "full_name": "Борсунов Алексей Анатольевич",
+    "position": "Начальник Лаборатории мех. Испытаний",
+    "phone": "8(499)213-13-68 8(916)792-18-57",
+    "email": null,
+    "comment": null,
+    "customer_key": null
+  },
+  {
+    "sort": 24,
+    "kind": "person",
+    "full_name": "Андреев Максим Юрьевич",
+    "position": "Технадзор спец. ГСН",
+    "phone": "8(985)894-62-64",
+    "email": null,
+    "comment": null,
+    "customer_key": null
+  },
+  {
+    "sort": 25,
+    "kind": "person",
+    "full_name": "Васильев Константин Евгеньевич",
+    "position": "Технадзорспец. АЗ",
+    "phone": "8(916)996-92-93",
+    "email": null,
+    "comment": null,
+    "customer_key": null
+  },
+  {
+    "sort": 26,
+    "kind": "person",
+    "full_name": "Гавриков Роман Андреевич",
+    "position": "Геодезист ООО \"ЛИДЕР\"",
+    "phone": "8(910)425-33-00",
+    "email": "Roman-type-r@yandex.ru",
+    "comment": null,
+    "customer_key": null
+  },
+  {
+    "sort": 27,
+    "kind": "person",
+    "full_name": "Спицина Анна Анатольевна",
+    "position": "ПТО Мастер Участка Мосгаз",
+    "phone": "8(926)258-39-95",
+    "email": "SpicynaAA@mos-gaz.ru",
+    "comment": "увед. ГВСД и УЭГНД",
+    "customer_key": "mosgaz"
+  },
+  {
+    "sort": 28,
+    "kind": "person",
+    "full_name": "Александр",
+    "position": "ИНТЕГРАЛ Заявки",
+    "phone": "8(915)119-07-07",
+    "email": null,
+    "comment": null,
+    "customer_key": "integral"
+  },
+  {
+    "sort": 29,
+    "kind": "org",
+    "full_name": "АО \"МОСГАЗ\"",
+    "position": null,
+    "phone": "8(800)700-71-04",
+    "email": "info@mos-gaz.ru",
+    "comment": null,
+    "customer_key": "mosgaz"
+  },
+  {
+    "sort": 30,
+    "kind": "org",
+    "full_name": "ОДНО ОКНО АО \"МОСГАЗ\"",
+    "position": null,
+    "phone": "8(495)660-72-66",
+    "email": "coo@mos-gaz.ru",
+    "comment": null,
+    "customer_key": "mosgaz"
+  },
+  {
+    "sort": 31,
+    "kind": "org",
+    "full_name": "Лаб. Мосгаз",
+    "position": null,
+    "phone": "8(499)267-62-89 8(499)263-11-00",
+    "email": "platovdv@mos-gaz.ru",
+    "comment": null,
+    "customer_key": "mosgaz"
+  },
+  {
+    "sort": 32,
+    "kind": "org",
+    "full_name": "Лаб. Интеграл",
+    "position": null,
+    "phone": "8(495)987-18-00 8(499)263-11-00",
+    "email": "integral22@list.ru",
+    "comment": null,
+    "customer_key": "integral"
+  },
+  {
+    "sort": 33,
+    "kind": "service",
+    "full_name": "Технадзор",
+    "position": null,
+    "phone": null,
+    "email": "tehnadxor@mos-gaz.ru",
+    "comment": null,
+    "customer_key": "mosgaz"
+  },
+  {
+    "sort": 34,
+    "kind": "org",
+    "full_name": "Жилищник",
+    "position": null,
+    "phone": "8(499)652-65-33",
+    "email": "ptin-zhilfilimonky@mos-gaz.ru",
+    "comment": null,
+    "customer_key": "mosgaz"
+  },
+  {
+    "sort": 35,
+    "kind": "org",
+    "full_name": "Префектура",
+    "position": null,
+    "phone": null,
+    "email": "tinao@mos.ru",
+    "comment": null,
+    "customer_key": null
+  },
+  {
+    "sort": 36,
+    "kind": "service",
+    "full_name": "Регистрация Журналов",
+    "position": null,
+    "phone": null,
+    "email": null,
+    "comment": "2 эт. Мосгаз 211 каб. УКС",
+    "customer_key": "mosgaz"
+  },
+  {
+    "sort": 37,
+    "kind": "org",
+    "full_name": "Департамент природопользования",
+    "position": null,
+    "phone": null,
+    "email": "depmospriroda@mos.ru",
+    "comment": null,
+    "customer_key": null
+  },
+  {
+    "sort": 38,
+    "kind": "service",
+    "full_name": "Снабжение",
+    "position": null,
+    "phone": null,
+    "email": "Zaletovmv@mos-gaz.ru; daevaaa@mos-gaz.ru; teplovodskayain@mos-gaz.ru; kulikovsv@mos-gaz.ru",
+    "comment": null,
+    "customer_key": "mosgaz"
+  },
+  {
+    "sort": 39,
+    "kind": "org",
+    "full_name": "РОССЕТИ",
+    "position": null,
+    "phone": null,
+    "email": null,
+    "comment": "lk.rossetmr.ru",
+    "customer_key": "rosseti"
+  },
+  {
+    "sort": 40,
+    "kind": "org",
+    "full_name": "МОСВОДОКАНАЛ",
+    "position": null,
+    "phone": null,
+    "email": null,
+    "comment": "ep.mosvodokanal.ru",
+    "customer_key": "vodokanal"
+  },
+  {
+    "sort": 41,
+    "kind": "org",
+    "full_name": "ГВСД  ГРС УЭНГД",
+    "position": null,
+    "phone": null,
+    "email": "info@mos-gaz.ru; chinaevum@mos-gaz.ru; tehnadzor@mos-gaz.ru",
+    "comment": "мосгаз,инспектор по защите,технадзор",
+    "customer_key": "mosgaz"
+  }
+]

@@ -106,6 +106,74 @@ export function Field({ label, required, children }: { label: string; required?:
   );
 }
 
+/** Список значений: отдельный инпут на каждый + «Добавить ещё» + корзина. */
+export function MultiValueInputs({
+  values,
+  onChange,
+  placeholder,
+  addLabel = "Добавить ещё",
+  inputClassName,
+  type = "text",
+}: {
+  values: string[];
+  onChange: (next: string[]) => void;
+  placeholder?: string;
+  addLabel?: string;
+  inputClassName?: string;
+  type?: "text" | "email" | "tel";
+}) {
+  const rows = values.length ? values : [""];
+  const setAt = (i: number, value: string) => {
+    const next = [...rows];
+    next[i] = value;
+    onChange(next);
+  };
+  const removeAt = (i: number) => {
+    if (rows.length <= 1) {
+      onChange([""]);
+      return;
+    }
+    onChange(rows.filter((_, idx) => idx !== i));
+  };
+  return (
+    <div className="space-y-2">
+      {rows.map((val, i) => (
+        <div key={i} className="flex items-center gap-2">
+          <Input
+            type={type}
+            value={val}
+            onChange={(e) => setAt(i, e.target.value)}
+            placeholder={placeholder}
+            className={cn("h-9 min-w-0 flex-1 text-sm", inputClassName)}
+          />
+          {rows.length > 1 ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="size-9 shrink-0 text-destructive hover:bg-destructive/10 hover:text-destructive"
+              onClick={() => removeAt(i)}
+              title="Удалить"
+              aria-label="Удалить"
+            >
+              <Trash2 className="size-3.5" />
+            </Button>
+          ) : null}
+        </div>
+      ))}
+      <Button
+        type="button"
+        variant="outline"
+        className="h-8 gap-1.5 px-2.5 text-sm"
+        onClick={() => onChange([...rows, ""])}
+      >
+        <Plus className="size-3.5" />
+        {addLabel}
+      </Button>
+    </div>
+  );
+}
+
 /** Кружок цвета в таблице справочников. */
 export function ColorSwatch({ color, title }: { color: string; title?: string }) {
   return (
@@ -161,7 +229,13 @@ export function EditSheet({
   );
 }
 
-type SoftTable = "documents" | "representatives" | "customers" | "customer_contacts" | "profiles";
+type SoftTable =
+  | "documents"
+  | "representatives"
+  | "customers"
+  | "customer_contacts"
+  | "external_contacts"
+  | "profiles";
 
 /** Мягкое удаление с подтверждением. */
 export function DeleteButton({

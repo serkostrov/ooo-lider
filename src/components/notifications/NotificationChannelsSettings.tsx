@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { ExternalLink, Link2, Unlink } from "lucide-react";
@@ -9,6 +10,8 @@ import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const CHANNELS_KEY = ["notification-channels"] as const;
+const LINK_POLL_MS = 2_000;
+const LINK_POLL_FOR_MS = 120_000;
 
 type ChannelsRow = {
   email: string | null;
@@ -26,6 +29,7 @@ export function NotificationChannelsSettings() {
   const { id: profileId } = useProfile();
   const qc = useQueryClient();
   const bot = botUsername();
+  const [awaitingLink, setAwaitingLink] = useState(false);
 
   const q = useQuery({
     queryKey: [...CHANNELS_KEY, profileId],
@@ -38,7 +42,19 @@ export function NotificationChannelsSettings() {
       if (error) throw error;
       return data as ChannelsRow | null;
     },
+    refetchInterval: awaitingLink ? LINK_POLL_MS : false,
   });
+
+  useEffect(() => {
+    if (!awaitingLink) return;
+    if (q.data?.telegram_chat_id) {
+      setAwaitingLink(false);
+      toast.success("Telegram привязан");
+      return;
+    }
+    const t = window.setTimeout(() => setAwaitingLink(false), LINK_POLL_FOR_MS);
+    return () => window.clearTimeout(t);
+  }, [awaitingLink, q.data?.telegram_chat_id]);
 
   const setChannels = useMutation({
     mutationFn: async (p: { telegram?: boolean; email?: boolean }) => {
@@ -67,8 +83,9 @@ export function NotificationChannelsSettings() {
       return code;
     },
     onSuccess: () => {
+      setAwaitingLink(true);
       toast.message("Откройте бота и нажмите Start", {
-        description: "После привязки обновите эту страницу",
+        description: "Страница сама обновится после привязки (бот может молчать — это ок)",
       });
     },
     onError: showError,
@@ -98,8 +115,8 @@ export function NotificationChannelsSettings() {
       <div className="rounded-xl border border-border/70 bg-card p-5 shadow-[var(--surface-glow)]">
         <h3 className="text-sm font-semibold text-foreground">Telegram</h3>
         <p className="mt-1 text-sm leading-snug text-muted-foreground">
-          Нажмите «Привязать» → откроется бот → Start. Уведомления уходят сами (нужен воркер
-          рассылки).
+          Нажмите «Привязать» → откроется бот → Start. Не открывайте бота вручную без ссылки из
+          кнопки — нужен код привязки.
         </p>
         <div className="mt-4 flex flex-wrap items-center gap-2">
           {linked ? (
@@ -125,11 +142,11 @@ export function NotificationChannelsSettings() {
               type="button"
               size="sm"
               className="h-8"
-              disabled={linkTg.isPending || !bot}
+              disabled={linkTg.isPending || !bot || awaitingLink}
               onClick={() => linkTg.mutate()}
             >
               <Link2 className="mr-1.5 size-3.5" />
-              Привязать Telegram
+              {awaitingLink ? "Ждём Start в боте…" : "Привязать Telegram"}
               <ExternalLink className="ml-1.5 size-3.5 opacity-70" />
             </Button>
           )}
