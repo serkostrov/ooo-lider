@@ -155,11 +155,14 @@ function snapshotTree(root: HTMLElement): NodeSnap[] {
         /* ignore */
       }
     }
-    if (!styles.color || /oklch|oklab/i.test(styles.color)) styles.color = "#171717";
+    if (!styles["color"] || /oklch|oklab/i.test(styles["color"])) {
+      styles["color"] = "#171717";
+    }
 
     const snap: NodeSnap = { path, styles };
     if (el instanceof HTMLImageElement) {
-      snap.imgSrc = el.currentSrc || el.src || undefined;
+      const src = el.currentSrc || el.src;
+      if (src) snap.imgSrc = src;
     }
     // inline background с url — тоже запомним
     const inlineBg = el.style.backgroundImage;

@@ -287,7 +287,8 @@ export function RequestStatusActions({
         m.mutate({ to: "sent", emailFlag: false });
         return;
       }
-      setSendByEmail(mailAvailable && r.send_by_email !== false && typeMail?.enabled !== false);
+      // сюда попадаем только если отправка писем у вида не выключена
+      setSendByEmail(mailAvailable && r.send_by_email !== false);
       setSendOpen(true);
       return;
     }
