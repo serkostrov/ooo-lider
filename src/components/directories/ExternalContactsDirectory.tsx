@@ -77,6 +77,21 @@ function kindLabel(kind: ExternalContactKind) {
   return EXTERNAL_CONTACT_KINDS.find((k) => k.v === kind)?.label ?? kind;
 }
 
+/** Телефоны/почта в таблице — каждый на своей строке. */
+function MultiContactCell({ value }: { value: string | null }) {
+  const parts = splitMultiContacts(value).map((x) => x.trim()).filter(Boolean);
+  if (!parts.length) return "—";
+  return (
+    <div className="flex flex-col gap-0.5 leading-snug">
+      {parts.map((p) => (
+        <span key={p} className="whitespace-nowrap">
+          {p}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 export function useExternalContacts(activeOnly = false) {
   return useQuery({
     queryKey: [...EXTERNAL_CONTACTS_KEY, activeOnly ? "active" : "all"],
@@ -173,13 +188,13 @@ export function ExternalContactsDirectory() {
               <SortableTh as="table" column="customer" sort={sort} onToggle={toggle}>
                 Заказчик
               </SortableTh>
-              <SortableTh as="table" column="position" sort={sort} onToggle={toggle}>
+              <SortableTh as="table" column="position" sort={sort} onToggle={toggle} className="min-w-[16rem]">
                 Должность
               </SortableTh>
-              <SortableTh as="table" column="phone" sort={sort} onToggle={toggle}>
+              <SortableTh as="table" column="phone" sort={sort} onToggle={toggle} className="min-w-[11rem]">
                 Телефон
               </SortableTh>
-              <SortableTh as="table" column="email" sort={sort} onToggle={toggle}>
+              <SortableTh as="table" column="email" sort={sort} onToggle={toggle} className="min-w-[12rem]">
                 Почта
               </SortableTh>
               <SortableTh as="table" column="active" sort={sort} onToggle={toggle}>
@@ -199,19 +214,19 @@ export function ExternalContactsDirectory() {
                   className={is_admin ? "cursor-pointer" : ""}
                   onClick={() => is_admin && setEditing(r)}
                 >
-                  <TableCell className="text-muted-foreground">{kindLabel(r.kind)}</TableCell>
-                  <TableCell className="font-medium">{r.full_name}</TableCell>
-                  <TableCell className="text-muted-foreground">{r.customer_name ?? "—"}</TableCell>
-                  <TableCell>{r.position}</TableCell>
-                  <TableCell className="max-w-[18rem] whitespace-nowrap">
-                    <span className="inline-block max-w-full overflow-x-auto align-bottom">
-                      {r.phone}
-                    </span>
+                  <TableCell className="whitespace-nowrap text-muted-foreground">
+                    {kindLabel(r.kind)}
                   </TableCell>
-                  <TableCell className="max-w-[18rem] whitespace-nowrap">
-                    <span className="inline-block max-w-full overflow-x-auto align-bottom">
-                      {r.email}
-                    </span>
+                  <TableCell className="min-w-[12rem] font-medium">{r.full_name}</TableCell>
+                  <TableCell className="whitespace-nowrap text-muted-foreground">
+                    {r.customer_name ?? "—"}
+                  </TableCell>
+                  <TableCell className="min-w-[16rem] max-w-[28rem]">{r.position ?? "—"}</TableCell>
+                  <TableCell className="min-w-[11rem] align-top">
+                    <MultiContactCell value={r.phone} />
+                  </TableCell>
+                  <TableCell className="min-w-[12rem] align-top">
+                    <MultiContactCell value={r.email} />
                   </TableCell>
                   <TableCell>{r.is_active ? "Да" : "Нет"}</TableCell>
                 </TableRow>
