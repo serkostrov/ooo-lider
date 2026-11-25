@@ -163,7 +163,6 @@ export function ExternalContactsDirectory() {
     <div>
       <p className="mb-3 text-sm text-muted-foreground">
         Общий список: люди, организации и службы. На карточке этапа их можно привязать к этапу.
-        В телефоне и почте можно указать несколько через «;».
       </p>
       {isError ? (
         <p className="mb-3 rounded-md border border-danger/30 bg-danger-soft px-3 py-2 text-sm text-danger">
