@@ -4,11 +4,20 @@ import {
   formatLongRuDate,
   labMosgazLetterBody,
   labMosgazPreviewRows,
+  parseLetterDateYmd,
 } from "./labMosgaz";
 
 describe("formatLongRuDate", () => {
   it("форматирует длинную дату", () => {
     expect(formatLongRuDate("2026-07-01")).toBe("01 июля 2026 года");
+  });
+});
+
+describe("parseLetterDateYmd", () => {
+  it("принимает YYYY-MM-DD и ДД.ММ.ГГГГ", () => {
+    expect(parseLetterDateYmd("2025-11-13")).toBe("2025-11-13");
+    expect(parseLetterDateYmd("13.11.2025")).toBe("2025-11-13");
+    expect(parseLetterDateYmd("")).toBeNull();
   });
 });
 
@@ -32,12 +41,12 @@ describe("buildLabMosgazFillInput", () => {
       fields: [],
       objectCtx,
     });
-    expect(input.outNumber).toBe("37");
+    expect(input.outNumber).toBe("");
     expect(input.callTime).toBe("13-00");
     const body = labMosgazLetterBody(input);
     expect(body).toMatch(/продувку/);
     expect(body).toMatch(/Сиреневый бульвар/);
-    expect(labMosgazPreviewRows(input)[0]?.value).toBe("37");
+    expect(labMosgazPreviewRows(input)[0]?.value).toBe("");
   });
 
   it("требует пикеты и время", () => {

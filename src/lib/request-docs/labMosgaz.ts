@@ -47,6 +47,20 @@ export function formatLongRuDate(ymd: string): string {
   return `${String(d).padStart(2, "0")} ${month} ${y} года`;
 }
 
+/** Дата исходящего из поля заявки → YYYY-MM-DD; иначе null. */
+export function parseLetterDateYmd(raw: string): string | null {
+  const t = raw.trim();
+  if (!t) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(t)) return t;
+  const m = /^(\d{1,2})[./](\d{1,2})[./](\d{4})$/.exec(t);
+  if (!m) return null;
+  const d = Number(m[1]);
+  const mo = Number(m[2]);
+  const y = Number(m[3]);
+  if (!y || mo < 1 || mo > 12 || d < 1 || d > 31) return null;
+  return `${y}-${String(mo).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+}
+
 export type LabMosgazObjectCtx = {
   name: string;
   address: string;
@@ -84,6 +98,7 @@ export function buildLabMosgazFillInput(args: {
   const pickets = valueOrDefault(args.values, args.fields, "Пикеты (от – до)");
   const note = valueOrDefault(args.values, args.fields, "Примечание");
   const outRaw = valueOrDefault(args.values, args.fields, "Исх. №");
+  const letterDateRaw = valueOrDefault(args.values, args.fields, "Дата исходящего");
   const performerRaw = valueOrDefault(args.values, args.fields, "Исполнитель");
 
   if (!pickets.trim()) throw new Error("Укажите «Пикеты (от – до)»");
@@ -92,8 +107,9 @@ export function buildLabMosgazFillInput(args: {
   if (!responsible.trim()) throw new Error("Укажите ответственного за производство работ");
 
   return {
-    outNumber: outRaw.trim() || String(args.requestNumber),
-    letterDate: mskToday(),
+    // Исх. № — номер исходящего; задаётся при подготовке бланка (не № заявки).
+    outNumber: outRaw.trim(),
+    letterDate: parseLetterDateYmd(letterDateRaw) ?? mskToday(),
     objectName: args.objectCtx.name,
     projectNumber: args.objectCtx.projectNumber,
     workTypes: workTypes.trim(),

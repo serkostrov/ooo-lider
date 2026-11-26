@@ -46,6 +46,9 @@ export type ObjectProgress = {
   stagesOnReview: number;
   stagesNoExecutor: number;
   requestsOverdue: number;
+  /** Дней до окончания договора; отрицательное — просрочка. */
+  contractDaysLeft: number | null;
+  contractEnd: string | null;
 };
 
 export type AttentionSlice = {
@@ -114,6 +117,8 @@ type ActiveObject = {
   stages_on_review: number | null;
   stages_no_executor: number | null;
   requests_overdue: number | null;
+  contract_days_left: number | null;
+  contract_end: string | null;
 };
 
 type StageRow = {
@@ -192,7 +197,7 @@ export function useDirectorDashboard() {
         supabase
           .from("v_objects")
           .select(
-            "id, name, progress_pct, stages_total, stages_closed, stages_overdue, stages_no_response, stages_on_review, stages_no_executor, requests_overdue",
+            "id, name, progress_pct, stages_total, stages_closed, stages_overdue, stages_no_response, stages_on_review, stages_no_executor, requests_overdue, contract_days_left, contract_end",
           )
           .neq("status", "completed"),
         supabase
@@ -324,6 +329,11 @@ export function useDirectorDashboard() {
             stagesOnReview: num(o.stages_on_review),
             stagesNoExecutor: num(o.stages_no_executor),
             requestsOverdue: num(o.requests_overdue),
+            contractDaysLeft:
+              o.contract_days_left == null || !Number.isFinite(Number(o.contract_days_left))
+                ? null
+                : Number(o.contract_days_left),
+            contractEnd: o.contract_end ?? null,
           };
         })
         .sort(

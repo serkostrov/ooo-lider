@@ -26,6 +26,7 @@ export type ObjectDraft = {
   object_type: string;
   contract_start: string;
   contract_end: string;
+  actual_work_start: string;
   responsible_id: string;
   curator_contact_id: string;
   technadzor_contact_id: string;
@@ -44,6 +45,7 @@ export const EMPTY_DRAFT: ObjectDraft = {
   object_type: "",
   contract_start: "",
   contract_end: "",
+  actual_work_start: "",
   responsible_id: "",
   curator_contact_id: "",
   technadzor_contact_id: "",
@@ -83,6 +85,7 @@ export function draftToPayload(d: ObjectDraft) {
     object_type: d.object_type,
     contract_start: d.contract_start || null,
     contract_end: d.contract_end || null,
+    actual_work_start: d.actual_work_start || null,
     responsible_id: d.responsible_id || null,
     curator_contact_id: d.curator_contact_id || null,
     technadzor_contact_id: d.technadzor_contact_id || null,
@@ -334,7 +337,7 @@ export function ObjectCardFields({
             </SelectContent>
           </Select>
         </Field>
-        <div className="flex flex-wrap gap-5 sm:col-span-2">
+        <div className="flex flex-wrap gap-x-5 gap-y-4 sm:col-span-2 xl:col-span-4">
           <Field label="Дата начала по договору" required>
             <DateField value={value.contract_start} onChange={(ymd) => set("contract_start", ymd)} />
           </Field>
@@ -344,6 +347,9 @@ export function ObjectCardFields({
               {...(value.contract_start ? { min: value.contract_start } : {})}
               onChange={(ymd) => set("contract_end", ymd)}
             />
+          </Field>
+          <Field label="Фактическая дата начала работ">
+            <DateField value={value.actual_work_start} onChange={(ymd) => set("actual_work_start", ymd)} />
           </Field>
         </div>
         {showStatus && (

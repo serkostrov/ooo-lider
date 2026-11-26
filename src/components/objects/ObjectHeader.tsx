@@ -5,8 +5,8 @@ import { formatDateTime } from "@/lib/dates";
 import { cn } from "@/lib/utils";
 import {
   TONE_CLASS,
+  contractDaysLeftLabel,
   contractTone,
-  daysLeftText,
   statusLabel,
   useObjectTypes,
   type ObjectRow,
@@ -18,8 +18,8 @@ export function ObjectHeader({ o, actions }: { o: ObjectRow; actions?: ReactNode
   const [open, setOpen] = useState(false);
   const tone = o.status === "completed" ? "none" : contractTone(o.contract_days_left);
   const { label: typeLabel } = useObjectTypes();
-  const days =
-    o.status !== "completed" && o.contract_days_left !== null ? daysLeftText(o.contract_days_left) : null;
+  const daysLeft =
+    o.status !== "completed" && o.contract_days_left !== null ? o.contract_days_left : null;
 
   return (
     <div
@@ -59,10 +59,26 @@ export function ObjectHeader({ o, actions }: { o: ObjectRow; actions?: ReactNode
                 "inline-flex h-6 items-center gap-1 rounded-md px-1.5 text-[11px] sm:h-7 sm:gap-1.5 sm:px-2 sm:text-xs",
                 TONE_CLASS[tone] || "bg-muted/60",
               )}
+              title={
+                daysLeft != null
+                  ? `${contractDaysLeftLabel(daysLeft)} · до ${formatDate(o.contract_end) || "—"}`
+                  : undefined
+              }
             >
-              <span className="hidden opacity-80 sm:inline">Договор</span>
-              <span className="tabular-nums">{formatDate(o.contract_end) || "—"}</span>
-              {days ? <span className="font-semibold tabular-nums">{days}</span> : null}
+              <span className="hidden opacity-80 sm:inline">До окончания</span>
+              {daysLeft != null ? (
+                <span className="font-semibold tabular-nums">
+                  {daysLeft < 0 ? `−${-daysLeft}` : String(daysLeft)}
+                  <span className="font-medium opacity-80"> дн.</span>
+                </span>
+              ) : (
+                <span className="tabular-nums">{formatDate(o.contract_end) || "—"}</span>
+              )}
+              {daysLeft != null && o.contract_end ? (
+                <span className="hidden tabular-nums opacity-70 sm:inline">
+                  · {formatDate(o.contract_end)}
+                </span>
+              ) : null}
             </div>
 
             {o.stages_total > 0 && (
@@ -135,6 +151,12 @@ export function ObjectHeader({ o, actions }: { o: ObjectRow; actions?: ReactNode
             label="Срок договора"
             value={`${formatDate(o.contract_start) || "—"} – ${formatDate(o.contract_end) || "—"}`}
           />
+          {o.status !== "completed" && o.contract_days_left !== null ? (
+            <Field label="До окончания объекта" value={contractDaysLeftLabel(o.contract_days_left)} />
+          ) : null}
+          {o.actual_work_start ? (
+            <Field label="Фактическая дата начала работ" value={formatDate(o.actual_work_start)} />
+          ) : null}
           {o.notes && (
             <div className="sm:col-span-2 lg:col-span-3">
               <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">

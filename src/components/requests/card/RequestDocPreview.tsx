@@ -915,7 +915,10 @@ function DirectorFooter({
           / {LIDER_DIRECTOR}/
         </p>
       </div>
-      <div className="border-t border-neutral-200 pt-2.5 text-[12px] leading-snug text-neutral-700">
+      <div
+        data-performer-line
+        className="border-t border-neutral-200 pt-2.5 text-[12px] leading-snug text-neutral-700"
+      >
         {editing && onPerformerChange ? (
           <div className="flex flex-wrap items-center gap-2">
             <span className="shrink-0">Исполнитель:</span>
@@ -945,6 +948,7 @@ function InlineValue({
   type,
   className,
   inputClassName,
+  placeholder,
 }: {
   value: string;
   editing: boolean;
@@ -953,6 +957,7 @@ function InlineValue({
   type?: string | undefined;
   className?: string | undefined;
   inputClassName?: string | undefined;
+  placeholder?: string | undefined;
 }) {
   if (!editing || !onChange) {
     return (
@@ -967,6 +972,7 @@ function InlineValue({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         rows={3}
+        placeholder={placeholder}
         className={cn("min-h-[3.25rem] w-full text-sm", inlineControl, inputClassName)}
       />
     );
@@ -976,6 +982,7 @@ function InlineValue({
       type={type}
       value={value}
       onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
       className={cn("h-8 w-full text-sm", inlineControl, inputClassName)}
     />
   );
@@ -1178,6 +1185,7 @@ function LabIntegralEditor({
                   editing
                   onChange={(v) => set("outNumber", v)}
                   inputClassName="w-24"
+                  placeholder="№"
                 />
                 <span>от</span>
                 <InlineValue
@@ -1189,7 +1197,7 @@ function LabIntegralEditor({
                 />
               </div>
             ) : (
-              <p>{`Исх. № ${input.outNumber} от ${formatLongRuDate(input.letterDate)}`}</p>
+              <p>{`Исх. № ${input.outNumber.trim() || "…"} от ${formatLongRuDate(input.letterDate)}`}</p>
             )}
           </div>
           <p className="text-right font-semibold text-neutral-900">
@@ -1350,11 +1358,19 @@ function LabMosgazEditor({
                 editing
                 onChange={(v) => set("outNumber", v)}
                 inputClassName="w-24"
+                placeholder="№"
               />
-              <span>от {formatLongRuDate(input.letterDate)}</span>
+              <span>от</span>
+              <InlineValue
+                value={input.letterDate}
+                editing
+                type="date"
+                onChange={(v) => set("letterDate", v)}
+                inputClassName="w-40"
+              />
             </div>
           ) : (
-            <p>{`Исх. № ${input.outNumber} от ${formatLongRuDate(input.letterDate)}`}</p>
+            <p>{`Исх. № ${input.outNumber.trim() || "…"} от ${formatLongRuDate(input.letterDate)}`}</p>
           )}
         </div>
         <div className="text-right font-medium text-neutral-900">

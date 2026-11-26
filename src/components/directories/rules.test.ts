@@ -266,6 +266,7 @@ describe("Шаблоны этапов", () => {
     expect(validateStageTemplate({ ...base, name: "" })).toMatch(/название/);
     expect(validateStageTemplate({ ...base, workTypeId: "" })).toMatch(/группу/);
     expect(validateStageTemplate({ ...base, duration: "1.5" })).toMatch(/Сроки/);
+    expect(validateStageTemplate({ ...base, number: "1.1" })).toBeNull();
     expect(
       validateStageTemplate({
         ...base,

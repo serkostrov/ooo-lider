@@ -1,4 +1,5 @@
 import { formatDate } from "@/lib/format";
+import { mskToday } from "@/lib/dates";
 import type {
   BlankConfig,
   ExcelColumnConfig,
@@ -17,7 +18,7 @@ import {
 import { DEFAULT_PERFORMER } from "./letterhead";
 import type { TechnadzorFillInput, TechnadzorObjectCtx } from "./technadzor";
 import type { GeotrestFillInput, GeotrestObjectCtx } from "./geotrest";
-import type { LabMosgazObjectCtx } from "./labMosgaz";
+import { parseLetterDateYmd, type LabMosgazObjectCtx } from "./labMosgaz";
 
 export type DocValueMap = Record<string, string>;
 
@@ -102,7 +103,8 @@ export function buildDocValueMap(args: {
     "Точный адрес для вызова": addressExact,
     "Вид вызова": callKind,
     "Что нужно": fieldVal(v, f, "Что нужно"),
-    "Исх. №": outRaw.trim() || String(args.requestNumber),
+    "Исх. №": outRaw.trim(),
+    "Дата исходящего": fieldVal(v, f, "Дата исходящего").trim() || formatDate(mskToday()),
     "Исполнитель": fieldVal(v, f, "Исполнитель") || DEFAULT_PERFORMER,
     "Название объекта": args.object.name,
     "Адрес объекта": args.object.address,
@@ -203,7 +205,7 @@ export function integralInputFromMap(
 
   return {
     outNumber: map["Исх. №"]?.trim() || "",
-    letterDate: args.letterDate,
+    letterDate: parseLetterDateYmd(map["Дата исходящего"] ?? "") ?? args.letterDate,
     recipient: args.recipient,
     method,
     callDate: args.callDate,

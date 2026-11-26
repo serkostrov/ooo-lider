@@ -56,7 +56,6 @@ function Block({ children }: { children: ReactNode }) {
 
 function draftFrom(stage: ObjectStage) {
   return {
-    code: stage.code || String(stage.number ?? ""),
     executor_id: stage.executor_id ?? "",
     coexecutor_id: stage.coexecutor_id ?? "",
     confirmer_id: stage.confirmer_id ?? "",
@@ -97,15 +96,6 @@ export const StageMainTab = forwardRef<
       const rm = toIntOrNull(v.remind_days);
       if (rd === "bad" || rm === "bad") throw new Error("Дни — целое число от 0 или пусто");
       if (v.start_date && v.due_date && v.due_date < v.start_date) throw new Error("Срок окончания раньше даты начала");
-      const nextCode = v.code.trim();
-      const prevCode = (stage.code || String(stage.number ?? "")).trim();
-      if (is_admin && nextCode && nextCode !== prevCode) {
-        const { error: codeErr } = await supabase.rpc("set_object_stage_code", {
-          p_stage_id: stage.id,
-          p_code: nextCode,
-        });
-        if (codeErr) throw codeErr;
-      }
       const d = (x: string) => x || null;
       const { error } = await supabase
         .from("object_stages")
@@ -176,21 +166,6 @@ export const StageMainTab = forwardRef<
           <span className="font-semibold text-warning">Возвращён на доработку:</span> {stage.return_reason}
         </div>
       )}
-
-      {editing && is_admin ? (
-        <Block>
-          <Section title="Номер" hint="задаётся вручную, перетаскивание порядок не меняет">
-            <Field label="Номер этапа">
-              <Input
-                value={v.code}
-                onChange={(e) => set("code", e.target.value)}
-                className="h-9 w-40 text-sm tabular-nums"
-                placeholder="например 1.5"
-              />
-            </Field>
-          </Section>
-        </Block>
-      ) : null}
 
       <Block>
         <Section

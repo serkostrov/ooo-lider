@@ -18,6 +18,7 @@ import { Route as AuthenticatedHistoryRouteImport } from './routes/_authenticate
 import { Route as AuthenticatedNotificationsRouteImport } from './routes/_authenticated/notifications'
 import { Route as AuthenticatedObjectsRouteImport } from './routes/_authenticated/objects'
 import { Route as AuthenticatedOverdueRouteImport } from './routes/_authenticated/overdue'
+import { Route as AuthenticatedRegistryRouteImport } from './routes/_authenticated/registry'
 import { Route as AuthenticatedRequestsRouteImport } from './routes/_authenticated/requests'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedDirectoriesBlankConstructorRouteImport } from './routes/_authenticated/directories_.blank-constructor'
@@ -76,6 +77,11 @@ const AuthenticatedObjectsRoute = AuthenticatedObjectsRouteImport.update({
 const AuthenticatedOverdueRoute = AuthenticatedOverdueRouteImport.update({
   id: '/overdue',
   path: '/overdue',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedRegistryRoute = AuthenticatedRegistryRouteImport.update({
+  id: '/registry',
+  path: '/registry',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedRequestsRoute = AuthenticatedRequestsRouteImport.update({
@@ -162,6 +168,7 @@ export interface FileRoutesByFullPath {
   '/notifications': typeof AuthenticatedNotificationsRoute
   '/objects': typeof AuthenticatedObjectsRoute
   '/overdue': typeof AuthenticatedOverdueRoute
+  '/registry': typeof AuthenticatedRegistryRoute
   '/requests': typeof AuthenticatedRequestsRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/directories/blank-constructor': typeof AuthenticatedDirectoriesBlankConstructorRoute
@@ -185,6 +192,7 @@ export interface FileRoutesByTo {
   '/notifications': typeof AuthenticatedNotificationsRoute
   '/objects': typeof AuthenticatedObjectsRoute
   '/overdue': typeof AuthenticatedOverdueRoute
+  '/registry': typeof AuthenticatedRegistryRoute
   '/requests': typeof AuthenticatedRequestsRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/directories/blank-constructor': typeof AuthenticatedDirectoriesBlankConstructorRoute
@@ -210,6 +218,7 @@ export interface FileRoutesById {
   '/_authenticated/notifications': typeof AuthenticatedNotificationsRoute
   '/_authenticated/objects': typeof AuthenticatedObjectsRoute
   '/_authenticated/overdue': typeof AuthenticatedOverdueRoute
+  '/_authenticated/registry': typeof AuthenticatedRegistryRoute
   '/_authenticated/requests': typeof AuthenticatedRequestsRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/directories_/blank-constructor': typeof AuthenticatedDirectoriesBlankConstructorRoute
@@ -235,6 +244,7 @@ export interface FileRouteTypes {
     | '/notifications'
     | '/objects'
     | '/overdue'
+    | '/registry'
     | '/requests'
     | '/settings'
     | '/directories/blank-constructor'
@@ -258,6 +268,7 @@ export interface FileRouteTypes {
     | '/notifications'
     | '/objects'
     | '/overdue'
+    | '/registry'
     | '/requests'
     | '/settings'
     | '/directories/blank-constructor'
@@ -282,6 +293,7 @@ export interface FileRouteTypes {
     | '/_authenticated/notifications'
     | '/_authenticated/objects'
     | '/_authenticated/overdue'
+    | '/_authenticated/registry'
     | '/_authenticated/requests'
     | '/_authenticated/settings'
     | '/_authenticated/directories_/blank-constructor'
@@ -366,6 +378,13 @@ declare module '@tanstack/react-router' {
       path: '/overdue'
       fullPath: '/overdue'
       preLoaderRoute: typeof AuthenticatedOverdueRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/registry': {
+      id: '/_authenticated/registry'
+      path: '/registry'
+      fullPath: '/registry'
+      preLoaderRoute: typeof AuthenticatedRegistryRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/requests': {
@@ -469,6 +488,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedNotificationsRoute: typeof AuthenticatedNotificationsRoute
   AuthenticatedObjectsRoute: typeof AuthenticatedObjectsRoute
   AuthenticatedOverdueRoute: typeof AuthenticatedOverdueRoute
+  AuthenticatedRegistryRoute: typeof AuthenticatedRegistryRoute
   AuthenticatedRequestsRoute: typeof AuthenticatedRequestsRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
   AuthenticatedDirectoriesBlankConstructorRoute: typeof AuthenticatedDirectoriesBlankConstructorRoute
@@ -491,6 +511,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedNotificationsRoute: AuthenticatedNotificationsRoute,
   AuthenticatedObjectsRoute: AuthenticatedObjectsRoute,
   AuthenticatedOverdueRoute: AuthenticatedOverdueRoute,
+  AuthenticatedRegistryRoute: AuthenticatedRegistryRoute,
   AuthenticatedRequestsRoute: AuthenticatedRequestsRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
   AuthenticatedDirectoriesBlankConstructorRoute:

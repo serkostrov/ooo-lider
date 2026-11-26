@@ -13,7 +13,7 @@ import {
 } from "docx";
 import { formatDate } from "@/lib/format";
 import { mskToday } from "@/lib/dates";
-import { formatLongRuDate } from "./labMosgaz";
+import { formatLongRuDate, parseLetterDateYmd } from "./labMosgaz";
 import { normalizeCallTime, valueOrDefault } from "./technadzor";
 import {
   buildDirectorTable,
@@ -135,6 +135,7 @@ export function buildLabIntegralFillInput(args: {
   const responsible = valueOrDefault(args.values, args.fields, "Ответственный за производство работ");
   const note = valueOrDefault(args.values, args.fields, "Примечание");
   const outRaw = valueOrDefault(args.values, args.fields, "Исх. №");
+  const letterDateRaw = valueOrDefault(args.values, args.fields, "Дата исходящего");
   const performerRaw = valueOrDefault(args.values, args.fields, "Исполнитель");
 
   const specimensFull = [specimens.trim(), pickets.trim()].filter(Boolean).join("\n") || pickets.trim();
@@ -152,8 +153,9 @@ export function buildLabIntegralFillInput(args: {
     /радиограф|ультразвук|просвет/i.test(methodNorm) || methodNorm === LAB_INTEGRAL_DEFAULT_METHOD;
 
   return {
-    outNumber: outRaw.trim() || String(args.requestNumber),
-    letterDate: mskToday(),
+    // Исх. № — номер исходящего письма; проставляют при подготовке бланка (не № заявки).
+    outNumber: outRaw.trim(),
+    letterDate: parseLetterDateYmd(letterDateRaw) ?? mskToday(),
     recipient: (args.recipient ?? LAB_INTEGRAL_RECIPIENT).trim() || LAB_INTEGRAL_RECIPIENT,
     method: methodNorm,
     callDate: args.callDate,

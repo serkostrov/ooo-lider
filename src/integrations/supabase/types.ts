@@ -941,6 +941,7 @@ export type Database = {
       }
       objects: {
         Row: {
+          actual_work_start: string | null
           address: string | null
           completed_at: string | null
           contract_end: string | null
@@ -968,6 +969,7 @@ export type Database = {
           utn_number: string | null
         }
         Insert: {
+          actual_work_start?: string | null
           address?: string | null
           completed_at?: string | null
           contract_end?: string | null
@@ -995,6 +997,7 @@ export type Database = {
           utn_number?: string | null
         }
         Update: {
+          actual_work_start?: string | null
           address?: string | null
           completed_at?: string | null
           contract_end?: string | null
@@ -2144,6 +2147,7 @@ export type Database = {
       }
       v_objects: {
         Row: {
+          actual_work_start: string | null
           address: string | null
           completed_at: string | null
           contract_days_left: number | null

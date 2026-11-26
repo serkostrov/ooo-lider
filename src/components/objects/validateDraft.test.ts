@@ -8,6 +8,7 @@ const base: ObjectDraft = {
   object_type: "uks",
   contract_start: "2026-01-01",
   contract_end: "2026-12-31",
+  actual_work_start: "",
   responsible_id: "",
   curator_contact_id: "",
   technadzor_contact_id: "",

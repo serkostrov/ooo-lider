@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Отправка заказчику → Реестр</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --card: #1a222c;
+      --fg: #e8eef4;
+      --muted: #8b97a5;
+      --border: #2a3542;
+      --orange: #c47a3a;
+      --orange-bg: #2a1f16;
+      --blue: #4a8fd4;
+      --blue-bg: #152030;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--fg);
+      padding: 32px 16px 48px;
+    }
+    .wrap {
+      max-width: 22rem;
+      margin: 0 auto;
+    }
+    h1 {
+      font-size: 1.25rem;
+      font-weight: 600;
+      margin: 0 0 4px;
+      letter-spacing: -0.02em;
+    }
+    .sub {
+      margin: 0 0 20px;
+      font-size: 0.875rem;
+      color: var(--muted);
+    }
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px 16px;
+      margin-bottom: 24px;
+      font-size: 0.8125rem;
+      color: var(--muted);
+    }
+    .legend span {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      flex-shrink: 0;
+    }
+    .dot.orange { background: var(--orange); }
+    .dot.blue { background: var(--blue); }
+    .flow {
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 0;
+    }
+    .card {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 14px;
+      background: var(--card);
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+    }
+    .card.hand {
+      background: var(--orange-bg);
+      border-color: color-mix(in srgb, var(--orange) 45%, var(--border));
+    }
+    .card.auto {
+      background: var(--blue-bg);
+      border-color: color-mix(in srgb, var(--blue) 45%, var(--border));
+    }
+    .num {
+      flex-shrink: 0;
+      width: 1.75rem;
+      height: 1.75rem;
+      border-radius: 999px;
+      display: grid;
+      place-items: center;
+      font-size: 0.75rem;
+      font-weight: 700;
+      background: var(--border);
+      color: var(--fg);
+    }
+    .card.hand .num { background: var(--orange); color: #1a1008; }
+    .card.auto .num { background: var(--blue); color: #061018; }
+    .title {
+      font-size: 0.9375rem;
+      font-weight: 600;
+      margin: 0 0 2px;
+    }
+    .desc {
+      margin: 0;
+      font-size: 0.8125rem;
+      color: var(--muted);
+      line-height: 1.4;
+    }
+    .arrow {
+      text-align: center;
+      color: var(--muted);
+      font-size: 1.25rem;
+      line-height: 1;
+      padding: 6px 0;
+      user-select: none;
+    }
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg: #f4f6f8;
+        --card: #fff;
+        --fg: #1c2126;
+        --muted: #5a6470;
+        --border: #c5ccd4;
+        --orange: #b86a28;
+        --orange-bg: #fff5eb;
+        --blue: #2f6fad;
+        --blue-bg: #eef5fc;
+      }
+      .card.hand .num { color: #fff; }
+      .card.auto .num { color: #fff; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Отправка → реестр</h1>
+    <p class="sub">Сверху вниз: что делаете вы и что делает система</p>
+
+    <div class="legend">
+      <span><i class="dot orange" aria-hidden="true"></i> Вы руками</span>
+      <span><i class="dot blue" aria-hidden="true"></i> Автоматически</span>
+    </div>
+
+    <div class="flow">
+      <div class="card hand">
+        <span class="num">1</span>
+        <div>
+          <p class="title">Заявка готова</p>
+          <p class="desc">Офис нажимает «Отправить заказчику»</p>
+        </div>
+      </div>
+      <div class="arrow" aria-hidden="true">↓</div>
+
+      <div class="card">
+        <span class="num">2</span>
+        <div>
+          <p class="title">Бланк и статус</p>
+          <p class="desc">Готовится документ, статус → «Отправлена»</p>
+        </div>
+      </div>
+      <div class="arrow" aria-hidden="true">↓</div>
+
+      <div class="card auto">
+        <span class="num">3</span>
+        <div>
+          <p class="title">Строка в реестре</p>
+          <p class="desc">Письма / Технадзор / Геотрест — по типу заявки</p>
+        </div>
+      </div>
+      <div class="arrow" aria-hidden="true">↓</div>
+
+      <div class="card auto">
+        <span class="num">4</span>
+        <div>
+          <p class="title">Что пишется сразу</p>
+          <p class="desc">Контрагент, дата, «Заявка №N…», файл бланка</p>
+        </div>
+      </div>
+      <div class="arrow" aria-hidden="true">↓</div>
+
+      <div class="card hand">
+        <span class="num">5</span>
+        <div>
+          <p class="title">Ответ заказчика</p>
+          <p class="desc">«Принять» — дата, № письма, текст (можно пропустить)</p>
+        </div>
+      </div>
+      <div class="arrow" aria-hidden="true">↓</div>
+
+      <div class="card auto">
+        <span class="num">6</span>
+        <div>
+          <p class="title">Та же строка реестра</p>
+          <p class="desc">Дописываются входящие поля (или позже вручную)</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

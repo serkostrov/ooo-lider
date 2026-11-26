@@ -113,14 +113,14 @@ export function StageMainForm({
       });
       if (err) throw new Error(err);
 
-      const num = Number(number.trim());
+      const numParsed = Number(number.trim().replace(",", "."));
       const dur = duration.trim() === "" ? null : Number(duration.trim());
       const resp = responseDays.trim() === "" ? null : Number(responseDays.trim());
       const rem = remindDays.trim() === "" ? null : Number(remindDays.trim());
 
       const payload = {
-        number: num,
-        sort: num,
+        number: numParsed,
+        sort: Math.floor(numParsed),
         name: name.trim(),
         work_type_id: workType,
         description: emptyToNull(description),
@@ -194,13 +194,14 @@ export function StageMainForm({
     </Select>
   );
 
-  const num = (value: string, onChange: (v: string) => void) => (
+  const num = (value: string, onChange: (v: string) => void, decimal = false) => (
     <Input
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      inputMode="numeric"
+      inputMode={decimal ? "decimal" : "numeric"}
       disabled={readOnly}
       className="h-9 text-sm"
+      placeholder={decimal ? "1 или 1.1" : undefined}
     />
   );
 
@@ -215,7 +216,7 @@ export function StageMainForm({
       <Section title="Основное" hint="Номер, название и группа этапа в регламенте.">
         <div className="grid gap-6 sm:grid-cols-[7.5rem_minmax(0,1.4fr)_minmax(0,1fr)]">
           <Field label="Номер" required>
-            {num(number, setNumber)}
+            {num(number, setNumber, true)}
           </Field>
           <Field label="Название" required>
             <Input

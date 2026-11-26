@@ -47,6 +47,10 @@ export function DateField({
   const [open, setOpen] = useState(false);
   const selected = parseYmd(value);
   const minDate = min ? parseYmd(min) : undefined;
+  const year = new Date().getFullYear();
+  // Нативный dropdown по умолчанию до текущего года — даём −30…+10
+  const startMonth = new Date(year - 30, 0, 1);
+  const endMonth = new Date(year + 10, 11, 31);
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -57,7 +61,8 @@ export function DateField({
           disabled={disabled}
           aria-label={ariaLabel}
           className={cn(
-            "h-9 w-[11.5rem] max-w-full justify-start gap-2 px-2.5 text-left text-sm font-normal tabular-nums",
+            "h-9 max-w-full justify-start gap-2 px-2.5 text-left text-sm font-normal tabular-nums",
+            className?.includes("w-full") ? "w-full" : "w-[11.5rem]",
             !value && "text-muted-foreground",
             className,
           )}
@@ -81,10 +86,12 @@ export function DateField({
           ) : null}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="z-[60] w-auto p-0" align="start">
+      <PopoverContent className="z-[60] w-auto overflow-visible p-0" align="start">
         <Calendar
           mode="single"
           selected={selected}
+          startMonth={startMonth}
+          endMonth={endMonth}
           {...(selected ? { defaultMonth: selected } : {})}
           {...(minDate ? { disabled: { before: minDate } } : {})}
           captionLayout="dropdown"

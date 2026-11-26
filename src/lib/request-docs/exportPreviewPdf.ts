@@ -362,17 +362,32 @@ export async function downloadElementAsPdf(el: HTMLElement, filename: string) {
   flattenEditableControls(clone);
 
   const footer = clone.querySelector<HTMLElement>("[data-letterhead-footer]");
+  const performer = clone.querySelector<HTMLElement>("[data-performer-line]");
   if (footer) {
     footer.style.flexShrink = "0";
     footer.style.height = "14px";
     footer.style.minHeight = "14px";
-    footer.style.marginTop = "24px";
+    footer.style.marginTop = "8px";
+  }
+  if (performer) {
+    performer.style.flexShrink = "0";
+    performer.style.marginTop = "12px";
   }
 
   await embedAssets(clone);
   await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
 
   const footerHcss = footer ? Math.max(footer.offsetHeight, 14) : 0;
+  // Как в Word: исполнитель + нижняя полоска — подвал страницы, не «висит» над пустотой
+  let bottomChromeCss = footerHcss;
+  if (performer && footer) {
+    const shellTop = clone.getBoundingClientRect().top;
+    const perfTop = performer.getBoundingClientRect().top - shellTop;
+    const footBottom = footer.getBoundingClientRect().bottom - shellTop;
+    bottomChromeCss = Math.max(footerHcss, Math.ceil(footBottom - perfTop) + 4);
+  } else if (performer) {
+    bottomChromeCss = Math.max(performer.offsetHeight + 8, 24);
+  }
   const captureH = Math.max(clone.scrollHeight, clone.offsetHeight, el.scrollHeight);
   const scale = 2;
   const disabled = disableModernColorSheets();
@@ -413,9 +428,9 @@ export async function downloadElementAsPdf(el: HTMLElement, filename: string) {
     const pageW = pdf.internal.pageSize.getWidth();
     const pageH = pdf.internal.pageSize.getHeight();
 
-    // Полоску вырезаем из снимка и клеим к низу последней страницы A4
-    const stripPx = footerHcss > 0
-      ? Math.min(canvas.height, Math.round((footerHcss + 4) * scale))
+    // Исполнитель + полоску вырезаем и клеим к низу последней страницы A4 (как footer в Word)
+    const stripPx = bottomChromeCss > 0
+      ? Math.min(canvas.height, Math.round((bottomChromeCss + 2) * scale))
       : 0;
     const contentPx = Math.max(1, canvas.height - stripPx);
 

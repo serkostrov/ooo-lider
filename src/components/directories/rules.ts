@@ -89,6 +89,16 @@ export function toIntOrNull(v: string): number | null | "bad" {
   return Number(t);
 }
 
+/** Целое или дробное > 0 (1, 1.1, 2,5). Пусто → null. */
+export function toPositiveNumberOrNull(v: string): number | null | "bad" {
+  const t = v.trim().replace(",", ".");
+  if (t === "") return null;
+  if (!/^\d+(\.\d+)?$/.test(t)) return "bad";
+  const n = Number(t);
+  if (!Number.isFinite(n) || n <= 0) return "bad";
+  return n;
+}
+
 /** Транслит названия → code для ролей/статусов. */
 export function slugCode(name: string, fallback = "item") {
   const map: Record<string, string> = {
@@ -354,11 +364,11 @@ export function validateStageTemplate(v: {
   existing: { id: string; number: number }[];
   currentId?: string | null;
 }): RuleError {
-  const num = toIntOrNull(v.number);
+  const num = toPositiveNumberOrNull(v.number);
   const dur = toIntOrNull(v.duration);
   const resp = toIntOrNull(v.responseDays);
   const rem = toIntOrNull(v.remindDays);
-  if (num === null || num === "bad" || num < 1) return "Номер этапа — целое число больше 0";
+  if (num === null || num === "bad") return "Номер этапа — число больше 0 (можно 1.1)";
   if (dur === "bad" || resp === "bad" || rem === "bad") return "Сроки — целые числа от 0 или пусто";
   if (!v.name.trim()) return "Укажите название этапа";
   if (!v.workTypeId) return "Выберите группу";

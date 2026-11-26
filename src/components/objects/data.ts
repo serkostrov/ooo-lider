@@ -42,6 +42,7 @@ export type ObjectRow = {
   object_type: string;
   contract_start: string | null;
   contract_end: string | null;
+  actual_work_start: string | null;
   contract_days_left: number | null;
   responsible_id: string | null;
   responsible_name: string | null;
@@ -398,6 +399,21 @@ export function daysLeftText(daysLeft: number | null | undefined) {
   if (daysLeft < 0) return `−${-daysLeft}д`;
   if (daysLeft === 0) return "сегодня";
   return `${daysLeft}д`;
+}
+
+/** Полная подпись: «Осталось 12 дн.» / «Просрочен на 3 дн.» */
+export function contractDaysLeftLabel(daysLeft: number | null | undefined) {
+  if (daysLeft === null || daysLeft === undefined) return "";
+  if (daysLeft < 0) return `Просрочен на ${-daysLeft} дн.`;
+  if (daysLeft === 0) return "Сегодня окончание";
+  return `Осталось ${daysLeft} дн.`;
+}
+
+/** Значение для карточки статистики (число дней). */
+export function contractDaysLeftValue(daysLeft: number | null | undefined) {
+  if (daysLeft === null || daysLeft === undefined) return "—";
+  if (daysLeft < 0) return `−${-daysLeft}`;
+  return String(daysLeft);
 }
 
 export const TONE_CLASS: Record<"ok" | "warn" | "bad" | "none", string> = {

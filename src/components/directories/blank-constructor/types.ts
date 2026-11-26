@@ -45,6 +45,12 @@ export type BlankConfig = {
   letterhead: boolean;
   recipientLines: string[];
   showDirectorBlock: boolean;
+  /** Показывать слева «Исх. № … от …» (Word). */
+  showOutgoing: boolean;
+  /** Демо / значение по умолчанию для превью шаблона. */
+  outNumber: string;
+  /** Дата исходящего YYYY-MM-DD для превью шаблона. */
+  letterDate: string;
   /** Word-таблица */
   tableRows: TableRowConfig[];
   /** Word-факс */
@@ -102,6 +108,7 @@ export const SAMPLE_FIELD_OPTIONS = [
   "Что нужно",
   "Примечание",
   "Исх. №",
+  "Дата исходящего",
   "Исполнитель",
   "Номер и дата регистрации проекта в УТН",
   "Шифр и наименование объекта",
@@ -161,6 +168,7 @@ export const DEMO_VALUES: Record<string, string> = {
   "Вид вызова": "КГС",
   "Примечание": "",
   "Исх. №": "42",
+  "Дата исходящего": "13.11.2025",
   "Исполнитель": "Петров П.П.",
   "Номер и дата регистрации проекта в УТН": "№441 от 01.11.2026 г.",
   "Шифр и наименование объекта": "ГП-2026/09 Газопровод к котельной",
@@ -192,6 +200,9 @@ export function defaultConfig(format: BlankFormat | null = null): BlankConfig {
     letterhead: true,
     recipientLines: ["Начальнику УЭГНД", "Иванову И.И."],
     showDirectorBlock: true,
+    showOutgoing: true,
+    outNumber: "42",
+    letterDate: "2025-11-13",
     tableRows: [
       {
         id: rid(),

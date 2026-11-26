@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Check, RotateCcw, Undo2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -36,6 +36,8 @@ import {
   resolveEmailTitle,
 } from "@/lib/request-docs/emailCopy";
 import { EmailLetterPreview } from "@/components/requests/EmailLetterPreview";
+import { AcceptResponseDialog } from "@/components/registry/AcceptResponseDialog";
+import { registrySyncOnSent } from "@/lib/registry/syncOnSent";
 
 function useStatusFlow(r: RequestRow) {
   const flow = useRequestFlowStatuses();
@@ -177,12 +179,14 @@ export function RequestStatusActions({
   className?: string;
 }) {
   const me = useProfile();
+  const qc = useQueryClient();
   const { next, prev, onRework, canSendToRework, reworkDef } = useStatusFlow(r);
   const { data: scenario = [] } = useRequestTypeScenario(r.request_type_id);
   const scenarioRole = next ? scenarioRoleForTransition(scenario, next.v) : null;
   const [back, setBack] = useState(false);
   const [reworkOpen, setReworkOpen] = useState(false);
   const [sendOpen, setSendOpen] = useState(false);
+  const [acceptOpen, setAcceptOpen] = useState(false);
   const [sendByEmail, setSendByEmail] = useState(r.send_by_email !== false);
   const [mailTitle, setMailTitle] = useState("");
   const [mailSubtitle, setMailSubtitle] = useState("");
@@ -293,10 +297,15 @@ export function RequestStatusActions({
         mailResult = { sent: false };
       }
 
+      if (to === "sent") {
+        await registrySyncOnSent({ r, values: fieldValues ?? [] });
+      }
+
       return { to, emailFlag, mailResult };
     },
     onSuccess: ({ to, emailFlag, mailResult }) => {
       if (to === "sent") {
+        void qc.invalidateQueries({ queryKey: ["registry-entries"] });
         if (emailFlag && mailResult?.sent) {
           toast.success(`Заявка отправлена · письмо на ${mailResult.to}`);
         } else if (emailFlag && mailResult && !mailResult.sent) {
@@ -336,6 +345,11 @@ export function RequestStatusActions({
       }
       // сюда попадаем только если отправка писем у вида не выключена
       openSendDialog();
+      return;
+    }
+    // «Принята заказчиком» — модалка ответа в реестр
+    if (next.v === "accepted") {
+      setAcceptOpen(true);
       return;
     }
     m.mutate({
@@ -554,6 +568,13 @@ export function RequestStatusActions({
           </form>
         </DialogContent>
       </Dialog>
+
+      <AcceptResponseDialog
+        open={acceptOpen}
+        onOpenChange={setAcceptOpen}
+        requestId={r.id}
+        onDone={onChanged}
+      />
     </div>
   );
 }

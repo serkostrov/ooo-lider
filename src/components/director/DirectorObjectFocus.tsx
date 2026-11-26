@@ -18,10 +18,13 @@ import {
   type DirectorProblems,
   type ObjectProgress,
 } from "@/components/director/data";
+import { contractDaysLeftValue, contractTone } from "@/components/objects/data";
+import { formatDate } from "@/lib/format";
 
 type StatCard = {
   label: string;
   value: string;
+  hint?: string;
   tone?: "danger" | "warning" | "info" | "neutral";
 };
 
@@ -82,8 +85,17 @@ export function DirectorObjectFocus({
       .slice(0, 10);
   }, [problems, objectId]);
 
+  const endTone = contractTone(selected?.contractDaysLeft);
   const cards: StatCard[] = selected
     ? [
+        {
+          label: "До окончания",
+          value: contractDaysLeftValue(selected.contractDaysLeft),
+          ...(selected.contractEnd
+            ? { hint: `до ${formatDate(selected.contractEnd)}` }
+            : {}),
+          tone: endTone === "bad" ? "danger" : endTone === "warn" ? "warning" : "info",
+        },
         {
           label: "Закрыто этапов",
           value: `${selected.stagesClosed} / ${selected.stagesTotal}`,
@@ -159,6 +171,9 @@ export function DirectorObjectFocus({
                 {list.map((o) => (
                   <SelectItem key={o.id} value={o.id} className="text-sm">
                     {o.name}
+                    {o.contractDaysLeft != null
+                      ? ` · ${o.contractDaysLeft < 0 ? `−${-o.contractDaysLeft}` : o.contractDaysLeft} дн.`
+                      : ""}
                     {o.stagesOverdue + o.requestsOverdue > 0
                       ? ` · просроч. ${o.stagesOverdue + o.requestsOverdue}`
                       : ""}
@@ -170,7 +185,7 @@ export function DirectorObjectFocus({
 
           {selected && (
             <>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
                 {cards.map((c) => (
                   <div
                     key={c.label}
@@ -182,7 +197,13 @@ export function DirectorObjectFocus({
                     <p className="text-[11px] text-muted-foreground">{c.label}</p>
                     <p className="mt-0.5 text-lg font-semibold tabular-nums tracking-tight">
                       {c.value}
+                      {c.label === "До окончания" && c.value !== "—" ? (
+                        <span className="ml-0.5 text-sm font-medium opacity-70">дн.</span>
+                      ) : null}
                     </p>
+                    {c.hint ? (
+                      <p className="mt-0.5 truncate text-[10px] text-muted-foreground">{c.hint}</p>
+                    ) : null}
                   </div>
                 ))}
               </div>

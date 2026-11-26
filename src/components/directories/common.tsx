@@ -38,6 +38,10 @@ export function Toolbar({
   className,
   /** Одна строка: поиск сжимается, кнопки не переносятся. */
   nowrap = false,
+  /** Классы обёртки поля поиска (например max-w-*). */
+  searchClassName,
+  /** Поиск слева, действия (children + Добавить) справа. */
+  split = false,
 }: {
   search: string;
   onSearch: (v: string) => void;
@@ -46,19 +50,37 @@ export function Toolbar({
   children?: ReactNode;
   className?: string;
   nowrap?: boolean;
+  searchClassName?: string;
+  split?: boolean;
 }) {
+  const actions =
+    children || onAdd ? (
+      <>
+        {children}
+        {onAdd ? (
+          <Button onClick={onAdd} className="h-9 shrink-0 gap-1.5 px-3 text-sm">
+            <Plus className="size-4" />
+            {addLabel}
+          </Button>
+        ) : null}
+      </>
+    ) : null;
+
   return (
     <div
       className={cn(
         "mb-4 flex w-full items-center gap-1.5 sm:gap-3",
         nowrap ? "flex-nowrap" : "flex-wrap",
+        split && "justify-between",
         className,
       )}
     >
       <div
         className={cn(
-          "relative min-w-0 flex-1",
-          nowrap ? "basis-0" : "basis-48",
+          "relative min-w-0",
+          split ? "w-full max-w-[16rem] shrink-0" : "flex-1",
+          !split && (nowrap ? "basis-0" : "basis-48"),
+          searchClassName,
         )}
       >
         <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground sm:left-3" />
@@ -83,13 +105,13 @@ export function Toolbar({
           </button>
         ) : null}
       </div>
-      {children}
-      {onAdd && (
-        <Button onClick={onAdd} className="h-9 shrink-0 gap-1.5 px-3 text-sm">
-          <Plus className="size-4" />
-          {addLabel}
-        </Button>
-      )}
+      {actions ? (
+        split ? (
+          <div className="flex flex-wrap items-center justify-end gap-1.5 sm:gap-3">{actions}</div>
+        ) : (
+          actions
+        )
+      ) : null}
     </div>
   );
 }

@@ -18,30 +18,69 @@ function download(blob: Blob, fileName: string) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+type SheetSpec<T> = {
+  name: string;
+  columns: Column<T>[];
+  rows: T[];
+};
+
+function sheetToAoa<T>(columns: Column<T>[], rows: T[]): (string | number)[][] {
+  return [columns.map((c) => c.header), ...rows.map((r) => columns.map((c) => c.value(r) ?? ""))];
+}
+
+function uniqueSheetName(raw: string, used: Set<string>): string {
+  const base = (raw.trim().slice(0, 31) || "Лист").replace(/[:\\/?*\[\]]/g, " ");
+  let name = base;
+  let i = 2;
+  while (used.has(name)) {
+    const suffix = ` (${i})`;
+    name = `${base.slice(0, Math.max(1, 31 - suffix.length))}${suffix}`;
+    i += 1;
+  }
+  used.add(name);
+  return name;
+}
+
+function fallbackCsv<T>(fileName: string, sheets: SheetSpec<T>[]) {
+  const esc = (v: string | number) => {
+    const s = String(v);
+    return /[";\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const first = sheets[0];
+  if (!first) return;
+  const aoa = sheetToAoa(first.columns, first.rows);
+  const csv = "﻿" + aoa.map((r) => r.map(esc).join(";")).join("\r\n");
+  download(new Blob([csv], { type: "text/csv;charset=utf-8" }), `${safeFileName(fileName)}.csv`);
+  toast.info(
+    sheets.length > 1
+      ? "Не удалось записать Excel — выгружен CSV только первого листа"
+      : "Не удалось записать Excel — выгружен CSV, он открывается в Excel",
+  );
+}
+
+/** Выгрузка в .xlsx с несколькими листами. */
+export async function exportXlsxSheets<T>(fileName: string, sheets: SheetSpec<T>[]) {
+  if (sheets.length === 0) return;
+  try {
+    const wb = XLSX.utils.book_new();
+    const used = new Set<string>();
+    for (const sheet of sheets) {
+      const ws = XLSX.utils.aoa_to_sheet(sheetToAoa(sheet.columns, sheet.rows));
+      ws["!cols"] = sheet.columns.map((c) => ({ wch: c.width ?? 18 }));
+      XLSX.utils.book_append_sheet(wb, ws, uniqueSheetName(sheet.name, used));
+    }
+    XLSX.writeFile(wb, `${safeFileName(fileName)}.xlsx`);
+  } catch {
+    fallbackCsv(fileName, sheets);
+  }
+}
+
 /**
  * Выгрузка в .xlsx (SheetJS, ТЗ 7.5).
  * Если запись файла недоступна — CSV с BOM, который Excel открывает с кириллицей.
  */
 export async function exportXlsx<T>(fileName: string, sheetName: string, columns: Column<T>[], rows: T[]) {
-  const aoa: (string | number)[][] = [
-    columns.map((c) => c.header),
-    ...rows.map((r) => columns.map((c) => c.value(r) ?? "")),
-  ];
-  try {
-    const ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws["!cols"] = columns.map((c) => ({ wch: c.width ?? 18 }));
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, sheetName.slice(0, 31));
-    XLSX.writeFile(wb, `${safeFileName(fileName)}.xlsx`);
-  } catch {
-    const esc = (v: string | number) => {
-      const s = String(v);
-      return /[";\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-    };
-    const csv = "﻿" + aoa.map((r) => r.map(esc).join(";")).join("\r\n");
-    download(new Blob([csv], { type: "text/csv;charset=utf-8" }), `${safeFileName(fileName)}.csv`);
-    toast.info("Не удалось записать Excel — выгружен CSV, он открывается в Excel");
-  }
+  await exportXlsxSheets(fileName, [{ name: sheetName, columns, rows }]);
 }
 
 const escHtml = (v: unknown) =>

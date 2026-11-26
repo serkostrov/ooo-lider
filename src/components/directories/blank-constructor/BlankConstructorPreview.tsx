@@ -9,12 +9,42 @@ import {
   LIDER_REQUISITES,
   formatPerformerLine,
 } from "@/lib/request-docs/letterhead";
+import { formatLongRuDate } from "@/lib/request-docs/labMosgaz";
+import { mskToday } from "@/lib/dates";
 import { cn } from "@/lib/utils";
 import {
   type BlankConfig,
   renderTemplate,
   resolveSource,
 } from "./types";
+
+function OutgoingAndRecipient({ config }: { config: BlankConfig }) {
+  const recipients = config.recipientLines.filter((l) => l.trim());
+  const showOut = config.showOutgoing !== false;
+  // В шаблоне только превью: дата = сегодня, номер — при отправке бланка
+  const outLine = `Исх. № … от ${formatLongRuDate(mskToday())}`;
+
+  if (!showOut && recipients.length === 0) return null;
+
+  return (
+    <div className="mb-4 grid gap-2 sm:grid-cols-2 sm:items-start">
+      {showOut ? (
+        <p className="text-[13px] font-semibold leading-snug text-neutral-900">{outLine}</p>
+      ) : (
+        <span />
+      )}
+      {recipients.length > 0 ? (
+        <div className="space-y-0.5 text-right text-[12px] leading-snug">
+          {recipients.map((line, i) => (
+            <p key={i} className="font-semibold">
+              {line}
+            </p>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
 /** Шапка бланка: только верх картинки, без нижней полоски на контенте. */
 function LetterheadHeader() {
@@ -107,7 +137,10 @@ function DirectorFooter() {
           / {LIDER_DIRECTOR}/
         </p>
       </div>
-      <div className="border-t border-neutral-200 pt-3 text-xs text-neutral-700">
+      <div
+        data-performer-line
+        className="border-t border-neutral-200 pt-3 text-xs text-neutral-700"
+      >
         <p>{formatPerformerLine(DEFAULT_PERFORMER)}</p>
       </div>
     </div>
@@ -125,15 +158,7 @@ function EmptyHint({ text }: { text: string }) {
 function WordTablePreview({ config }: { config: BlankConfig }) {
   return (
     <LetterheadFrame enabled={config.letterhead}>
-      {config.recipientLines.filter((l) => l.trim()).length > 0 && (
-        <div className="mb-4 space-y-0.5 text-right text-[12px] leading-snug">
-          {config.recipientLines
-            .filter((l) => l.trim())
-            .map((line, i) => (
-              <p key={i}>{line}</p>
-            ))}
-        </div>
-      )}
+      <OutgoingAndRecipient config={config} />
       <p className="mb-3 text-center text-sm font-semibold uppercase tracking-wide">
         Заявка (черновик конструктора)
       </p>
@@ -162,14 +187,7 @@ function WordTablePreview({ config }: { config: BlankConfig }) {
 function WordFaxPreview({ config }: { config: BlankConfig }) {
   return (
     <LetterheadFrame enabled={config.letterhead}>
-      <div className="mb-4 space-y-0.5 text-right text-[12px] leading-snug">
-        <p className="font-semibold">Кому:</p>
-        {config.recipientLines
-          .filter((l) => l.trim())
-          .map((line, i) => (
-            <p key={i}>{line}</p>
-          ))}
-      </div>
+      <OutgoingAndRecipient config={config} />
       <p className="mb-4 text-center text-base font-bold uppercase tracking-wide">
         {config.faxTitle.trim() || "ФАКСОГРАММА"}
       </p>

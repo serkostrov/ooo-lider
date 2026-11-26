@@ -2,11 +2,133 @@
 
 import * as React from "react";
 import { ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
-import { DayButton, DayPicker, getDefaultClassNames } from "react-day-picker";
+import {
+  DayButton,
+  DayPicker,
+  getDefaultClassNames,
+  type DropdownProps,
+} from "react-day-picker";
 import { ru } from "react-day-picker/locale";
 
 import { cn } from "@/lib/utils";
 import { Button, buttonVariants } from "@/components/ui/button";
+
+const MONTHS_SHORT = [
+  "янв",
+  "фев",
+  "мар",
+  "апр",
+  "май",
+  "июн",
+  "июл",
+  "авг",
+  "сен",
+  "окт",
+  "ноя",
+  "дек",
+] as const;
+
+/** Красивый выбор месяца/года вместо нативного select. */
+function CalendarDropdown({
+  options,
+  className,
+  components: _components,
+  classNames: _classNames,
+  ...selectProps
+}: DropdownProps) {
+  const [open, setOpen] = React.useState(false);
+  const rootRef = React.useRef<HTMLDivElement>(null);
+  const opts = options ?? [];
+  const selected = opts.find((o) => o.value === Number(selectProps.value));
+  const isMonth =
+    opts.length > 0 && opts.length <= 12 && opts.every((o) => o.value >= 0 && o.value <= 11);
+
+  React.useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  const pick = (value: number) => {
+    selectProps.onChange?.({
+      target: { value: String(value) },
+    } as React.ChangeEvent<HTMLSelectElement>);
+    setOpen(false);
+  };
+
+  return (
+    <div ref={rootRef} className="relative">
+      <button
+        type="button"
+        disabled={selectProps.disabled}
+        aria-label={selectProps["aria-label"]}
+        aria-expanded={open}
+        aria-haspopup="listbox"
+        onClick={() => setOpen((v) => !v)}
+        className={cn(
+          "inline-flex h-8 items-center gap-1 rounded-md border border-input bg-background px-2 text-sm font-medium tabular-nums transition-colors",
+          "hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+          "disabled:pointer-events-none disabled:opacity-50",
+          open && "border-ring bg-muted/40 ring-2 ring-ring/30",
+          className,
+        )}
+      >
+        <span className="min-w-[2.25rem] text-left">{selected?.label ?? "—"}</span>
+        <ChevronDownIcon
+          className={cn("size-3.5 text-muted-foreground transition-transform", open && "rotate-180")}
+        />
+      </button>
+      {open ? (
+        <div
+          role="listbox"
+          className={cn(
+            "absolute left-1/2 top-[calc(100%+6px)] z-30 -translate-x-1/2 rounded-lg border border-border bg-popover p-1.5 text-popover-foreground shadow-lg",
+            isMonth ? "w-[11.75rem]" : "w-[13.5rem]",
+          )}
+        >
+          <div
+            className={cn(
+              "grid gap-1",
+              isMonth ? "grid-cols-3" : "max-h-52 grid-cols-3 overflow-y-auto overscroll-contain pr-0.5",
+            )}
+          >
+            {opts.map((opt) => {
+              const active = opt.value === Number(selectProps.value);
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  role="option"
+                  aria-selected={active}
+                  disabled={opt.disabled}
+                  onClick={() => pick(opt.value)}
+                  className={cn(
+                    "rounded-md px-1.5 py-1.5 text-center text-[12px] font-medium tabular-nums transition-colors",
+                    "hover:bg-accent hover:text-accent-foreground",
+                    "disabled:pointer-events-none disabled:opacity-40",
+                    active && "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground",
+                  )}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
 function Calendar({
   className,
@@ -37,7 +159,7 @@ function Calendar({
       )}
       captionLayout={captionLayout}
       formatters={{
-        formatMonthDropdown: (date) => date.toLocaleString("ru-RU", { month: "short" }),
+        formatMonthDropdown: (date) => MONTHS_SHORT[date.getMonth()] ?? "",
         ...formatters,
       }}
       classNames={{
@@ -63,14 +185,11 @@ function Calendar({
           defaultClassNames.month_caption,
         ),
         dropdowns: cn(
-          "flex h-(--cell-size) w-full items-center justify-center gap-1.5 text-sm font-medium",
+          "relative z-10 flex h-(--cell-size) w-full items-center justify-center gap-1.5 text-sm font-medium",
           defaultClassNames.dropdowns,
         ),
-        dropdown_root: cn(
-          "has-focus:border-ring border-input shadow-xs has-focus:ring-ring/50 has-focus:ring-[3px] relative rounded-md border",
-          defaultClassNames.dropdown_root,
-        ),
-        dropdown: cn("bg-popover absolute inset-0 opacity-0", defaultClassNames.dropdown),
+        dropdown_root: cn("relative", defaultClassNames.dropdown_root),
+        dropdown: cn("absolute inset-0 opacity-0", defaultClassNames.dropdown),
         caption_label: cn(
           "select-none font-medium",
           captionLayout === "label"
@@ -124,6 +243,7 @@ function Calendar({
 
           return <ChevronDownIcon className={cn("size-4", className)} {...props} />;
         },
+        Dropdown: CalendarDropdown,
         DayButton: CalendarDayButton,
         WeekNumber: ({ children, ...props }) => {
           return (

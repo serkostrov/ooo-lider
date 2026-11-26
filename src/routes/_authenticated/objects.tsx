@@ -38,7 +38,6 @@ import { useTableColumnWidths, type ColumnWidthDef } from "@/lib/table-column-wi
 import {
   OBJECT_STATUSES,
   contractTone,
-  daysLeftText,
   statusLabel,
   useObjectProblemSummary,
   useObjectTypes,
@@ -817,24 +816,39 @@ function ObjectCard({
               )}
             </dd>
           </div>
-          <div className="min-w-0 col-span-2">
-            <dt className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-              Окончание договора
-            </dt>
-            <dd
-              className={cn(
-                "font-medium tabular-nums",
-                tone === "bad" && "text-danger",
-                tone === "warn" && "text-warning",
-              )}
-            >
-              {formatDate(o.contract_end) || "—"}
-              {o.status !== "completed" && o.contract_days_left !== null && (
-                <span className="ml-1.5 text-xs font-normal opacity-80">
-                  {daysLeftText(o.contract_days_left)}
-                </span>
-              )}
-            </dd>
+          <div className="min-w-0 col-span-2 grid grid-cols-2 gap-x-3">
+            <div className="min-w-0">
+              <dt className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                До окончания
+              </dt>
+              <dd
+                className={cn(
+                  "font-[family-name:var(--font-display)] text-base font-semibold tabular-nums",
+                  tone === "bad" && "text-danger",
+                  tone === "warn" && "text-warning",
+                )}
+              >
+                {o.status !== "completed" && o.contract_days_left !== null
+                  ? o.contract_days_left < 0
+                    ? `−${-o.contract_days_left} дн.`
+                    : `${o.contract_days_left} дн.`
+                  : "—"}
+              </dd>
+            </div>
+            <div className="min-w-0">
+              <dt className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                Окончание договора
+              </dt>
+              <dd
+                className={cn(
+                  "font-medium tabular-nums",
+                  tone === "bad" && "text-danger",
+                  tone === "warn" && "text-warning",
+                )}
+              >
+                {formatDate(o.contract_end) || "—"}
+              </dd>
+            </div>
           </div>
         </dl>
 
@@ -998,13 +1012,15 @@ function ObjectTableRow({
             <div
               className={
                 tone === "bad"
-                  ? "mt-0.5 text-[11px] text-danger/70"
+                  ? "mt-0.5 text-[11px] font-semibold text-danger"
                   : tone === "warn"
-                    ? "mt-0.5 text-[11px] text-warning/70"
-                    : "mt-0.5 text-[11px] text-muted-foreground"
+                    ? "mt-0.5 text-[11px] font-semibold text-warning"
+                    : "mt-0.5 text-[11px] font-semibold text-foreground"
               }
             >
-              {daysLeftText(o.contract_days_left)}
+              {o.contract_days_left < 0
+                ? `−${-o.contract_days_left} дн.`
+                : `${o.contract_days_left} дн.`}
             </div>
           )}
         </div>

@@ -158,12 +158,14 @@ function CommonToggles({
   showLetterhead,
   showDirector,
   showRecipient,
+  showOutgoing,
 }: {
   config: BlankConfig;
   patch: (p: Partial<BlankConfig>) => void;
   showLetterhead: boolean;
   showDirector: boolean;
   showRecipient: boolean;
+  showOutgoing: boolean;
 }) {
   return (
     <div className="space-y-4">
@@ -176,6 +178,20 @@ function CommonToggles({
           <Switch
             checked={config.letterhead}
             onCheckedChange={(v) => patch({ letterhead: v })}
+          />
+        </div>
+      )}
+      {showOutgoing && (
+        <div className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2">
+          <div>
+            <Label className="text-sm">Исх. № и дата на бланке</Label>
+            <p className="text-xs text-muted-foreground">
+              Слева: «Исх. № … от …». Дата — сегодня, номер проставляется при подготовке/отправке бланка.
+            </p>
+          </div>
+          <Switch
+            checked={config.showOutgoing}
+            onCheckedChange={(v) => patch({ showOutgoing: v })}
           />
         </div>
       )}
@@ -450,6 +466,7 @@ function ConfigStep({
         showLetterhead={isWord}
         showDirector={isWord}
         showRecipient={isWord}
+        showOutgoing={isWord}
       />
 
       {config.format === "word_table" && (
@@ -610,11 +627,21 @@ export function BlankConstructorEditor({
     }
     const engine = defaultEngineForFormat(format);
     const base = engine ? presetConfigForEngine(engine) : defaultConfig(format);
+    const keepOutgoing =
+      (format === "word_table" || format === "word_fax") &&
+      (config.format === "word_table" || config.format === "word_fax");
     commit({
       ...base,
       format,
       letterhead: config.letterhead,
       showDirectorBlock: config.showDirectorBlock,
+      ...(keepOutgoing
+        ? {
+            showOutgoing: config.showOutgoing,
+            outNumber: config.outNumber,
+            letterDate: config.letterDate,
+          }
+        : {}),
     });
     setStep("config");
   };

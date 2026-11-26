@@ -13,6 +13,7 @@ import { StagesDirectory } from "@/components/directories/stages/StagesDirectory
 import { RequestTypesDirectory } from "@/components/directories/request-types/RequestTypesDirectory";
 import { BlankTemplatesDirectory } from "@/components/directories/blank-templates/BlankTemplatesDirectory";
 import { RolesDirectory } from "@/components/directories/RolesDirectory";
+import { RegistryJournalsDirectory } from "@/components/directories/registry-journals/RegistryJournalsDirectory";
 import { PageHeader } from "@/components/PageHeader";
 import { useProfile } from "@/lib/profile";
 import { cn } from "@/lib/utils";
@@ -39,7 +40,8 @@ type TabValue =
   | "employees"
   | "roles"
   | "statuses"
-  | "request-statuses";
+  | "request-statuses"
+  | "registry-journals";
 
 type TabDef = { v: TabValue; label: string };
 
@@ -61,6 +63,7 @@ const SECTIONS: { id: string; label: string; tabs: TabDef[] }[] = [
     tabs: [
       { v: "request-types", label: "Виды заявок" },
       { v: "blank-templates", label: "Шаблоны бланков" },
+      { v: "registry-journals", label: "Журналы реестра" },
       { v: "representatives", label: "Представители" },
       { v: "request-statuses", label: "Статусы заявок" },
     ],
@@ -196,6 +199,7 @@ function DirectoriesPage() {
             tab !== "object-types" &&
             tab !== "request-types" &&
             tab !== "blank-templates" &&
+            tab !== "registry-journals" &&
             tab !== "statuses" &&
             tab !== "request-statuses" && (
               <h2 className="mb-4 flex h-9 items-center text-xl font-semibold tracking-tight">
@@ -208,6 +212,7 @@ function DirectoriesPage() {
           {tab === "documents" && <DocumentsDirectory />}
           {tab === "request-types" && <RequestTypesDirectory />}
           {tab === "blank-templates" && <BlankTemplatesDirectory />}
+          {tab === "registry-journals" && <RegistryJournalsDirectory />}
           {tab === "representatives" && <RepresentativesDirectory />}
           {tab === "external-contacts" && <ExternalContactsDirectory />}
           {tab === "customers" && <CustomersDirectory />}

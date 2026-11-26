@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useProfile } from "@/lib/profile";
 import { showError } from "@/lib/format";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,7 +25,7 @@ import { OBJECTS_KEY, useActiveProfiles, type ProfileShort } from "@/components/
 import { ObjectCardFields, draftToPayload, validateDraft, type ObjectDraft } from "@/components/objects/ObjectCardFields";
 import { MembersPicker } from "@/components/objects/MembersPicker";
 import { StagesPicker, useAvailableTemplates } from "@/components/objects/StagesPicker";
-import { ReorderModeButton } from "@/components/directories/ReorderModeButton";
+import { NumbersModeButton, ReorderModeButton } from "@/components/directories/ReorderModeButton";
 import { Reorderable } from "@/components/directories/stages/Reorderable";
 import { StatusBadge, useObjectStages, type ObjectStage } from "@/components/stages/data";
 import { cn } from "@/lib/utils";
@@ -44,7 +45,7 @@ function EditObjectPage() {
       const { data, error } = await supabase
         .from("objects")
         .select(
-          "id, name, address, customer_id, object_type, contract_start, contract_end, responsible_id, status, notes, curator_contact_id, technadzor_contact_id, technadzor_ehz_contact_id, project_number, utn_number, utn_date",
+          "id, name, address, customer_id, object_type, contract_start, contract_end, actual_work_start, responsible_id, status, notes, curator_contact_id, technadzor_contact_id, technadzor_ehz_contact_id, project_number, utn_number, utn_date",
         )
         .eq("id", id)
         .is("deleted_at", null)
@@ -79,6 +80,7 @@ function EditObjectPage() {
     object_type: obj.object_type,
     contract_start: obj.contract_start ?? "",
     contract_end: obj.contract_end ?? "",
+    actual_work_start: obj.actual_work_start ?? "",
     responsible_id: obj.responsible_id ?? "",
     curator_contact_id: obj.curator_contact_id ?? "",
     technadzor_contact_id: obj.technadzor_contact_id ?? "",
@@ -296,6 +298,7 @@ function StagesTab({ id }: { id: string }) {
   const [adding, setAdding] = useState(false);
   const [picked, setPicked] = useState<string[]>([]);
   const [reordering, setReordering] = useState(false);
+  const [editingNumbers, setEditingNumbers] = useState(false);
   const { data: stages = [], isLoading } = useObjectStages(id);
   const { templates } = useAvailableTemplates();
   const { data: memberIds = [] } = useQuery({
@@ -361,14 +364,29 @@ function StagesTab({ id }: { id: string }) {
         <p className="min-w-0 flex-1 text-sm text-muted-foreground">
           {reordering
             ? "Перетащите этапы за ручку — меняется только порядок, номера остаются как заданы."
-            : "Номер этапа задаётся вручную в карточке. Один шаблон можно добавить несколько раз. Исключённый этап не учитывается в готовности."}
+            : editingNumbers
+              ? "Правьте номера в колонке N, затем нажмите «Готово»."
+              : "Один шаблон можно добавить несколько раз. Исключённый этап не учитывается в готовности."}
         </p>
         <div className="flex shrink-0 items-center gap-2">
+          {tops.length > 0 && (
+            <NumbersModeButton
+              active={editingNumbers}
+              disabled={reorder.isPending}
+              onChange={(on) => {
+                setEditingNumbers(on);
+                if (on) setReordering(false);
+              }}
+            />
+          )}
           {tops.length > 1 && (
             <ReorderModeButton
               active={reordering}
-              onChange={setReordering}
               disabled={reorder.isPending}
+              onChange={(on) => {
+                setReordering(on);
+                if (on) setEditingNumbers(false);
+              }}
             />
           )}
           <Button
@@ -391,7 +409,7 @@ function StagesTab({ id }: { id: string }) {
           onMove={(ids) => reorder.mutate(ids)}
           header={
             <>
-              <span className={cn(thLabelClass, "w-10 shrink-0")}>N</span>
+              <span className={cn(thLabelClass, "w-14 shrink-0")}>N</span>
               <span className={cn(thLabelClass, "min-w-0 flex-1")}>Этап</span>
               <span className={cn(thLabelClass, "hidden w-40 shrink-0 sm:block")}>Исполнитель</span>
               <span className={cn(thLabelClass, "hidden w-40 shrink-0 md:block")}>Адресат</span>
@@ -408,6 +426,7 @@ function StagesTab({ id }: { id: string }) {
               onReorderChildren={(ids) => reorder.mutate(ids)}
               reordering={reordering}
               reorderPending={reorder.isPending}
+              editingNumbers={editingNumbers}
               onExcludeChild={(stageId, excluded) => exclude.mutate({ stageId, excluded })}
             />
           )}
@@ -462,6 +481,104 @@ function StagePeopleCells({ s }: { s: ObjectStage }) {
   );
 }
 
+function StageCodeInline({
+  stageId,
+  code,
+  editable,
+  className,
+}: {
+  stageId: string;
+  code: string;
+  editable: boolean;
+  className?: string;
+}) {
+  const qc = useQueryClient();
+  const [value, setValue] = useState(code);
+  useEffect(() => {
+    setValue(code);
+  }, [code]);
+
+  const save = useMutation({
+    mutationFn: async (next: string) => {
+      const trimmed = next.trim().replace(",", ".");
+      if (!trimmed) throw new Error("Укажите номер");
+      if (trimmed === code.trim()) return;
+      const { error } = await supabase.rpc("set_object_stage_code", {
+        p_stage_id: stageId,
+        p_code: trimmed,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Номер обновлён");
+      void qc.invalidateQueries({ queryKey: ["object-stages"] });
+    },
+    onError: (e) => {
+      setValue(code);
+      showError(e);
+    },
+  });
+
+  const commit = () => {
+    if (!editable || save.isPending) return;
+    const trimmed = value.trim().replace(",", ".");
+    if (!trimmed) {
+      setValue(code);
+      return;
+    }
+    if (trimmed === code.trim()) {
+      setValue(code);
+      return;
+    }
+    setValue(trimmed);
+    save.mutate(trimmed);
+  };
+
+  if (!editable) {
+    return (
+      <span
+        className={cn(
+          "inline-flex h-8 w-14 shrink-0 items-center justify-center text-sm font-semibold tabular-nums",
+          className,
+        )}
+        title={`Номер этапа ${code}`}
+      >
+        {code}
+      </span>
+    );
+  }
+
+  return (
+    <Input
+      value={value}
+      disabled={save.isPending}
+      onChange={(e) => setValue(e.target.value)}
+      onBlur={commit}
+      onClick={(e) => e.stopPropagation()}
+      onPointerDown={(e) => e.stopPropagation()}
+      onKeyDown={(e) => {
+        e.stopPropagation();
+        if (e.key === "Enter") {
+          e.preventDefault();
+          (e.target as HTMLInputElement).blur();
+        }
+        if (e.key === "Escape") {
+          e.preventDefault();
+          setValue(code);
+          (e.target as HTMLInputElement).blur();
+        }
+      }}
+      inputMode="decimal"
+      className={cn(
+        "h-8 w-14 shrink-0 px-1.5 text-center text-sm font-semibold tabular-nums",
+        className,
+      )}
+      title="Номер этапа (можно 1.1)"
+      aria-label="Номер этапа"
+    />
+  );
+}
+
 function StageEditRow({
   s,
   substages,
@@ -470,6 +587,7 @@ function StageEditRow({
   onReorderChildren,
   reordering,
   reorderPending,
+  editingNumbers,
   onExcludeChild,
 }: {
   s: ObjectStage;
@@ -479,12 +597,14 @@ function StageEditRow({
   onReorderChildren: (ids: string[]) => void;
   reordering: boolean;
   reorderPending: boolean;
+  editingNumbers: boolean;
   onExcludeChild: (stageId: string, excluded: boolean) => void;
 }) {
+  const codeEditable = editingNumbers && !reordering && !excludePending;
   return (
     <div className="min-w-0 flex-1 space-y-2 py-1">
       <div className={`flex min-w-0 items-center gap-3 text-sm ${s.is_excluded ? "opacity-70" : ""}`}>
-        <span className="w-10 shrink-0 font-semibold tabular-nums">{s.code}</span>
+        <StageCodeInline stageId={s.id} code={s.code || String(s.number)} editable={codeEditable} />
         <span className={`min-w-0 flex-1 truncate ${s.is_excluded ? "text-muted-foreground line-through" : ""}`} title={s.name}>
           {s.name}
         </span>
@@ -495,7 +615,7 @@ function StageEditRow({
         <Button
           variant="outline"
           className="h-8 w-[5.5rem] shrink-0 text-sm"
-          disabled={excludePending || reordering}
+          disabled={excludePending || reordering || editingNumbers}
           onClick={(e) => {
             e.stopPropagation();
             onExclude(!s.is_excluded);
@@ -514,7 +634,12 @@ function StageEditRow({
               <div
                 className={`flex min-w-0 flex-1 items-center gap-3 py-1 text-sm ${child.is_excluded ? "opacity-70" : ""}`}
               >
-                <span className="w-12 shrink-0 font-semibold tabular-nums text-muted-foreground">{child.code}</span>
+                <StageCodeInline
+                  stageId={child.id}
+                  code={child.code || String(child.number)}
+                  editable={codeEditable}
+                  className="text-muted-foreground"
+                />
                 <span
                   className={`min-w-0 flex-1 truncate ${child.is_excluded ? "text-muted-foreground line-through" : ""}`}
                   title={child.name}
@@ -530,7 +655,7 @@ function StageEditRow({
                 <Button
                   variant="outline"
                   className="h-8 w-[5.5rem] shrink-0 text-sm"
-                  disabled={excludePending || reordering}
+                  disabled={excludePending || reordering || editingNumbers}
                   onClick={(e) => {
                     e.stopPropagation();
                     onExcludeChild(child.id, !child.is_excluded);
