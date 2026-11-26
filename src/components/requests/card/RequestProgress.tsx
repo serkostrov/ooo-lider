@@ -3,7 +3,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Check, RotateCcw, Undo2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { showError } from "@/lib/format";
+import { formatDate, showError } from "@/lib/format";
 import { formatDateTime } from "@/lib/dates";
 import { cn } from "@/lib/utils";
 import { isValidEmail, looksLikeEmailField } from "@/lib/validation";
@@ -30,6 +30,12 @@ import {
   type RequestStatusDef,
 } from "../data";
 import { sendRequestDocEmail } from "@/lib/request-docs/sendRequestDocEmail";
+import {
+  previewAttachmentFileName,
+  resolveEmailSubtitle,
+  resolveEmailTitle,
+} from "@/lib/request-docs/emailCopy";
+import { EmailLetterPreview } from "@/components/requests/EmailLetterPreview";
 
 function useStatusFlow(r: RequestRow) {
   const flow = useRequestFlowStatuses();
@@ -178,6 +184,8 @@ export function RequestStatusActions({
   const [reworkOpen, setReworkOpen] = useState(false);
   const [sendOpen, setSendOpen] = useState(false);
   const [sendByEmail, setSendByEmail] = useState(r.send_by_email !== false);
+  const [mailTitle, setMailTitle] = useState("");
+  const [mailSubtitle, setMailSubtitle] = useState("");
   const [reason, setReason] = useState("");
   // Обязательные поля шага (сценарий) — блокируют следующий переход.
   const blockedByFields = missingRequired.length > 0 && !!next;
@@ -194,10 +202,21 @@ export function RequestStatusActions({
         .eq("id", r.request_type_id)
         .maybeSingle();
       if (error) throw error;
-      const row = data as unknown as { send_to_email?: string | null; send_by_email?: boolean } | null;
+      const row = data as unknown as {
+        send_to_email?: string | null;
+        send_by_email?: boolean;
+        email_title?: string | null;
+        email_subtitle?: string | null;
+        doc_template?: string | null;
+        name?: string | null;
+      } | null;
       return {
         email: (row?.send_to_email ?? "").trim(),
         enabled: row?.send_by_email !== false,
+        emailTitle: row?.email_title ?? null,
+        emailSubtitle: row?.email_subtitle ?? null,
+        docTemplate: row?.doc_template ?? null,
+        typeName: (row?.name ?? "").trim(),
       };
     },
   });
@@ -205,16 +224,42 @@ export function RequestStatusActions({
   /** Сначала поле заявки, иначе email вида из справочника. */
   const recipientEmail = fieldEmail || typeMail?.email || "";
   const mailAvailable = !!recipientEmail;
+  const attachmentPreview = useMemo(
+    () =>
+      previewAttachmentFileName(
+        typeMail?.docTemplate,
+        r.number,
+        formatDate(r.call_date),
+      ),
+    [typeMail?.docTemplate, r.number, r.call_date],
+  );
+
+  const openSendDialog = () => {
+    const vars = {
+      number: r.number,
+      type: typeMail?.typeName || r.type_name,
+      object: r.object_name ?? "",
+      call_date: formatDate(r.call_date),
+    };
+    setMailTitle(resolveEmailTitle(typeMail?.emailTitle, vars));
+    setMailSubtitle(resolveEmailSubtitle(typeMail?.emailSubtitle, vars));
+    setSendByEmail(mailAvailable && r.send_by_email !== false);
+    setSendOpen(true);
+  };
 
   const m = useMutation({
     mutationFn: async ({
       to,
       comment,
       emailFlag,
+      subject,
+      text,
     }: {
       to: string;
       comment?: string;
       emailFlag?: boolean;
+      subject?: string;
+      text?: string;
     }) => {
       await beforeChange?.();
       if (to === "sent" && emailFlag !== undefined) {
@@ -238,6 +283,8 @@ export function RequestStatusActions({
           r,
           values: fieldValues ?? [],
           to: recipientEmail,
+          subject,
+          text,
         });
         mailResult = res.ok
           ? { sent: true, to: res.to }
@@ -288,8 +335,7 @@ export function RequestStatusActions({
         return;
       }
       // сюда попадаем только если отправка писем у вида не выключена
-      setSendByEmail(mailAvailable && r.send_by_email !== false);
-      setSendOpen(true);
+      openSendDialog();
       return;
     }
     m.mutate({
@@ -365,7 +411,7 @@ export function RequestStatusActions({
       )}
 
       <Dialog open={sendOpen} onOpenChange={setSendOpen}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
           <DialogHeader>
             <DialogTitle className="text-base">Отправить заявку</DialogTitle>
           </DialogHeader>
@@ -386,12 +432,31 @@ export function RequestStatusActions({
                 </span>
               </span>
             </label>
+            {mailAvailable && sendByEmail ? (
+              <div className="space-y-1.5">
+                <p className="text-xs text-muted-foreground">Письмо — правьте прямо в превью</p>
+                <EmailLetterPreview
+                  to={recipientEmail}
+                  title={mailTitle}
+                  subtitle={mailSubtitle}
+                  filename={attachmentPreview}
+                  editable
+                  onTitleChange={setMailTitle}
+                  onSubtitleChange={setMailSubtitle}
+                />
+              </div>
+            ) : null}
             <div className="flex gap-3">
               <Button
                 type="button"
                 disabled={m.isPending}
                 onClick={() =>
-                  m.mutate({ to: "sent", emailFlag: mailAvailable && sendByEmail })
+                  m.mutate({
+                    to: "sent",
+                    emailFlag: mailAvailable && sendByEmail,
+                    subject: mailTitle,
+                    text: mailSubtitle,
+                  })
                 }
                 className="h-9 flex-1 bg-success text-sm text-success-foreground hover:bg-success/90"
               >

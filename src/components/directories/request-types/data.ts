@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { looksLikeEmailField } from "@/lib/validation";
 import { FIELD_TYPES as FIELD_TYPES_SRC, FILLED_BY as FILLED_BY_SRC } from "../rules";
 
 export const REQUEST_TYPES_KEY = ["dir-request-types"] as const;
@@ -13,6 +14,10 @@ export type RequestType = {
   send_to_email: string | null;
   /** Отправлять заявки на send_to_email. По умолчанию true. */
   send_by_email: boolean;
+  /** Тема письма (плейсхолдеры {{number}} {{type}} {{object}} {{call_date}}). */
+  email_title: string | null;
+  /** Текст сопроводительного письма (те же плейсхолдеры). */
+  email_subtitle: string | null;
   doc_template: string | null;
   /** Шаблон из справочника «Шаблоны бланков». */
   blank_template_id: string | null;
@@ -49,6 +54,8 @@ export function useRequestTypes() {
       return ((data ?? []) as unknown as RequestType[]).map((t) => ({
         ...t,
         send_by_email: t.send_by_email !== false,
+        email_title: t.email_title ?? null,
+        email_subtitle: t.email_subtitle ?? null,
       }));
     },
   });
@@ -67,13 +74,31 @@ export function useRequestFields(typeId?: string) {
         .is("deleted_at", null)
         .order("sort");
       if (typeId) q = q.eq("request_type_id", typeId);
-      const { data, error } = await q;
+      const [{ data, error }, typeRes] = await Promise.all([
+        q,
+        typeId
+          ? supabase.from("request_types").select("send_to_email").eq("id", typeId).maybeSingle()
+          : Promise.resolve({ data: null, error: null }),
+      ]);
       if (error) throw error;
-      return (data ?? []).map((f) => ({
-        ...f,
-        options: Array.isArray(f.options) ? (f.options as unknown[]).map(String) : [],
-        default_value: f.default_value ?? null,
-      })) as RequestField[];
+      if (typeRes.error) throw typeRes.error;
+      const typeEmail = (typeRes.data?.send_to_email ?? "").trim() || null;
+      return (data ?? []).map((f) => {
+        const field = {
+          ...f,
+          options: Array.isArray(f.options) ? (f.options as unknown[]).map(String) : [],
+          default_value: f.default_value ?? null,
+        } as RequestField;
+        // Email вида → дефолт поля «Адрес отправки» в заявке, если у поля нет своего default.
+        if (
+          typeEmail &&
+          looksLikeEmailField(field) &&
+          (field.default_value == null || field.default_value === "")
+        ) {
+          field.default_value = typeEmail;
+        }
+        return field;
+      });
     },
   });
 }

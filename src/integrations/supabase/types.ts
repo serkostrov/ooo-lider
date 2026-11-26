@@ -1479,6 +1479,8 @@ export type Database = {
           created_at: string
           deleted_at: string | null
           doc_template: string | null
+          email_subtitle: string | null
+          email_title: string | null
           id: string
           is_active: boolean
           name: string
@@ -1492,6 +1494,8 @@ export type Database = {
           created_at?: string
           deleted_at?: string | null
           doc_template?: string | null
+          email_subtitle?: string | null
+          email_title?: string | null
           id?: string
           is_active?: boolean
           name: string
@@ -1505,6 +1509,8 @@ export type Database = {
           created_at?: string
           deleted_at?: string | null
           doc_template?: string | null
+          email_subtitle?: string | null
+          email_title?: string | null
           id?: string
           is_active?: boolean
           name?: string

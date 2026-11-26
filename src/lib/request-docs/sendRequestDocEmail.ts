@@ -38,6 +38,8 @@ import {
 import { parseBlankConfig } from "@/components/directories/blank-templates/data";
 import { presetConfigForEngine } from "@/components/directories/blank-constructor/enginePresets";
 import type { BlankConfig, BlankEngine } from "@/components/directories/blank-constructor/types";
+import { resolveEmailSubtitle, resolveEmailTitle } from "./emailCopy";
+import { formatDate } from "@/lib/format";
 
 const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
@@ -141,13 +143,17 @@ export async function sendRequestDocEmail(args: {
   r: RequestRow;
   values: FieldValue[];
   to: string;
+  /** Тема письма (если пусто — из шаблона вида / дефолт). */
+  subject?: string;
+  /** Текст сопроводительного письма. */
+  text?: string;
 }): Promise<{ ok: true; to: string; filename: string } | { ok: false; error: string }> {
   const to = args.to.trim();
   if (!to) return { ok: false, error: "Не указан email получателя" };
 
   const { data: typeRow, error: typeErr } = await supabase
     .from("request_types")
-    .select("doc_template, name, blank_template_id")
+    .select("doc_template, name, blank_template_id, email_title, email_subtitle")
     .eq("id", args.r.request_type_id)
     .maybeSingle();
   if (typeErr) return { ok: false, error: typeErr.message };
@@ -283,16 +289,22 @@ export async function sendRequestDocEmail(args: {
   }
 
   const typeName = typeRow?.name || args.r.type_name;
-  const subject = `[Лидер] Заявка №${args.r.number} «${typeName}»`;
-  const text = [
-    `Здравствуйте!`,
-    "",
-    `Во вложении бланк заявки №${args.r.number} (${typeName}).`,
-    `Объект: ${args.r.object_name}`,
-    `Дата вызова: ${args.r.call_date}`,
-    "",
-    `ООО «Лидер»`,
-  ].join("\n");
+  const copyVars = {
+    number: args.r.number,
+    type: typeName,
+    object: args.r.object_name ?? "",
+    call_date: formatDate(args.r.call_date),
+  };
+  const typeMeta = typeRow as
+    | { email_title?: string | null; email_subtitle?: string | null }
+    | null
+    | undefined;
+  const subject =
+    (args.subject ?? "").trim() ||
+    resolveEmailTitle(typeMeta?.email_title, copyVars, valueMap);
+  const text =
+    (args.text ?? "").trim() ||
+    resolveEmailSubtitle(typeMeta?.email_subtitle, copyVars, valueMap);
 
   const { data, error } = await supabase.functions.invoke("send-request-doc", {
     body: {
