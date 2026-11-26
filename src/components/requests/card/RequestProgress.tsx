@@ -283,8 +283,8 @@ export function RequestStatusActions({
           r,
           values: fieldValues ?? [],
           to: recipientEmail,
-          subject,
-          text,
+          ...(subject !== undefined ? { subject } : {}),
+          ...(text !== undefined ? { text } : {}),
         });
         mailResult = res.ok
           ? { sent: true, to: res.to }
