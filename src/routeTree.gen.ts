@@ -24,10 +24,12 @@ import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedDirectoriesBlankConstructorRouteImport } from './routes/_authenticated/directories_.blank-constructor'
 import { Route as AuthenticatedObjectsIdRouteImport } from './routes/_authenticated/objects_.$id'
 import { Route as AuthenticatedObjectsNewRouteImport } from './routes/_authenticated/objects_.new'
+import { Route as AuthenticatedRegistryEntryIdRouteImport } from './routes/_authenticated/registry_.$entryId'
 import { Route as AuthenticatedRequestsRequestIdRouteImport } from './routes/_authenticated/requests_.$requestId'
 import { Route as AuthenticatedRequestsNewRouteImport } from './routes/_authenticated/requests_.new'
 import { Route as AuthenticatedDirectoriesBlankTemplatesIdRouteImport } from './routes/_authenticated/directories_.blank-templates.$id'
 import { Route as AuthenticatedDirectoriesCustomersIdRouteImport } from './routes/_authenticated/directories_.customers.$id'
+import { Route as AuthenticatedDirectoriesRegistryJournalsIdRouteImport } from './routes/_authenticated/directories_.registry-journals.$id'
 import { Route as AuthenticatedDirectoriesRequestTypesIdRouteImport } from './routes/_authenticated/directories_.request-types.$id'
 import { Route as AuthenticatedDirectoriesStagesIdRouteImport } from './routes/_authenticated/directories_.stages.$id'
 import { Route as AuthenticatedObjectsIdEditRouteImport } from './routes/_authenticated/objects_.$id_.edit'
@@ -110,6 +112,12 @@ const AuthenticatedObjectsNewRoute = AuthenticatedObjectsNewRouteImport.update({
   path: '/objects/new',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedRegistryEntryIdRoute =
+  AuthenticatedRegistryEntryIdRouteImport.update({
+    id: '/registry_/$entryId',
+    path: '/registry/$entryId',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedRequestsRequestIdRoute =
   AuthenticatedRequestsRequestIdRouteImport.update({
     id: '/requests_/$requestId',
@@ -132,6 +140,12 @@ const AuthenticatedDirectoriesCustomersIdRoute =
   AuthenticatedDirectoriesCustomersIdRouteImport.update({
     id: '/directories_/customers/$id',
     path: '/directories/customers/$id',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedDirectoriesRegistryJournalsIdRoute =
+  AuthenticatedDirectoriesRegistryJournalsIdRouteImport.update({
+    id: '/directories_/registry-journals/$id',
+    path: '/directories/registry-journals/$id',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedDirectoriesRequestTypesIdRoute =
@@ -174,10 +188,12 @@ export interface FileRoutesByFullPath {
   '/directories/blank-constructor': typeof AuthenticatedDirectoriesBlankConstructorRoute
   '/objects/$id': typeof AuthenticatedObjectsIdRoute
   '/objects/new': typeof AuthenticatedObjectsNewRoute
+  '/registry/$entryId': typeof AuthenticatedRegistryEntryIdRoute
   '/requests/$requestId': typeof AuthenticatedRequestsRequestIdRoute
   '/requests/new': typeof AuthenticatedRequestsNewRoute
   '/directories/blank-templates/$id': typeof AuthenticatedDirectoriesBlankTemplatesIdRoute
   '/directories/customers/$id': typeof AuthenticatedDirectoriesCustomersIdRoute
+  '/directories/registry-journals/$id': typeof AuthenticatedDirectoriesRegistryJournalsIdRoute
   '/directories/request-types/$id': typeof AuthenticatedDirectoriesRequestTypesIdRoute
   '/directories/stages/$id': typeof AuthenticatedDirectoriesStagesIdRoute
   '/objects/$id/edit': typeof AuthenticatedObjectsIdEditRoute
@@ -198,10 +214,12 @@ export interface FileRoutesByTo {
   '/directories/blank-constructor': typeof AuthenticatedDirectoriesBlankConstructorRoute
   '/objects/$id': typeof AuthenticatedObjectsIdRoute
   '/objects/new': typeof AuthenticatedObjectsNewRoute
+  '/registry/$entryId': typeof AuthenticatedRegistryEntryIdRoute
   '/requests/$requestId': typeof AuthenticatedRequestsRequestIdRoute
   '/requests/new': typeof AuthenticatedRequestsNewRoute
   '/directories/blank-templates/$id': typeof AuthenticatedDirectoriesBlankTemplatesIdRoute
   '/directories/customers/$id': typeof AuthenticatedDirectoriesCustomersIdRoute
+  '/directories/registry-journals/$id': typeof AuthenticatedDirectoriesRegistryJournalsIdRoute
   '/directories/request-types/$id': typeof AuthenticatedDirectoriesRequestTypesIdRoute
   '/directories/stages/$id': typeof AuthenticatedDirectoriesStagesIdRoute
   '/objects/$id/edit': typeof AuthenticatedObjectsIdEditRoute
@@ -224,10 +242,12 @@ export interface FileRoutesById {
   '/_authenticated/directories_/blank-constructor': typeof AuthenticatedDirectoriesBlankConstructorRoute
   '/_authenticated/objects_/$id': typeof AuthenticatedObjectsIdRoute
   '/_authenticated/objects_/new': typeof AuthenticatedObjectsNewRoute
+  '/_authenticated/registry_/$entryId': typeof AuthenticatedRegistryEntryIdRoute
   '/_authenticated/requests_/$requestId': typeof AuthenticatedRequestsRequestIdRoute
   '/_authenticated/requests_/new': typeof AuthenticatedRequestsNewRoute
   '/_authenticated/directories_/blank-templates/$id': typeof AuthenticatedDirectoriesBlankTemplatesIdRoute
   '/_authenticated/directories_/customers/$id': typeof AuthenticatedDirectoriesCustomersIdRoute
+  '/_authenticated/directories_/registry-journals/$id': typeof AuthenticatedDirectoriesRegistryJournalsIdRoute
   '/_authenticated/directories_/request-types/$id': typeof AuthenticatedDirectoriesRequestTypesIdRoute
   '/_authenticated/directories_/stages/$id': typeof AuthenticatedDirectoriesStagesIdRoute
   '/_authenticated/objects_/$id_/edit': typeof AuthenticatedObjectsIdEditRoute
@@ -250,10 +270,12 @@ export interface FileRouteTypes {
     | '/directories/blank-constructor'
     | '/objects/$id'
     | '/objects/new'
+    | '/registry/$entryId'
     | '/requests/$requestId'
     | '/requests/new'
     | '/directories/blank-templates/$id'
     | '/directories/customers/$id'
+    | '/directories/registry-journals/$id'
     | '/directories/request-types/$id'
     | '/directories/stages/$id'
     | '/objects/$id/edit'
@@ -274,10 +296,12 @@ export interface FileRouteTypes {
     | '/directories/blank-constructor'
     | '/objects/$id'
     | '/objects/new'
+    | '/registry/$entryId'
     | '/requests/$requestId'
     | '/requests/new'
     | '/directories/blank-templates/$id'
     | '/directories/customers/$id'
+    | '/directories/registry-journals/$id'
     | '/directories/request-types/$id'
     | '/directories/stages/$id'
     | '/objects/$id/edit'
@@ -299,10 +323,12 @@ export interface FileRouteTypes {
     | '/_authenticated/directories_/blank-constructor'
     | '/_authenticated/objects_/$id'
     | '/_authenticated/objects_/new'
+    | '/_authenticated/registry_/$entryId'
     | '/_authenticated/requests_/$requestId'
     | '/_authenticated/requests_/new'
     | '/_authenticated/directories_/blank-templates/$id'
     | '/_authenticated/directories_/customers/$id'
+    | '/_authenticated/directories_/registry-journals/$id'
     | '/_authenticated/directories_/request-types/$id'
     | '/_authenticated/directories_/stages/$id'
     | '/_authenticated/objects_/$id_/edit'
@@ -422,6 +448,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedObjectsNewRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/registry_/$entryId': {
+      id: '/_authenticated/registry_/$entryId'
+      path: '/registry/$entryId'
+      fullPath: '/registry/$entryId'
+      preLoaderRoute: typeof AuthenticatedRegistryEntryIdRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/requests_/$requestId': {
       id: '/_authenticated/requests_/$requestId'
       path: '/requests/$requestId'
@@ -448,6 +481,13 @@ declare module '@tanstack/react-router' {
       path: '/directories/customers/$id'
       fullPath: '/directories/customers/$id'
       preLoaderRoute: typeof AuthenticatedDirectoriesCustomersIdRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/directories_/registry-journals/$id': {
+      id: '/_authenticated/directories_/registry-journals/$id'
+      path: '/directories/registry-journals/$id'
+      fullPath: '/directories/registry-journals/$id'
+      preLoaderRoute: typeof AuthenticatedDirectoriesRegistryJournalsIdRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/directories_/request-types/$id': {
@@ -494,10 +534,12 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedDirectoriesBlankConstructorRoute: typeof AuthenticatedDirectoriesBlankConstructorRoute
   AuthenticatedObjectsIdRoute: typeof AuthenticatedObjectsIdRoute
   AuthenticatedObjectsNewRoute: typeof AuthenticatedObjectsNewRoute
+  AuthenticatedRegistryEntryIdRoute: typeof AuthenticatedRegistryEntryIdRoute
   AuthenticatedRequestsRequestIdRoute: typeof AuthenticatedRequestsRequestIdRoute
   AuthenticatedRequestsNewRoute: typeof AuthenticatedRequestsNewRoute
   AuthenticatedDirectoriesBlankTemplatesIdRoute: typeof AuthenticatedDirectoriesBlankTemplatesIdRoute
   AuthenticatedDirectoriesCustomersIdRoute: typeof AuthenticatedDirectoriesCustomersIdRoute
+  AuthenticatedDirectoriesRegistryJournalsIdRoute: typeof AuthenticatedDirectoriesRegistryJournalsIdRoute
   AuthenticatedDirectoriesRequestTypesIdRoute: typeof AuthenticatedDirectoriesRequestTypesIdRoute
   AuthenticatedDirectoriesStagesIdRoute: typeof AuthenticatedDirectoriesStagesIdRoute
   AuthenticatedObjectsIdEditRoute: typeof AuthenticatedObjectsIdEditRoute
@@ -518,12 +560,15 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
     AuthenticatedDirectoriesBlankConstructorRoute,
   AuthenticatedObjectsIdRoute: AuthenticatedObjectsIdRoute,
   AuthenticatedObjectsNewRoute: AuthenticatedObjectsNewRoute,
+  AuthenticatedRegistryEntryIdRoute: AuthenticatedRegistryEntryIdRoute,
   AuthenticatedRequestsRequestIdRoute: AuthenticatedRequestsRequestIdRoute,
   AuthenticatedRequestsNewRoute: AuthenticatedRequestsNewRoute,
   AuthenticatedDirectoriesBlankTemplatesIdRoute:
     AuthenticatedDirectoriesBlankTemplatesIdRoute,
   AuthenticatedDirectoriesCustomersIdRoute:
     AuthenticatedDirectoriesCustomersIdRoute,
+  AuthenticatedDirectoriesRegistryJournalsIdRoute:
+    AuthenticatedDirectoriesRegistryJournalsIdRoute,
   AuthenticatedDirectoriesRequestTypesIdRoute:
     AuthenticatedDirectoriesRequestTypesIdRoute,
   AuthenticatedDirectoriesStagesIdRoute: AuthenticatedDirectoriesStagesIdRoute,

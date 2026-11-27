@@ -49,6 +49,39 @@ export function systemValue(
   return String(raw);
 }
 
+type RegistryEntryDbRow = RegistryEntry & {
+  objects?: { name: string } | null;
+  requests?: { number: number } | null;
+  extra?: Record<string, unknown> | null;
+};
+
+function mapRegistryEntry(row: RegistryEntryDbRow): RegistryEntry {
+  return {
+    id: row.id,
+    journal_id: row.journal_id,
+    channel: row.channel,
+    number: row.number,
+    request_id: row.request_id,
+    request_type_id: row.request_type_id,
+    object_id: row.object_id,
+    counterparty: row.counterparty,
+    out_date: row.out_date,
+    out_content: row.out_content,
+    out_doc_path: row.out_doc_path,
+    in_date: row.in_date,
+    in_letter_no: row.in_letter_no,
+    in_content: row.in_content,
+    extra: row.extra && typeof row.extra === "object" ? row.extra : {},
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+    object_name: row.objects?.name ?? null,
+    request_number: row.requests?.number ?? null,
+  };
+}
+
+const ENTRY_SELECT =
+  "id, journal_id, channel, number, request_id, request_type_id, object_id, counterparty, out_date, out_content, out_doc_path, in_date, in_letter_no, in_content, extra, created_at, updated_at, objects(name), requests(number)";
+
 export function useRegistryEntries(journalId: string | null | undefined) {
   return useQuery({
     queryKey: ["registry-entries", journalId],
@@ -56,40 +89,30 @@ export function useRegistryEntries(journalId: string | null | undefined) {
     queryFn: async (): Promise<RegistryEntry[]> => {
       const { data, error } = await supabase
         .from("registry_entries" as never)
-        .select(
-          "id, journal_id, channel, number, request_id, request_type_id, object_id, counterparty, out_date, out_content, out_doc_path, in_date, in_letter_no, in_content, extra, created_at, updated_at, objects(name), requests(number)",
-        )
+        .select(ENTRY_SELECT)
         .eq("journal_id", journalId!)
         .is("deleted_at", null)
         .order("number", { ascending: false });
       if (error) throw error;
-      return ((data ?? []) as unknown as Array<
-        RegistryEntry & {
-          objects?: { name: string } | null;
-          requests?: { number: number } | null;
-          extra?: Record<string, unknown> | null;
-        }
-      >).map((row) => ({
-        id: row.id,
-        journal_id: row.journal_id,
-        channel: row.channel,
-        number: row.number,
-        request_id: row.request_id,
-        request_type_id: row.request_type_id,
-        object_id: row.object_id,
-        counterparty: row.counterparty,
-        out_date: row.out_date,
-        out_content: row.out_content,
-        out_doc_path: row.out_doc_path,
-        in_date: row.in_date,
-        in_letter_no: row.in_letter_no,
-        in_content: row.in_content,
-        extra: row.extra && typeof row.extra === "object" ? row.extra : {},
-        created_at: row.created_at,
-        updated_at: row.updated_at,
-        object_name: row.objects?.name ?? null,
-        request_number: row.requests?.number ?? null,
-      }));
+      return ((data ?? []) as unknown as RegistryEntryDbRow[]).map(mapRegistryEntry);
+    },
+  });
+}
+
+export function useRegistryEntry(entryId: string | null | undefined) {
+  return useQuery({
+    queryKey: ["registry-entry", entryId],
+    enabled: !!entryId && entryId !== "new",
+    queryFn: async (): Promise<RegistryEntry | null> => {
+      const { data, error } = await supabase
+        .from("registry_entries" as never)
+        .select(ENTRY_SELECT)
+        .eq("id", entryId!)
+        .is("deleted_at", null)
+        .maybeSingle();
+      if (error) throw error;
+      if (!data) return null;
+      return mapRegistryEntry(data as unknown as RegistryEntryDbRow);
     },
   });
 }
@@ -126,8 +149,10 @@ export function useRegistrySave() {
       if (error) throw error;
       return data as string;
     },
-    onSuccess: (_id, vars) => {
+    onSuccess: (id, vars) => {
       void qc.invalidateQueries({ queryKey: ["registry-entries", vars.journal_id] });
+      void qc.invalidateQueries({ queryKey: ["registry-entry", id] });
+      if (vars.id) void qc.invalidateQueries({ queryKey: ["registry-entry", vars.id] });
     },
   });
 }

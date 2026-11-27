@@ -3,7 +3,6 @@ import { useEffect, useMemo, useState } from "react";
 import { PageFrame } from "@/components/PageFrame";
 import { PageHeader } from "@/components/PageHeader";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { RegistryEntryDialog } from "@/components/registry/RegistryEntryDialog";
 import { RegistryTable } from "@/components/registry/RegistryTable";
 import {
   EMPTY_REGISTRY_FILTERS,
@@ -14,7 +13,6 @@ import {
 import {
   useRegistryEntries,
   useRegistryJournals,
-  type RegistryEntry,
   type RegistryJournal,
 } from "@/components/registry/data";
 import { useProfile } from "@/lib/profile";
@@ -70,14 +68,13 @@ function ChannelPanel({
   canEdit: boolean;
   onCountChange?: (journalId: string, count: number) => void;
 }) {
+  const navigate = useNavigate();
   const { data: rows = [], isLoading, error } = useRegistryEntries(journalId);
 
   useEffect(() => {
     onCountChange?.(journalId, rows.length);
   }, [journalId, rows.length, onCountChange]);
   const [filters, setFilters] = useState<RegistryFilterState>(EMPTY_REGISTRY_FILTERS);
-  const [edit, setEdit] = useState<RegistryEntry | null>(null);
-  const [createOpen, setCreateOpen] = useState(false);
 
   const filtered = useMemo(
     () => filterRegistryEntries(rows, filters),
@@ -98,8 +95,11 @@ function ChannelPanel({
           onAdd={
             canEdit
               ? () => {
-                  setEdit(null);
-                  setCreateOpen(true);
+                  void navigate({
+                    to: "/registry/$entryId",
+                    params: { entryId: "new" },
+                    search: { journal: journalId },
+                  });
                 }
               : undefined
           }
@@ -115,25 +115,9 @@ function ChannelPanel({
         </p>
       ) : (
         <div className="min-h-0 flex-1 overflow-auto">
-          <RegistryTable
-            journalId={journalId}
-            rows={filtered}
-            onEdit={(row) => {
-              setEdit(row);
-              setCreateOpen(true);
-            }}
-          />
+          <RegistryTable journalId={journalId} rows={filtered} />
         </div>
       )}
-      <RegistryEntryDialog
-        open={createOpen}
-        onOpenChange={(v) => {
-          setCreateOpen(v);
-          if (!v) setEdit(null);
-        }}
-        journalId={journalId}
-        entry={edit}
-      />
     </div>
   );
 }

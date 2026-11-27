@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -7,7 +7,6 @@ import { formatDate, showError } from "@/lib/format";
 import { openFile } from "@/lib/files";
 import { useProfile } from "@/lib/profile";
 import { cn } from "@/lib/utils";
-import { RegistryEntryViewDialog } from "./RegistryEntryViewDialog";
 import {
   systemValue,
   useRegistryDelete,
@@ -32,23 +31,27 @@ function cellText(entry: RegistryEntry, field: RegistryJournalField) {
 export function RegistryTable({
   journalId,
   rows,
-  onEdit,
 }: {
   journalId: string;
   rows: RegistryEntry[];
-  onEdit: (row: RegistryEntry) => void;
 }) {
   const { is_admin } = useProfile();
   const navigate = useNavigate();
   const canEdit = is_admin;
   const del = useRegistryDelete();
   const { data: fields = [] } = useRegistryJournalFields(journalId);
-  const [viewEntry, setViewEntry] = useState<RegistryEntry | null>(null);
 
   const tableFields = useMemo(
     () => fields.filter((f) => f.show_in_table),
     [fields],
   );
+
+  const openEntry = (row: RegistryEntry) => {
+    void navigate({
+      to: "/registry/$entryId",
+      params: { entryId: row.id },
+    });
+  };
 
   if (rows.length === 0) {
     return (
@@ -94,11 +97,11 @@ export function RegistryTable({
               tabIndex={0}
               title="Открыть запись"
               className="cursor-pointer border-b border-border/70 last:border-0 hover:bg-muted/20"
-              onClick={() => setViewEntry(row)}
+              onClick={() => openEntry(row)}
               onKeyDown={(e) => {
                 if (e.key === "Enter" || e.key === " ") {
                   e.preventDefault();
-                  setViewEntry(row);
+                  openEntry(row);
                 }
               }}
             >
@@ -172,7 +175,7 @@ export function RegistryTable({
                       size="icon"
                       className="size-8"
                       title="Изменить"
-                      onClick={() => onEdit(row)}
+                      onClick={() => openEntry(row)}
                     >
                       <Pencil className="size-3.5" />
                     </Button>
@@ -203,15 +206,6 @@ export function RegistryTable({
           ))}
         </tbody>
       </table>
-
-      <RegistryEntryViewDialog
-        open={!!viewEntry}
-        onOpenChange={(v) => {
-          if (!v) setViewEntry(null);
-        }}
-        entry={viewEntry}
-        fields={fields}
-      />
     </div>
   );
 }
