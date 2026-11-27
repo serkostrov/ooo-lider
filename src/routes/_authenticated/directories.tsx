@@ -2,7 +2,6 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { DocumentsDirectory } from "@/components/directories/DocumentsDirectory";
 import { RepresentativesDirectory } from "@/components/directories/RepresentativesDirectory";
-import { ExternalContactsDirectory } from "@/components/directories/ExternalContactsDirectory";
 import { CustomersDirectory } from "@/components/directories/CustomersDirectory";
 import { EmployeesDirectory } from "@/components/directories/EmployeesDirectory";
 import { StatusesDirectory } from "@/components/directories/StatusesDirectory";
@@ -35,7 +34,6 @@ type TabValue =
   | "request-types"
   | "blank-templates"
   | "representatives"
-  | "external-contacts"
   | "customers"
   | "employees"
   | "roles"
@@ -73,7 +71,6 @@ const SECTIONS: { id: string; label: string; tabs: TabDef[] }[] = [
     label: "Оргструктура",
     tabs: [
       { v: "customers", label: "Заказчики" },
-      { v: "external-contacts", label: "Внешние контакты" },
       { v: "employees", label: "Сотрудники" },
       { v: "roles", label: "Роли" },
     ],
@@ -214,7 +211,6 @@ function DirectoriesPage() {
           {tab === "blank-templates" && <BlankTemplatesDirectory />}
           {tab === "registry-journals" && <RegistryJournalsDirectory />}
           {tab === "representatives" && <RepresentativesDirectory />}
-          {tab === "external-contacts" && <ExternalContactsDirectory />}
           {tab === "customers" && <CustomersDirectory />}
           {tab === "employees" && <EmployeesDirectory />}
           {tab === "roles" && <RolesDirectory />}

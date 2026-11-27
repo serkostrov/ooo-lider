@@ -18,13 +18,7 @@ export function StageDocumentsTab({ stage, readOnly = false }: { stage: ObjectSt
   };
 
   return (
-    <div className="space-y-5">
-      {!readOnly && (
-        <p className="text-sm text-muted-foreground">
-          Перетащите файлы в зону или нажмите на неё. С телефона или планшета откроются камера или галерея.
-        </p>
-      )}
-
+    <div className="space-y-3">
       {readOnly ? (
         isLoading ? (
           <FileSkeleton />

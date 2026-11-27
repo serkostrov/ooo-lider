@@ -14,6 +14,7 @@ import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthenticatedDirectorRouteImport } from './routes/_authenticated/director'
 import { Route as AuthenticatedDirectoriesRouteImport } from './routes/_authenticated/directories'
+import { Route as AuthenticatedExternalContactsRouteImport } from './routes/_authenticated/external-contacts'
 import { Route as AuthenticatedHistoryRouteImport } from './routes/_authenticated/history'
 import { Route as AuthenticatedNotificationsRouteImport } from './routes/_authenticated/notifications'
 import { Route as AuthenticatedObjectsRouteImport } from './routes/_authenticated/objects'
@@ -58,6 +59,12 @@ const AuthenticatedDirectoriesRoute =
   AuthenticatedDirectoriesRouteImport.update({
     id: '/directories',
     path: '/directories',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedExternalContactsRoute =
+  AuthenticatedExternalContactsRouteImport.update({
+    id: '/external-contacts',
+    path: '/external-contacts',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedHistoryRoute = AuthenticatedHistoryRouteImport.update({
@@ -178,6 +185,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/director': typeof AuthenticatedDirectorRoute
   '/directories': typeof AuthenticatedDirectoriesRoute
+  '/external-contacts': typeof AuthenticatedExternalContactsRoute
   '/history': typeof AuthenticatedHistoryRoute
   '/notifications': typeof AuthenticatedNotificationsRoute
   '/objects': typeof AuthenticatedObjectsRoute
@@ -204,6 +212,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/director': typeof AuthenticatedDirectorRoute
   '/directories': typeof AuthenticatedDirectoriesRoute
+  '/external-contacts': typeof AuthenticatedExternalContactsRoute
   '/history': typeof AuthenticatedHistoryRoute
   '/notifications': typeof AuthenticatedNotificationsRoute
   '/objects': typeof AuthenticatedObjectsRoute
@@ -232,6 +241,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/_authenticated/director': typeof AuthenticatedDirectorRoute
   '/_authenticated/directories': typeof AuthenticatedDirectoriesRoute
+  '/_authenticated/external-contacts': typeof AuthenticatedExternalContactsRoute
   '/_authenticated/history': typeof AuthenticatedHistoryRoute
   '/_authenticated/notifications': typeof AuthenticatedNotificationsRoute
   '/_authenticated/objects': typeof AuthenticatedObjectsRoute
@@ -260,6 +270,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/director'
     | '/directories'
+    | '/external-contacts'
     | '/history'
     | '/notifications'
     | '/objects'
@@ -286,6 +297,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/director'
     | '/directories'
+    | '/external-contacts'
     | '/history'
     | '/notifications'
     | '/objects'
@@ -313,6 +325,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/_authenticated/director'
     | '/_authenticated/directories'
+    | '/_authenticated/external-contacts'
     | '/_authenticated/history'
     | '/_authenticated/notifications'
     | '/_authenticated/objects'
@@ -376,6 +389,13 @@ declare module '@tanstack/react-router' {
       path: '/directories'
       fullPath: '/directories'
       preLoaderRoute: typeof AuthenticatedDirectoriesRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/external-contacts': {
+      id: '/_authenticated/external-contacts'
+      path: '/external-contacts'
+      fullPath: '/external-contacts'
+      preLoaderRoute: typeof AuthenticatedExternalContactsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/history': {
@@ -524,6 +544,7 @@ declare module '@tanstack/react-router' {
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedDirectorRoute: typeof AuthenticatedDirectorRoute
   AuthenticatedDirectoriesRoute: typeof AuthenticatedDirectoriesRoute
+  AuthenticatedExternalContactsRoute: typeof AuthenticatedExternalContactsRoute
   AuthenticatedHistoryRoute: typeof AuthenticatedHistoryRoute
   AuthenticatedNotificationsRoute: typeof AuthenticatedNotificationsRoute
   AuthenticatedObjectsRoute: typeof AuthenticatedObjectsRoute
@@ -549,6 +570,7 @@ interface AuthenticatedRouteRouteChildren {
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedDirectorRoute: AuthenticatedDirectorRoute,
   AuthenticatedDirectoriesRoute: AuthenticatedDirectoriesRoute,
+  AuthenticatedExternalContactsRoute: AuthenticatedExternalContactsRoute,
   AuthenticatedHistoryRoute: AuthenticatedHistoryRoute,
   AuthenticatedNotificationsRoute: AuthenticatedNotificationsRoute,
   AuthenticatedObjectsRoute: AuthenticatedObjectsRoute,

@@ -13,7 +13,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { REGISTRY_JOURNALS_KEY } from "@/components/directories/registry-journals/data";
+import { mskCurrentYear } from "@/lib/dates";
 import { fieldLabelClass, fieldStackClass } from "@/lib/ui";
+import { Switch } from "@/components/ui/switch";
 import {
   useRegistryJournalFields,
   type RegistryEntry,
@@ -35,6 +37,8 @@ export type RegistryFilterState = {
   outTo: string;
   inFrom: string;
   inTo: string;
+  /** По умолчанию только текущий год; true — включая архив прошлых лет. */
+  showAllYears: boolean;
 };
 
 export const EMPTY_REGISTRY_FILTERS: RegistryFilterState = {
@@ -47,7 +51,15 @@ export const EMPTY_REGISTRY_FILTERS: RegistryFilterState = {
   outTo: "",
   inFrom: "",
   inTo: "",
+  showAllYears: false,
 };
+
+/** Год записи: дата исходящего → входящего → создания. */
+export function registryEntryYear(row: RegistryEntry): number {
+  const raw = row.out_date || row.in_date || row.created_at?.slice(0, 10) || "";
+  const y = Number(raw.slice(0, 4));
+  return Number.isFinite(y) && y > 1900 ? y : mskCurrentYear();
+}
 
 export function hasReply(row: RegistryEntry): boolean {
   return !!(
@@ -70,7 +82,10 @@ export function filterRegistryEntries(
   filters: RegistryFilterState,
 ): RegistryEntry[] {
   const q = filters.search.trim().toLowerCase();
+  const yearNow = mskCurrentYear();
   return rows.filter((row) => {
+    if (!filters.showAllYears && registryEntryYear(row) !== yearNow) return false;
+
     if (filters.replyStatus === "pending" && hasReply(row)) return false;
     if (filters.replyStatus === "answered" && !hasReply(row)) return false;
 
@@ -112,8 +127,15 @@ export function filterRegistryEntries(
   });
 }
 
+/** Только записи текущего года (для счётчиков вкладок). */
+export function filterRegistryCurrentYear(rows: RegistryEntry[]): RegistryEntry[] {
+  const yearNow = mskCurrentYear();
+  return rows.filter((row) => registryEntryYear(row) === yearNow);
+}
+
 export function registryActiveFilterCount(filters: RegistryFilterState): number {
   let n = 0;
+  // «Показать все» — отдельный тумблер, не фильтр из попапа
   if (filters.replyStatus !== "all") n += 1;
   if (filters.source !== "all") n += 1;
   if (filters.counterparty !== "all") n += 1;
@@ -162,7 +184,10 @@ export function RegistryToolbar({
       const sheetRows =
         j.id === journalId
           ? exportRows
-          : (qc.getQueryData<RegistryEntry[]>(["registry-entries", j.id]) ?? []);
+          : filterRegistryEntries(
+              qc.getQueryData<RegistryEntry[]>(["registry-entries", j.id]) ?? [],
+              { ...filters, search: "" },
+            );
       return { name: j.name, fields: sheetFields, rows: sheetRows };
     });
     exportRegistryExcel(sheets);
@@ -193,6 +218,7 @@ export function RegistryToolbar({
     onChange({
       ...EMPTY_REGISTRY_FILTERS,
       search: filters.search,
+      showAllYears: filters.showAllYears,
     });
 
   return (
@@ -204,6 +230,16 @@ export function RegistryToolbar({
       className="mb-0"
       split
     >
+      <label
+        className="inline-flex h-9 shrink-0 cursor-pointer items-center gap-2 rounded-md border border-border px-2.5 text-sm"
+        title="По умолчанию только текущий год"
+      >
+        <Switch
+          checked={filters.showAllYears}
+          onCheckedChange={(v) => patch({ showAllYears: v })}
+        />
+        <span className="whitespace-nowrap text-muted-foreground">Показать все</span>
+      </label>
       <Button
         type="button"
         variant="outline"

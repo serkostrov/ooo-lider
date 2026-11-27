@@ -18,6 +18,7 @@ import { formatProfileOption, useActiveProfiles } from "@/components/objects/dat
 import { useProfile } from "@/lib/profile";
 import { StatusBadge, useObjectStages, type ObjectStage } from "../data";
 import { StageExternalContacts } from "./StageExternalContacts";
+import { StageDocumentsTab } from "./StageDocumentsTab";
 
 const NONE = "__none";
 
@@ -79,7 +80,8 @@ export const StageMainTab = forwardRef<
   const set = (k: keyof typeof v, val: string) => setV((x) => ({ ...x, [k]: val }));
 
   const respDays = toIntOrNull(v.response_days);
-  const responseDue = v.doc_sent_at && typeof respDays === "number" ? addDays(v.doc_sent_at, respDays) : "";
+  const responseDue =
+    v.doc_sent_at && typeof respDays === "number" ? addDays(v.doc_sent_at, respDays) : "";
 
   const showDoc =
     !!stage.outgoing_doc ||
@@ -243,7 +245,16 @@ export const StageMainTab = forwardRef<
         </Section>
       </Block>
 
-      {showDoc && (
+      <Block>
+        <Section
+          title="Файлы"
+          hint="черновик на согласование и подписанный скан"
+        >
+          <StageDocumentsTab stage={stage} readOnly={!canWork} />
+        </Section>
+      </Block>
+
+      {showDoc ? (
         <Block>
           <Section
             title="Исходящий документ"
@@ -291,7 +302,7 @@ export const StageMainTab = forwardRef<
             </div>
           </Section>
         </Block>
-      )}
+      ) : null}
 
       <Block>
         <Section title="Заметка" {...(workOn ? { hint: "что мешает или когда обещали" } : {})}>
@@ -365,45 +376,7 @@ function Predecessors({ stage }: { stage: ObjectStage }) {
   );
 }
 
-function LinkedRequests({ stage }: { stage: ObjectStage }) {
-  const { data = [] } = useQuery({
-    queryKey: ["stage-requests", stage.id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("v_requests")
-        .select("id, number, type_name, call_date, status")
-        .eq("stage_id", stage.id)
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      return data ?? [];
-    },
-  });
-  if (data.length === 0) return null;
-  return (
-    <Block>
-      <Section title="Связанные заявки">
-        <ul className="divide-y divide-border">
-          {data.map((r) => (
-            <li key={r.id}>
-              <Link
-                to="/requests/$requestId"
-                params={{ requestId: r.id! }}
-                search={{ from: "object" }}
-                className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2 text-sm transition-colors hover:text-primary"
-              >
-                <span className="font-medium tabular-nums">№{r.number}</span>
-                <span className="min-w-0 flex-1 truncate">{r.type_name}</span>
-                <span className="text-muted-foreground">вызов на {formatDate(r.call_date)}</span>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </Section>
-    </Block>
-  );
-}
-
-/** Образцы «От нас» / «Ждём» из справочника этапов (правка 2.3). Нет файлов — блока нет. */
+/** Образцы «От нас» / «Ждём» из справочника этапов. Нет файлов — блока нет. */
 function TemplateSamples({ templateId }: { templateId: string | null }) {
   const { data: files = [] } = useQuery({
     queryKey: ["template-files", templateId ?? "none"],
@@ -443,3 +416,42 @@ function TemplateSamples({ templateId }: { templateId: string | null }) {
     </div>
   );
 }
+
+function LinkedRequests({ stage }: { stage: ObjectStage }) {
+  const { data = [] } = useQuery({
+    queryKey: ["stage-requests", stage.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("v_requests")
+        .select("id, number, type_name, call_date, status")
+        .eq("stage_id", stage.id)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+  if (data.length === 0) return null;
+  return (
+    <Block>
+      <Section title="Связанные заявки">
+        <ul className="divide-y divide-border">
+          {data.map((r) => (
+            <li key={r.id}>
+              <Link
+                to="/requests/$requestId"
+                params={{ requestId: r.id! }}
+                search={{ from: "object" }}
+                className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2 text-sm transition-colors hover:text-primary"
+              >
+                <span className="font-medium tabular-nums">№{r.number}</span>
+                <span className="min-w-0 flex-1 truncate">{r.type_name}</span>
+                <span className="text-muted-foreground">вызов на {formatDate(r.call_date)}</span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </Section>
+    </Block>
+  );
+}
+

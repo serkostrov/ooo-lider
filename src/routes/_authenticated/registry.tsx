@@ -6,10 +6,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RegistryTable } from "@/components/registry/RegistryTable";
 import {
   EMPTY_REGISTRY_FILTERS,
+  filterRegistryCurrentYear,
   filterRegistryEntries,
   RegistryToolbar,
   type RegistryFilterState,
 } from "@/components/registry/RegistryToolbar";
+import { mskCurrentYear } from "@/lib/dates";
 import {
   useRegistryEntries,
   useRegistryJournals,
@@ -47,10 +49,11 @@ function CountPill({ count }: { count: number }) {
 
 function JournalTabLabel({ journalId, name }: { journalId: string; name: string }) {
   const { data: rows = [] } = useRegistryEntries(journalId);
+  const count = useMemo(() => filterRegistryCurrentYear(rows).length, [rows]);
   return (
     <span className="inline-flex items-center gap-1.5">
       {name}
-      <CountPill count={rows.length} />
+      <CountPill count={count} />
     </span>
   );
 }
@@ -70,16 +73,23 @@ function ChannelPanel({
 }) {
   const navigate = useNavigate();
   const { data: rows = [], isLoading, error } = useRegistryEntries(journalId);
+  const [filters, setFilters] = useState<RegistryFilterState>(EMPTY_REGISTRY_FILTERS);
+
+  const currentYearCount = useMemo(
+    () => filterRegistryCurrentYear(rows).length,
+    [rows],
+  );
 
   useEffect(() => {
-    onCountChange?.(journalId, rows.length);
-  }, [journalId, rows.length, onCountChange]);
-  const [filters, setFilters] = useState<RegistryFilterState>(EMPTY_REGISTRY_FILTERS);
+    onCountChange?.(journalId, currentYearCount);
+  }, [journalId, currentYearCount, onCountChange]);
 
   const filtered = useMemo(
     () => filterRegistryEntries(rows, filters),
     [rows, filters],
   );
+
+  const archivedCount = rows.length - currentYearCount;
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-3">
@@ -111,11 +121,17 @@ function ChannelPanel({
         <p className="text-sm text-danger">{(error as Error).message}</p>
       ) : filtered.length === 0 && rows.length > 0 ? (
         <p className="rounded-md border border-dashed border-border px-4 py-10 text-center text-sm text-muted-foreground">
-          Ничего не найдено. Сбросьте поиск или фильтры.
+          {!filters.showAllYears && archivedCount > 0 && currentYearCount === 0
+            ? `За ${mskCurrentYear()} г. записей нет. В архиве: ${archivedCount}. Включите «Все годы».`
+            : "Ничего не найдено. Сбросьте поиск или фильтры."}
         </p>
       ) : (
         <div className="min-h-0 flex-1 overflow-auto">
-          <RegistryTable journalId={journalId} rows={filtered} />
+          <RegistryTable
+            journalId={journalId}
+            rows={filtered}
+            groupByYear={filters.showAllYears}
+          />
         </div>
       )}
     </div>

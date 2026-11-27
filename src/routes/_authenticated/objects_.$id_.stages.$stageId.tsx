@@ -20,7 +20,6 @@ import {
   useStageConditions,
   type StageConditionsHandle,
 } from "@/components/stages/page/StageConditionsTab";
-import { StageDocumentsTab } from "@/components/stages/page/StageDocumentsTab";
 import { StageStepsTab, useStageSteps } from "@/components/stages/page/StageStepsTab";
 import { StageMessagesTab, useStageMessages } from "@/components/stages/page/StageMessagesTab";
 import { StageStatusBar } from "@/components/stages/page/StageStatusBar";
@@ -29,12 +28,15 @@ import { StageSubstages } from "@/components/stages/page/StageSubstages";
 import { RequestStatusButton } from "@/components/stages/RequestStatusButton";
 import { useObjectIdFolderItems } from "@/components/objects/ObjectIdFolderTab";
 
-const STAGE_TABS = ["main", "conditions", "documents", "steps", "messages", "history"] as const;
+const STAGE_TABS = ["main", "conditions", "steps", "messages", "history"] as const;
 type StageTab = (typeof STAGE_TABS)[number];
 
 export const Route = createFileRoute("/_authenticated/objects_/$id_/stages/$stageId")({
   validateSearch: (search: Record<string, unknown>): { tab?: StageTab } => {
-    const tab = STAGE_TABS.find((t) => t === search["tab"]);
+    const raw = search["tab"];
+    // Старый ?tab=documents больше не используется
+    if (raw === "documents") return {};
+    const tab = STAGE_TABS.find((t) => t === raw);
     return tab ? { tab } : {};
   },
   component: StagePage,
@@ -253,9 +255,6 @@ function StagePage() {
                     </span>
                   )}
                 </TabsTrigger>
-                <TabsTrigger value="documents" className={tabTriggerClass}>
-                  Файлы
-                </TabsTrigger>
                 {steps.length > 0 && (
                   <TabsTrigger value="steps" className={tabTriggerClass}>
                     Сценарий
@@ -389,9 +388,6 @@ function StagePage() {
               onChanged={refresh}
               onDirtyChange={setConditionsDirty}
             />
-          </TabsContent>
-          <TabsContent value="documents" className="mt-0">
-            <StageDocumentsTab stage={stage} readOnly={workReadOnly} />
           </TabsContent>
           {steps.length > 0 && (
             <TabsContent value="steps" className="mt-0">

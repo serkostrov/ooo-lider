@@ -273,6 +273,7 @@ export type Database = {
           email: string | null
           comment: string | null
           customer_id: string | null
+          parent_id: string | null
           is_active: boolean
           sort: number
           created_at: string
@@ -287,6 +288,7 @@ export type Database = {
           email?: string | null
           comment?: string | null
           customer_id?: string | null
+          parent_id?: string | null
           is_active?: boolean
           sort?: number
           created_at?: string
@@ -301,6 +303,7 @@ export type Database = {
           email?: string | null
           comment?: string | null
           customer_id?: string | null
+          parent_id?: string | null
           is_active?: boolean
           sort?: number
           created_at?: string
@@ -312,6 +315,13 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "external_contacts_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "external_contacts"
             referencedColumns: ["id"]
           },
         ]

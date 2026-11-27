@@ -8,6 +8,11 @@ export function mskToday(): string {
   }).format(new Date());
 }
 
+/** Текущий год по Москве. */
+export function mskCurrentYear(): number {
+  return Number(mskToday().slice(0, 4));
+}
+
 /** Разница в днях между датами YYYY-MM-DD: b − a. */
 export function daysBetween(a: string, b: string): number {
   const toUtc = (s: string) => {
